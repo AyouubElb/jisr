@@ -33,6 +33,12 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# docs (internal architecture notes, not for public repo)
+/docs
+
+# supabase (schema + migrations contain DB structure, run locally only)
+/supabase
+
 # vercel
 .vercel
 
