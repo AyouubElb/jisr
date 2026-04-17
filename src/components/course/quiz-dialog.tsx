@@ -33,6 +33,7 @@ const EMPTY_VALUES: CreateQuizInput = {
   title: "",
   description: "",
   time_limit_minutes: null,
+  passing_score: 60,
 };
 
 export function QuizDialog({

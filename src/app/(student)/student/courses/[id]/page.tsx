@@ -2,18 +2,14 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RichTextViewer } from "@/components/ui/rich-text-viewer";
 import { useCourse } from "@/lib/hooks/useCourses";
 import { useMyEnrollments } from "@/lib/hooks/useEnrollments";
-import {
-  useMyCompletions,
-  useMarkLessonComplete,
-  useUnmarkLessonComplete,
-} from "@/lib/hooks/useCompletions";
+import { useMyCompletions } from "@/lib/hooks/useCompletions";
 import { LEVEL_BADGE_COLORS, LEVEL_LABELS } from "@/lib/constants/levels";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -21,7 +17,6 @@ import {
   ArrowLeft,
   BookOpen,
   Calendar,
-  Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -45,8 +40,6 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
 
   const isEnrolled = enrollments?.some((e) => e.courses?.id === courseId) ?? false;
   const { data: completions } = useMyCompletions(isEnrolled ? courseId : "");
-  const { mutate: markComplete, isPending: markPending } = useMarkLessonComplete(courseId);
-  const { mutate: unmarkComplete, isPending: unmarkPending } = useUnmarkLessonComplete(courseId);
   const completedLessonIds = new Set(completions?.map((c) => c.lesson_id) ?? []);
 
   const toggleSection = (id: string): void => {
@@ -166,160 +159,145 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
                       </div>
                     </div>
 
-                    {/* Expanded content */}
+                    {/* Expanded content — interleaved timeline */}
                     {expandedSections.has(section.id) && (
                       <div className="border-t border-border">
-                        {/* Lessons */}
-                        {section.lessons?.length > 0 && (
-                          <div className="px-4 py-3 space-y-2">
-                            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                              Lecons
-                            </p>
-                            {section.lessons.map((lesson, lIndex) => {
-                              const isDone = completedLessonIds.has(lesson.id);
-                              return (
-                              <div key={lesson.id}>
-                                <div
-                                  className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
-                                  onClick={() =>
-                                    setOpenItem(openItem === lesson.id ? null : lesson.id)
-                                  }
-                                >
-                                  {isDone ? (
-                                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                                  ) : (
-                                    <BookOpen className="h-4 w-4 shrink-0 text-primary/60" />
-                                  )}
-                                  <span className="text-xs text-muted-foreground font-medium w-5">
-                                    {lIndex + 1}.
-                                  </span>
-                                  <div className="min-w-0 flex-1">
-                                    <p className={`text-sm font-medium ${isDone ? "text-muted-foreground line-through" : ""}`}>
-                                      {lesson.title}
-                                    </p>
-                                  </div>
-                                  <Badge variant="outline" className="text-[10px] shrink-0">
-                                    {lesson.type === "grammar" ? "Grammaire" : lesson.type === "vocabulary" ? "Vocabulaire" : "Ressource"}
-                                  </Badge>
-                                  {openItem === lesson.id ? (
-                                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                  ) : (
-                                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                  )}
-                                </div>
-                                {openItem === lesson.id && lesson.content && (
-                                  <div className="ml-12 mt-1 rounded-lg border border-border/50 bg-background p-4 space-y-3">
-                                    <RichTextViewer content={lesson.content} />
-                                    <div className="flex justify-end border-t border-border/40 pt-3">
+                        {(() => {
+                          type Lesson = SectionWithContent["lessons"][number];
+                          type Exercise = SectionWithContent["exercises"][number];
+                          type Quiz = SectionWithContent["quizzes"][number];
+                          type TimelineItem =
+                            | { kind: "lesson"; order: number; lesson: Lesson }
+                            | { kind: "exercise"; order: number; exercise: Exercise }
+                            | { kind: "quiz"; order: number; quiz: Quiz };
+
+                          const items: TimelineItem[] = [
+                            ...(section.lessons ?? []).map<TimelineItem>((l) => ({
+                              kind: "lesson",
+                              order: l.order,
+                              lesson: l,
+                            })),
+                            ...(section.exercises ?? []).map<TimelineItem>((e) => ({
+                              kind: "exercise",
+                              order: e.order,
+                              exercise: e,
+                            })),
+                            ...(section.quizzes ?? []).map<TimelineItem>((q) => ({
+                              kind: "quiz",
+                              order: q.order,
+                              quiz: q,
+                            })),
+                          ].sort((a, b) => a.order - b.order);
+
+                          if (items.length === 0) {
+                            return (
+                              <div className="px-4 py-6 text-center">
+                                <p className="text-sm text-muted-foreground">
+                                  Aucun contenu dans cette section
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="px-4 py-3 space-y-2">
+                              {items.map((item, idx) => {
+                                if (item.kind === "lesson") {
+                                  const lesson = item.lesson;
+                                  const isDone = completedLessonIds.has(lesson.id);
+                                  return (
+                                    <Link
+                                      key={`lesson-${lesson.id}`}
+                                      href={`/student/courses/${courseId}/lessons/${lesson.id}`}
+                                      className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors"
+                                    >
                                       {isDone ? (
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          disabled={unmarkPending}
-                                          onClick={() => unmarkComplete(lesson.id)}
-                                          className="text-muted-foreground"
-                                        >
-                                          <Check className="mr-2 h-4 w-4 text-emerald-600" />
-                                          Termine — annuler
-                                        </Button>
+                                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                                       ) : (
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          disabled={markPending}
-                                          onClick={() => markComplete(lesson.id)}
-                                        >
-                                          <Check className="mr-2 h-4 w-4" />
-                                          Marquer comme termine
-                                        </Button>
+                                        <BookOpen className="h-4 w-4 shrink-0 text-primary/60" />
+                                      )}
+                                      <span className="text-xs text-muted-foreground font-medium w-5">
+                                        {idx + 1}.
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <p className={`text-sm font-medium ${isDone ? "text-muted-foreground" : ""}`}>
+                                          {lesson.title}
+                                        </p>
+                                      </div>
+                                      <Badge variant="outline" className="text-[10px] shrink-0">
+                                        {lesson.type === "grammar" ? "Grammaire" : lesson.type === "vocabulary" ? "Vocabulaire" : "Ressource"}
+                                      </Badge>
+                                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                    </Link>
+                                  );
+                                }
+
+                                if (item.kind === "exercise") {
+                                  const exercise = item.exercise;
+                                  return (
+                                    <div key={`exercise-${exercise.id}`}>
+                                      <div
+                                        className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
+                                        onClick={() =>
+                                          setOpenItem(openItem === exercise.id ? null : exercise.id)
+                                        }
+                                      >
+                                        <Dumbbell className="h-4 w-4 shrink-0 text-orange-500/60" />
+                                        <span className="text-xs text-muted-foreground font-medium w-5">
+                                          {idx + 1}.
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                          <p className="text-sm font-medium">{exercise.title}</p>
+                                        </div>
+                                        <Badge variant="outline" className="text-[10px] shrink-0">
+                                          Exercice
+                                        </Badge>
+                                        {openItem === exercise.id ? (
+                                          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                        ) : (
+                                          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                        )}
+                                      </div>
+                                      {openItem === exercise.id && exercise.content && (
+                                        <div className="ml-12 mt-1 rounded-lg border border-border/50 bg-background p-4">
+                                          <RichTextViewer content={exercise.content} />
+                                        </div>
                                       )}
                                     </div>
-                                  </div>
-                                )}
-                              </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                                  );
+                                }
 
-                        {/* Exercises */}
-                        {section.exercises?.length > 0 && (
-                          <div className="px-4 py-3 space-y-2 border-t border-border/50">
-                            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                              Exercices
-                            </p>
-                            {section.exercises.map((exercise, eIndex) => (
-                              <div key={exercise.id}>
-                                <div
-                                  className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
-                                  onClick={() =>
-                                    setOpenItem(openItem === exercise.id ? null : exercise.id)
-                                  }
-                                >
-                                  <Dumbbell className="h-4 w-4 shrink-0 text-orange-500/60" />
-                                  <span className="text-xs text-muted-foreground font-medium w-5">
-                                    {eIndex + 1}.
-                                  </span>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium">{exercise.title}</p>
-                                  </div>
-                                  {openItem === exercise.id ? (
-                                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                  ) : (
+                                const quiz = item.quiz;
+                                const questionCount = quiz.quiz_blocks.filter(
+                                  (b) => b.type === "mcq" || b.type === "fill_blank" || b.type === "free_text",
+                                ).length;
+                                return (
+                                  <Link
+                                    key={`quiz-${quiz.id}`}
+                                    href={`/student/courses/${courseId}/quizzes/${quiz.id}`}
+                                    className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors"
+                                  >
+                                    <ClipboardList className="h-4 w-4 shrink-0 text-purple-500/70" />
+                                    <span className="text-xs text-muted-foreground font-medium w-5">
+                                      {idx + 1}.
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-medium">{quiz.title}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {questionCount} question{questionCount !== 1 ? "s" : ""}
+                                        {quiz.time_limit_minutes && ` · ${quiz.time_limit_minutes} min`}
+                                      </p>
+                                    </div>
+                                    <Badge variant="outline" className="text-[10px] shrink-0">
+                                      Quiz
+                                    </Badge>
                                     <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                  )}
-                                </div>
-                                {openItem === exercise.id && exercise.content && (
-                                  <div className="ml-12 mt-1 rounded-lg border border-border/50 bg-background p-4">
-                                    <RichTextViewer content={exercise.content} />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Quizzes */}
-                        {section.quizzes?.length > 0 && (
-                          <div className="px-4 py-3 space-y-2 border-t border-border/50">
-                            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                              Quizz
-                            </p>
-                            {section.quizzes.map((quiz, qIndex) => {
-                              const questionCount = quiz.quiz_blocks.filter(
-                                (b) => b.type === "mcq" || b.type === "fill_blank" || b.type === "free_text",
-                              ).length;
-                              return (
-                                <Link
-                                  key={quiz.id}
-                                  href={`/student/courses/${courseId}/quizzes/${quiz.id}`}
-                                  className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors"
-                                >
-                                  <ClipboardList className="h-4 w-4 shrink-0 text-purple-500/70" />
-                                  <span className="text-xs text-muted-foreground font-medium w-5">
-                                    {qIndex + 1}.
-                                  </span>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium">{quiz.title}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {questionCount} question{questionCount !== 1 ? "s" : ""}
-                                      {quiz.time_limit_minutes && ` · ${quiz.time_limit_minutes} min`}
-                                    </p>
-                                  </div>
-                                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {!section.lessons?.length && !section.exercises?.length && !section.quizzes?.length && (
-                          <div className="px-4 py-6 text-center">
-                            <p className="text-sm text-muted-foreground">
-                              Aucun contenu dans cette section
-                            </p>
-                          </div>
-                        )}
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

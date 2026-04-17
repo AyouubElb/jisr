@@ -23,6 +23,22 @@ export function useUpcomingSessions() {
   });
 }
 
+/** All sessions across the instructor's courses */
+export function useInstructorSessions() {
+  return useQuery({
+    queryKey: sessionKeys.instructorAll(),
+    queryFn: () => sessionsApi.listInstructorAll(),
+  });
+}
+
+/** All sessions from courses the student is enrolled in */
+export function useStudentSessions() {
+  return useQuery({
+    queryKey: sessionKeys.studentAll(),
+    queryFn: () => sessionsApi.listStudentAll(),
+  });
+}
+
 /** Create session */
 export function useCreateSession(courseId: string) {
   const queryClient = useQueryClient();

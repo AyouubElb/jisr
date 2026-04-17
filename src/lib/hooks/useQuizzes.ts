@@ -82,7 +82,7 @@ export function useDuplicateQuiz(courseId: string) {
         .map((b) => ({
           type: b.type,
           content: b.content,
-          points: b.points,
+          weight: b.weight,
           order: b.order,
         }));
 

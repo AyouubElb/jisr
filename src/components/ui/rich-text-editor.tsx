@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -68,6 +69,15 @@ export function RichTextEditor({
       onChange(e.getHTML());
     },
   });
+
+  // Sync external content changes (e.g. imports, form.reset) into the editor
+  // without clobbering normal typing. Compare against current HTML first so
+  // we don't trigger an infinite update loop from onUpdate above.
+  useEffect(() => {
+    if (!editor) return;
+    if (editor.getHTML() === content) return;
+    editor.commands.setContent(content, { emitUpdate: false });
+  }, [editor, content]);
 
   if (!editor) return null;
 

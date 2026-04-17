@@ -10,6 +10,8 @@ export const sessionKeys = {
   all: ["sessions"] as const,
   byCourse: (courseId: string) => [...sessionKeys.all, "course", courseId] as const,
   upcoming: () => [...sessionKeys.all, "upcoming"] as const,
+  instructorAll: () => [...sessionKeys.all, "instructor-all"] as const,
+  studentAll: () => [...sessionKeys.all, "student-all"] as const,
 };
 
 export const enrollmentKeys = {
@@ -26,7 +28,8 @@ export const sectionKeys = {
 export const lessonKeys = {
   all: ["lessons"] as const,
   bySection: (sectionId: string) => [...lessonKeys.all, "section", sectionId] as const,
-  detail: (id: string) => [...lessonKeys.all, "detail", id] as const,
+  details: () => [...lessonKeys.all, "detail"] as const,
+  detail: (id: string) => [...lessonKeys.details(), id] as const,
 };
 
 export const exerciseKeys = {
@@ -51,6 +54,7 @@ export const attemptKeys = {
   all: ["attempts"] as const,
   byQuiz: (quizId: string) => [...attemptKeys.all, "quiz", quizId] as const,
   mine: (quizId: string) => [...attemptKeys.all, "mine", quizId] as const,
+  mineByCourse: (courseId: string) => [...attemptKeys.all, "mine", "course", courseId] as const,
   detail: (id: string) => [...attemptKeys.all, "detail", id] as const,
 };
 
@@ -63,6 +67,11 @@ export const completionKeys = {
   all: ["lesson_completions"] as const,
   mineByCourse: (courseId: string) => [...completionKeys.all, "mine", "course", courseId] as const,
   byCourse: (courseId: string) => [...completionKeys.all, "course", courseId] as const,
+};
+
+export const engagementKeys = {
+  all: ["engagement"] as const,
+  recentActivity: () => [...engagementKeys.all, "recent-activity"] as const,
 };
 
 export const attendanceKeys = {

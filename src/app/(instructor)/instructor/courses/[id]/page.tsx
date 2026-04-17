@@ -95,7 +95,6 @@ import type {
 
 type LessonDialogState =
   | { mode: "create"; sectionId: string; nextOrder: number }
-  | { mode: "edit"; lesson: Lesson }
   | null;
 
 type ExerciseDialogState =
@@ -340,30 +339,18 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
             />
           </div>
 
-          {/* Lesson dialog (create + edit) */}
-          {lessonDialog &&
-            (lessonDialog.mode === "create" ? (
-              <LessonDialog
-                open
-                onOpenChange={(open) => {
-                  if (!open) setLessonDialog(null);
-                }}
-                courseId={courseId}
-                mode="create"
-                sectionId={lessonDialog.sectionId}
-                nextOrder={lessonDialog.nextOrder}
-              />
-            ) : (
-              <LessonDialog
-                open
-                onOpenChange={(open) => {
-                  if (!open) setLessonDialog(null);
-                }}
-                courseId={courseId}
-                mode="edit"
-                lesson={lessonDialog.lesson}
-              />
-            ))}
+          {/* Lesson create dialog (edit is a dedicated page) */}
+          {lessonDialog && (
+            <LessonDialog
+              open
+              onOpenChange={(open) => {
+                if (!open) setLessonDialog(null);
+              }}
+              courseId={courseId}
+              sectionId={lessonDialog.sectionId}
+              nextOrder={lessonDialog.nextOrder}
+            />
+          )}
 
           {/* Exercise dialog (create + edit) */}
           {exerciseDialog &&
@@ -449,7 +436,9 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                     })
                   }
                   onEditLesson={(lesson) =>
-                    setLessonDialog({ mode: "edit", lesson })
+                    router.push(
+                      `/instructor/courses/${courseId}/lessons/${lesson.id}/edit`,
+                    )
                   }
                   onEditExercise={(exercise) =>
                     setExerciseDialog({ mode: "edit", exercise })
@@ -934,165 +923,187 @@ function SectionCard({
         </div>
       </div>
 
-      {/* Expanded content */}
+      {/* Expanded content — interleaved timeline (lessons + exercises + quizzes sorted by order) */}
       {expanded && (
         <div className="border-t border-border">
-          {/* Lessons */}
-          {section.lessons?.length > 0 && (
-            <div className="px-4 py-3 space-y-1.5">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                Lecons
-              </p>
-              {section.lessons.map((lesson, lIndex) => (
-                <div
-                  key={lesson.id}
-                  className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 group"
-                >
-                  <BookOpen className="h-4 w-4 shrink-0 text-primary/60" />
-                  <span className="text-xs text-muted-foreground font-medium w-5">
-                    {lIndex + 1}.
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{lesson.title}</p>
-                    <Badge variant="outline" className="mt-0.5 text-[10px]">
-                      {lessonTypeLabel(lesson.type)}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      title="Modifier le contenu"
-                      onClick={() => onEditLesson(lesson)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => onDeleteLesson(lesson.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {(() => {
+            type TimelineItem =
+              | { kind: "lesson"; order: number; lesson: Lesson }
+              | { kind: "exercise"; order: number; exercise: Exercise }
+              | { kind: "quiz"; order: number; quiz: QuizWithBlocks };
 
-          {/* Exercises */}
-          {section.exercises?.length > 0 && (
-            <div className="px-4 py-3 space-y-1.5 border-t border-border/50">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                Exercices
-              </p>
-              {section.exercises.map((exercise, eIndex) => (
-                <div
-                  key={exercise.id}
-                  className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 group"
-                >
-                  <Dumbbell className="h-4 w-4 shrink-0 text-orange-500/60" />
-                  <span className="text-xs text-muted-foreground font-medium w-5">
-                    {eIndex + 1}.
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{exercise.title}</p>
-                  </div>
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      title="Modifier le contenu"
-                      onClick={() => onEditExercise(exercise)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => onDeleteExercise(exercise.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            const items: TimelineItem[] = [
+              ...(section.lessons ?? []).map<TimelineItem>((l) => ({
+                kind: "lesson",
+                order: l.order,
+                lesson: l,
+              })),
+              ...(section.exercises ?? []).map<TimelineItem>((e) => ({
+                kind: "exercise",
+                order: e.order,
+                exercise: e,
+              })),
+              ...(section.quizzes ?? []).map<TimelineItem>((q) => ({
+                kind: "quiz",
+                order: q.order,
+                quiz: q,
+              })),
+            ].sort((a, b) => a.order - b.order);
 
-          {/* Quizzes */}
-          {section.quizzes?.length > 0 && (
-            <div className="px-4 py-3 space-y-1.5 border-t border-border/50">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                Quiz
-              </p>
-              {section.quizzes.map((quiz, qIndex) => (
-                <div
-                  key={quiz.id}
-                  className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 group"
-                >
-                  <ClipboardList className="h-4 w-4 shrink-0 text-violet-500/60" />
-                  <span className="text-xs text-muted-foreground font-medium w-5">
-                    {qIndex + 1}.
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{quiz.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <Badge variant="outline" className="text-[10px]">
-                        {quiz.quiz_blocks?.length ?? 0} bloc{(quiz.quiz_blocks?.length ?? 0) !== 1 ? "s" : ""}
-                      </Badge>
-                      {quiz.time_limit_minutes && (
-                        <Badge variant="outline" className="text-[10px]">
-                          {quiz.time_limit_minutes} min
-                        </Badge>
-                      )}
+            if (items.length === 0) return null;
+
+            return (
+              <div className="px-4 py-3 space-y-1.5">
+                {items.map((item, idx) => {
+                  if (item.kind === "lesson") {
+                    const lesson = item.lesson;
+                    return (
+                      <div
+                        key={`lesson-${lesson.id}`}
+                        className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 group"
+                      >
+                        <BookOpen className="h-4 w-4 shrink-0 text-primary/60" />
+                        <span className="text-xs text-muted-foreground font-medium w-5">
+                          {idx + 1}.
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{lesson.title}</p>
+                          <Badge variant="outline" className="mt-0.5 text-[10px]">
+                            {lessonTypeLabel(lesson.type)}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Modifier le contenu"
+                            onClick={() => onEditLesson(lesson)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => onDeleteLesson(lesson.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (item.kind === "exercise") {
+                    const exercise = item.exercise;
+                    return (
+                      <div
+                        key={`exercise-${exercise.id}`}
+                        className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 group"
+                      >
+                        <Dumbbell className="h-4 w-4 shrink-0 text-orange-500/60" />
+                        <span className="text-xs text-muted-foreground font-medium w-5">
+                          {idx + 1}.
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{exercise.title}</p>
+                          <Badge variant="outline" className="mt-0.5 text-[10px]">
+                            Exercice
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Modifier le contenu"
+                            onClick={() => onEditExercise(exercise)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => onDeleteExercise(exercise.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const quiz = item.quiz;
+                  return (
+                    <div
+                      key={`quiz-${quiz.id}`}
+                      className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 group"
+                    >
+                      <ClipboardList className="h-4 w-4 shrink-0 text-violet-500/60" />
+                      <span className="text-xs text-muted-foreground font-medium w-5">
+                        {idx + 1}.
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{quiz.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Badge variant="outline" className="text-[10px]">
+                            Quiz
+                          </Badge>
+                          <Badge variant="outline" className="text-[10px]">
+                            {quiz.quiz_blocks?.length ?? 0} bloc{(quiz.quiz_blocks?.length ?? 0) !== 1 ? "s" : ""}
+                          </Badge>
+                          {quiz.time_limit_minutes && (
+                            <Badge variant="outline" className="text-[10px]">
+                              {quiz.time_limit_minutes} min
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          title="Apercu etudiant"
+                          onClick={() => onPreviewQuiz(quiz)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          title="Modifier le quiz"
+                          onClick={() => onEditQuiz(quiz)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          title="Dupliquer le quiz"
+                          onClick={() => onDuplicateQuiz(quiz)}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => onDeleteQuiz(quiz.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      title="Apercu etudiant"
-                      onClick={() => onPreviewQuiz(quiz)}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      title="Modifier le quiz"
-                      onClick={() => onEditQuiz(quiz)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      title="Dupliquer le quiz"
-                      onClick={() => onDuplicateQuiz(quiz)}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={() => onDeleteQuiz(quiz.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {/* Empty state inside section */}
           {!section.lessons?.length && !section.exercises?.length && !section.quizzes?.length && (

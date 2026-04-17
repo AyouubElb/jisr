@@ -33,6 +33,7 @@ interface BlockWrapperProps {
   index: number;
   total: number;
   points: number | null;
+  error?: string;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDuplicate: () => void;
@@ -46,6 +47,7 @@ export function BlockWrapper({
   index,
   total,
   points,
+  error,
   onMoveUp,
   onMoveDown,
   onDuplicate,
@@ -53,19 +55,18 @@ export function BlockWrapper({
   onPointsChange,
   children,
 }: BlockWrapperProps): React.JSX.Element {
-  const isQuestion = type === "mcq" || type === "fill_blank" || type === "free_text";
+  const isQuestion =
+    type === "mcq" || type === "fill_blank" || type === "free_text";
 
   return (
-    <div className="rounded-lg border border-border bg-card">
+    <div className={`rounded-lg border bg-card ${error ? "border-destructive" : "border-border"}`}>
       {/* Block header */}
       <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2">
         <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {BLOCK_TYPE_LABELS[type]}
         </span>
-        <span className="text-xs text-muted-foreground">
-          #{index + 1}
-        </span>
+        <span className="text-xs text-muted-foreground">#{index + 1}</span>
 
         <div className="ml-auto flex items-center gap-1">
           {isQuestion && (
@@ -123,6 +124,11 @@ export function BlockWrapper({
 
       {/* Block content */}
       <div className="p-4">{children}</div>
+      {error && (
+        <div className="border-t border-destructive/30 bg-destructive/5 px-4 py-2">
+          <p className="text-xs text-destructive">{error}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -153,8 +159,12 @@ export function TextBlockEditor({
 // ── MCQ block editor ──────────────────────────────────────────────────
 
 interface McqBlockEditorProps {
-  content: { prompt?: string; options?: McqOption[] };
-  onChange: (content: { prompt: string; options: McqOption[] }) => void;
+  content: { prompt?: string; options?: McqOption[]; allow_multiple?: boolean };
+  onChange: (content: {
+    prompt: string;
+    options: McqOption[];
+    allow_multiple: boolean;
+  }) => void;
 }
 
 export function McqBlockEditor({
@@ -164,10 +174,21 @@ export function McqBlockEditor({
   const baseId = useId();
   const prompt = content.prompt ?? "";
   const options = content.options ?? [];
+  const allowMultiple = content.allow_multiple ?? false;
 
-  const updatePrompt = (p: string): void => {
-    onChange({ prompt: p, options });
+  const emit = (next: {
+    prompt?: string;
+    options?: McqOption[];
+    allow_multiple?: boolean;
+  }): void => {
+    onChange({
+      prompt: next.prompt ?? prompt,
+      options: next.options ?? options,
+      allow_multiple: next.allow_multiple ?? allowMultiple,
+    });
   };
+
+  const updatePrompt = (p: string): void => emit({ prompt: p });
 
   const addOption = (): void => {
     const newOption: McqOption = {
@@ -175,17 +196,48 @@ export function McqBlockEditor({
       label: "",
       is_correct: false,
     };
-    onChange({ prompt, options: [...options, newOption] });
+    emit({ options: [...options, newOption] });
   };
 
   const updateOption = (idx: number, patch: Partial<McqOption>): void => {
     const updated = options.map((o, i) => (i === idx ? { ...o, ...patch } : o));
-    onChange({ prompt, options: updated });
+    emit({ options: updated });
+  };
+
+  const toggleCorrect = (idx: number): void => {
+    const target = options[idx];
+    if (!target) return;
+    if (allowMultiple) {
+      updateOption(idx, { is_correct: !target.is_correct });
+    } else {
+      // Single-correct mode: mark this one correct, force all others to false
+      const updated = options.map((o, i) => ({
+        ...o,
+        is_correct: i === idx ? !o.is_correct : false,
+      }));
+      emit({ options: updated });
+    }
+  };
+
+  const toggleMode = (multiple: boolean): void => {
+    if (!multiple) {
+      // Switching single→multi is safe; multi→single must keep at most one correct
+      const correctIdx = options.findIndex((o) => o.is_correct);
+      const normalized = options.map((o, i) => ({
+        ...o,
+        is_correct: i === correctIdx,
+      }));
+      onChange({ prompt, options: normalized, allow_multiple: false });
+    } else {
+      onChange({ prompt, options, allow_multiple: true });
+    }
   };
 
   const removeOption = (idx: number): void => {
-    onChange({ prompt, options: options.filter((_, i) => i !== idx) });
+    emit({ options: options.filter((_, i) => i !== idx) });
   };
+
+  const correctCount = options.filter((o) => o.is_correct).length;
 
   return (
     <div className="space-y-4">
@@ -198,21 +250,61 @@ export function McqBlockEditor({
         />
       </div>
 
+      {/* Mode toggle — single vs multiple correct answers */}
+      <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-2.5 py-1.5">
+        <div className="flex flex-col">
+          <span className="text-xs font-medium">Plusieurs bonnes reponses</span>
+          <span className="text-[11px] text-muted-foreground">
+            {allowMultiple
+              ? "Toutes les bonnes options doivent etre cochees"
+              : "Une seule bonne reponse"}
+          </span>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={allowMultiple}
+          onClick={() => toggleMode(!allowMultiple)}
+          className={`relative h-4 w-8 shrink-0 rounded-full transition-colors ${
+            allowMultiple ? "bg-primary" : "bg-muted-foreground/30"
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+              allowMultiple ? "-translate-x-3" : "translate-x-0.5"
+            }`}
+          />
+        </button>
+      </div>
+
       <div className="space-y-2">
-        <Label>Options</Label>
+        <div className="flex items-center justify-between">
+          <Label>Options</Label>
+          <span className="text-xs text-muted-foreground">
+            {allowMultiple
+              ? `${correctCount} bonne${correctCount !== 1 ? "s" : ""} reponse${correctCount !== 1 ? "s" : ""}`
+              : correctCount === 1
+                ? "1 bonne reponse"
+                : "Aucune bonne reponse selectionnee"}
+          </span>
+        </div>
         {options.map((opt, idx) => (
           <div key={opt.id} className="flex items-center gap-2">
             <button
               type="button"
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+              className={`flex h-5 w-5 shrink-0 items-center justify-center border-2 transition-colors ${
+                allowMultiple ? "rounded" : "rounded-full"
+              } ${
                 opt.is_correct
-                  ? "border-green-600 bg-green-600 text-white"
-                  : "border-muted-foreground/30 hover:border-green-600/50"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-muted-foreground/30 hover:border-primary/50"
               }`}
-              onClick={() => updateOption(idx, { is_correct: !opt.is_correct })}
-              title={opt.is_correct ? "Reponse correcte" : "Marquer comme correcte"}
+              onClick={() => toggleCorrect(idx)}
+              title={
+                opt.is_correct ? "Reponse correcte" : "Marquer comme correcte"
+              }
             >
-              {opt.is_correct && <Check className="h-3.5 w-3.5" />}
+              {opt.is_correct && <Check className="h-3 w-3" strokeWidth={3} />}
             </button>
             <Input
               className="flex-1"
@@ -248,16 +340,50 @@ export function McqBlockEditor({
 // ── Fill-in-the-blank editor ──────────────────────────────────────────
 
 interface FillBlankBlockEditorProps {
-  content: { sentence?: string; accepted_answers?: string[] };
-  onChange: (content: { sentence: string; accepted_answers: string[] }) => void;
+  content: { sentence?: string; options?: McqOption[] };
+  onChange: (content: { sentence: string; options: McqOption[] }) => void;
 }
 
 export function FillBlankBlockEditor({
   content,
   onChange,
 }: FillBlankBlockEditorProps): React.JSX.Element {
+  const baseId = useId();
   const sentence = content.sentence ?? "";
-  const answers = content.accepted_answers ?? [""];
+  const options = content.options ?? [];
+
+  const emit = (next: { sentence?: string; options?: McqOption[] }): void => {
+    onChange({
+      sentence: next.sentence ?? sentence,
+      options: next.options ?? options,
+    });
+  };
+
+  const addOption = (): void => {
+    emit({
+      options: [
+        ...options,
+        { id: `${baseId}-${Date.now()}`, label: "", is_correct: false },
+      ],
+    });
+  };
+
+  const updateOption = (idx: number, patch: Partial<McqOption>): void => {
+    emit({ options: options.map((o, i) => (i === idx ? { ...o, ...patch } : o)) });
+  };
+
+  const toggleCorrect = (idx: number): void => {
+    // Single-correct: selecting one deselects all others
+    emit({
+      options: options.map((o, i) => ({ ...o, is_correct: i === idx })),
+    });
+  };
+
+  const removeOption = (idx: number): void => {
+    emit({ options: options.filter((_, i) => i !== idx) });
+  };
+
+  const correctCount = options.filter((o) => o.is_correct).length;
 
   return (
     <div className="space-y-4">
@@ -265,7 +391,7 @@ export function FillBlankBlockEditor({
         <Label>Phrase (utilisez ___ pour le trou)</Label>
         <Input
           value={sentence}
-          onChange={(e) => onChange({ sentence: e.target.value, accepted_answers: answers })}
+          onChange={(e) => emit({ sentence: e.target.value })}
           placeholder="ex : The cat ___ on the mat yesterday."
         />
         <p className="text-xs text-muted-foreground">
@@ -274,47 +400,53 @@ export function FillBlankBlockEditor({
       </div>
 
       <div className="space-y-2">
-        <Label>Reponses acceptees</Label>
-        {answers.map((ans, idx) => (
-          <div key={idx} className="flex items-center gap-2">
+        <div className="flex items-center justify-between">
+          <Label>Choix de mots</Label>
+          <span className="text-xs text-muted-foreground">
+            {correctCount === 1
+              ? "1 bonne reponse"
+              : "Aucune bonne reponse selectionnee"}
+          </span>
+        </div>
+        {options.map((opt, idx) => (
+          <div key={opt.id} className="flex items-center gap-2">
+            <button
+              type="button"
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                opt.is_correct
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-muted-foreground/30 hover:border-primary/50"
+              }`}
+              onClick={() => toggleCorrect(idx)}
+              title={opt.is_correct ? "Bonne reponse" : "Marquer comme correcte"}
+            >
+              {opt.is_correct && <Check className="h-3 w-3" strokeWidth={3} />}
+            </button>
             <Input
               className="flex-1"
-              value={ans}
-              onChange={(e) => {
-                const updated = [...answers];
-                updated[idx] = e.target.value;
-                onChange({ sentence, accepted_answers: updated });
-              }}
-              placeholder={`Reponse ${idx + 1}`}
+              value={opt.label}
+              onChange={(e) => updateOption(idx, { label: e.target.value })}
+              placeholder={`Choix ${idx + 1}`}
             />
-            {answers.length > 1 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                onClick={() =>
-                  onChange({
-                    sentence,
-                    accepted_answers: answers.filter((_, i) => i !== idx),
-                  })
-                }
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+              onClick={() => removeOption(idx)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
           </div>
         ))}
         <Button
           type="button"
           variant="outline"
           size="sm"
-          onClick={() =>
-            onChange({ sentence, accepted_answers: [...answers, ""] })
-          }
+          onClick={addOption}
           className="gap-1.5"
         >
           <Plus className="h-3.5 w-3.5" />
-          Ajouter une reponse
+          Ajouter un choix
         </Button>
       </div>
     </div>
@@ -324,42 +456,73 @@ export function FillBlankBlockEditor({
 // ── Free text editor ──────────────────────────────────────────────────
 
 interface FreeTextBlockEditorProps {
-  content: { prompt?: string; min_words?: number };
-  onChange: (content: { prompt: string; min_words?: number }) => void;
+  content: { prompt?: string; min_words?: number; max_words?: number };
+  onChange: (content: {
+    prompt: string;
+    min_words?: number;
+    max_words?: number;
+  }) => void;
 }
 
 export function FreeTextBlockEditor({
   content,
   onChange,
 }: FreeTextBlockEditorProps): React.JSX.Element {
+  const prompt = content.prompt ?? "";
+  const minWords = content.min_words;
+  const maxWords = content.max_words;
+
+  const emit = (next: {
+    prompt?: string;
+    min_words?: number;
+    max_words?: number;
+  }): void => {
+    onChange({
+      prompt: next.prompt ?? prompt,
+      min_words: "min_words" in next ? next.min_words : minWords,
+      max_words: "max_words" in next ? next.max_words : maxWords,
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>Consigne</Label>
         <Input
-          value={content.prompt ?? ""}
-          onChange={(e) =>
-            onChange({ prompt: e.target.value, min_words: content.min_words })
-          }
+          value={prompt}
+          onChange={(e) => emit({ prompt: e.target.value })}
           placeholder="ex : Write a paragraph about your daily routine."
         />
       </div>
-      <div className="space-y-2">
-        <Label>Nombre minimum de mots (optionnel)</Label>
-        <Input
-          type="number"
-          min={0}
-          className="w-32"
-          value={content.min_words ?? ""}
-          onChange={(e) => {
-            const v = e.target.value;
-            onChange({
-              prompt: content.prompt ?? "",
-              min_words: v === "" ? undefined : Number(v),
-            });
-          }}
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Minimum de mots (optionnel)</Label>
+          <Input
+            type="number"
+            min={0}
+            value={minWords ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              emit({ min_words: v === "" ? undefined : Number(v) });
+            }}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Maximum de mots (optionnel)</Label>
+          <Input
+            type="number"
+            min={0}
+            value={maxWords ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              emit({ max_words: v === "" ? undefined : Number(v) });
+            }}
+          />
+        </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Cette question sera corrigee manuellement par l&apos;instructeur.
+      </p>
     </div>
   );
 }
@@ -394,17 +557,24 @@ export function AudioBlockEditor({
     materialsApi.getSignedUrl(storagePath).then((url) => {
       if (!cancelled) setSignedUrl(url);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [storagePath]);
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+  const handleFile = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ): Promise<void> => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (inputRef.current) inputRef.current.value = "";
 
     setIsUploading(true);
     try {
-      const path = await materialsApi.uploadQuizMedia(file, { courseId, quizId });
+      const path = await materialsApi.uploadQuizMedia(file, {
+        courseId,
+        quizId,
+      });
       onChange({ audio_url: path, caption: content.caption });
     } catch {
       // toast is shown by the caller layer if needed
@@ -516,17 +686,24 @@ export function ImageBlockEditor({
     materialsApi.getSignedUrl(storagePath).then((url) => {
       if (!cancelled) setSignedUrl(url);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [storagePath]);
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+  const handleFile = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ): Promise<void> => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (inputRef.current) inputRef.current.value = "";
 
     setIsUploading(true);
     try {
-      const path = await materialsApi.uploadQuizMedia(file, { courseId, quizId });
+      const path = await materialsApi.uploadQuizMedia(file, {
+        courseId,
+        quizId,
+      });
       onChange({ image_url: path, alt: content.alt });
     } catch {
       // toast is shown by the caller layer if needed
@@ -607,6 +784,58 @@ export function ImageBlockEditor({
           }
           placeholder="ex : Image d'un dialogue dans un restaurant"
         />
+      </div>
+    </div>
+  );
+}
+
+// ── Voice block (student records audio response — manually graded) ────
+
+interface VoiceBlockEditorProps {
+  content: { prompt?: string; max_duration_seconds?: number };
+  onChange: (content: { prompt: string; max_duration_seconds: number }) => void;
+}
+
+export function VoiceBlockEditor({
+  content,
+  onChange,
+}: VoiceBlockEditorProps): React.JSX.Element {
+  const prompt = content.prompt ?? "";
+  const maxDuration = content.max_duration_seconds ?? 120;
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Consigne</Label>
+        <Input
+          value={prompt}
+          onChange={(e) =>
+            onChange({
+              prompt: e.target.value,
+              max_duration_seconds: maxDuration,
+            })
+          }
+          placeholder="ex : Presentez-vous en 1 minute"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Duree maximum (secondes)</Label>
+        <Input
+          type="number"
+          min={10}
+          max={600}
+          value={maxDuration}
+          onChange={(e) =>
+            onChange({
+              prompt,
+              max_duration_seconds: Number(e.target.value) || 120,
+            })
+          }
+          className="w-32"
+        />
+        <p className="text-xs text-muted-foreground">
+          Entre 10 et 600 secondes. Cette question sera corrigee manuellement.
+        </p>
       </div>
     </div>
   );

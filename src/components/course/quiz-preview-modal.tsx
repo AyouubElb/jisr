@@ -65,14 +65,13 @@ export function QuizPreviewModal({
                 )}
                 <span>
                   {quiz.quiz_blocks.filter((b) =>
-                    b.type === "mcq" || b.type === "fill_blank" || b.type === "free_text"
+                    b.type === "mcq" ||
+                    b.type === "fill_blank" ||
+                    b.type === "free_text" ||
+                    b.type === "voice"
                   ).length} question(s)
                 </span>
-                <span>
-                  {quiz.quiz_blocks
-                    .filter((b) => b.points !== null)
-                    .reduce((s, b) => s + (b.points ?? 0), 0)} pts
-                </span>
+                <span>Note sur 100</span>
               </div>
               {quiz.description && (
                 <p className="text-sm text-muted-foreground">{quiz.description}</p>
@@ -95,7 +94,7 @@ export function QuizPreviewModal({
                         key={block.id}
                         type={block.type as BlockType}
                         content={block.content as Record<string, unknown>}
-                        points={block.points}
+                        points={block.weight !== null ? Number(block.weight) : null}
                         index={idx}
                       />
                     ))}

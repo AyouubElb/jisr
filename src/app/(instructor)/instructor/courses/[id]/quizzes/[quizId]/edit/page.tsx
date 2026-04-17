@@ -33,9 +33,11 @@ import {
   FreeTextBlockEditor,
   AudioBlockEditor,
   ImageBlockEditor,
+  VoiceBlockEditor,
 } from "@/components/course/quiz-block-editor";
 import {
   createQuizSchema,
+  blockContentSchemas,
   type CreateQuizInput,
   type BlockType,
   BLOCK_TYPE_LABELS,
@@ -53,6 +55,7 @@ const AVAILABLE_BLOCK_TYPES: BlockType[] = [
   "mcq",
   "fill_blank",
   "free_text",
+  "voice",
 ];
 
 const BLOCK_TYPE_ICONS: Record<BlockType, React.ComponentType<{ className?: string }>> = {
@@ -62,6 +65,7 @@ const BLOCK_TYPE_ICONS: Record<BlockType, React.ComponentType<{ className?: stri
   mcq: ListChecks,
   fill_blank: Pencil,
   free_text: HelpCircle,
+  voice: Music,
 };
 
 // ── Local block state ────────────────────────────────────────────────
@@ -97,12 +101,16 @@ function createEmptyBlock(type: BlockType, order: number): LocalBlock {
     text: { html: "" },
     audio: { audio_url: "", caption: "" },
     image: { image_url: "", alt: "" },
-    mcq: { prompt: "", options: [] },
-    fill_blank: { sentence: "", accepted_answers: [""] },
-    free_text: { prompt: "", min_words: undefined },
+    mcq: { prompt: "", options: [], allow_multiple: false },
+    fill_blank: { sentence: "", accepted_answers: [""], case_sensitive: false },
+    free_text: { prompt: "", min_words: undefined, max_words: undefined },
+    voice: { prompt: "", max_duration_seconds: 120 },
   };
   const isQuestion =
-    type === "mcq" || type === "fill_blank" || type === "free_text";
+    type === "mcq" ||
+    type === "fill_blank" ||
+    type === "free_text" ||
+    type === "voice";
 
   return {
     clientId: `block-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -117,6 +125,7 @@ const EMPTY_VALUES: CreateQuizInput = {
   title: "",
   description: "",
   time_limit_minutes: null,
+  passing_score: 60,
 };
 
 export default function QuizEditPage(): React.JSX.Element {
@@ -130,6 +139,7 @@ export default function QuizEditPage(): React.JSX.Element {
   const { mutate: saveBlocks, isPending: isSavingBlocks } = useSaveQuizBlocks(courseId);
 
   const [blocks, setBlocks] = useState<LocalBlock[]>([]);
+  const [blockErrors, setBlockErrors] = useState<Record<string, string>>({});
 
   const form = useForm({
     resolver: zodResolver(createQuizSchema),
@@ -143,6 +153,7 @@ export default function QuizEditPage(): React.JSX.Element {
       title: quiz.title,
       description: quiz.description ?? "",
       time_limit_minutes: quiz.time_limit_minutes,
+      passing_score: quiz.passing_score ?? 60,
     });
     setBlocks(
       quiz.quiz_blocks
@@ -152,7 +163,7 @@ export default function QuizEditPage(): React.JSX.Element {
           clientId: b.id,
           type: b.type as BlockType,
           content: b.content as Record<string, unknown>,
-          points: b.points,
+          points: b.weight !== null ? Number(b.weight) : null,
           order: b.order,
         })),
     );
@@ -212,6 +223,12 @@ export default function QuizEditPage(): React.JSX.Element {
     setBlocks((prev) =>
       prev.map((b) => (b.clientId === clientId ? { ...b, content } : b)),
     );
+    setBlockErrors((prev) => {
+      if (!prev[clientId]) return prev;
+      const next = { ...prev };
+      delete next[clientId];
+      return next;
+    });
   };
 
   const updateBlockPoints = (clientId: string, points: number | null): void => {
@@ -223,10 +240,27 @@ export default function QuizEditPage(): React.JSX.Element {
   // ── Save ─────────────────────────────────────────────────────────
   const onSave = (values: Record<string, unknown>): void => {
     const data = values as unknown as CreateQuizInput;
+
+    // Validate each block's content against its schema
+    const errors: Record<string, string> = {};
+    for (const b of blocks) {
+      const schema = blockContentSchemas[b.type];
+      if (!schema) continue;
+      const result = schema.safeParse(b.content);
+      if (!result.success) {
+        const issues = result.error.flatten().formErrors;
+        errors[b.clientId] = issues[0] ?? result.error.flatten().fieldErrors
+          ? Object.values(result.error.flatten().fieldErrors).flat()[0] ?? "Bloc invalide"
+          : "Bloc invalide";
+      }
+    }
+    setBlockErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     const blockInserts = blocks.map((b) => ({
-      type: b.type as "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text",
+      type: b.type,
       content: b.content,
-      points: b.points,
+      weight: b.points,
       order: b.order,
     }));
 
@@ -296,17 +330,28 @@ export default function QuizEditPage(): React.JSX.Element {
             onChange={(c) => updateBlockContent(block.clientId, c)}
           />
         );
+      case "voice":
+        return (
+          <VoiceBlockEditor
+            content={block.content as { prompt?: string; max_duration_seconds?: number }}
+            onChange={(c) => updateBlockContent(block.clientId, c)}
+          />
+        );
       default:
         return null;
     }
   };
 
   // ── Derived stats ────────────────────────────────────────────────
-  const totalPoints = blocks
+  const totalWeight = blocks
     .filter((b) => b.points !== null)
     .reduce((sum, b) => sum + (b.points ?? 0), 0);
   const questionCount = blocks.filter(
-    (b) => b.type === "mcq" || b.type === "fill_blank" || b.type === "free_text",
+    (b) =>
+      b.type === "mcq" ||
+      b.type === "fill_blank" ||
+      b.type === "free_text" ||
+      b.type === "voice",
   ).length;
 
   // ── Loading ──────────────────────────────────────────────────────
@@ -360,7 +405,7 @@ export default function QuizEditPage(): React.JSX.Element {
               {questionCount} question{questionCount !== 1 ? "s" : ""}
             </span>
             <span>·</span>
-            <span>{totalPoints} pts</span>
+            <span>Poids: {totalWeight}</span>
           </div>
         </div>
         <Button type="submit" disabled={isSaving} className="gap-1.5">
@@ -416,6 +461,21 @@ export default function QuizEditPage(): React.JSX.Element {
                   })}
                 />
               </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Note de passage (%)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  placeholder="60"
+                  {...form.register("passing_score", {
+                    setValueAs: (v) => (v === "" || v === null ? 60 : Number(v)),
+                  })}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Seuil minimum pour reussir le quiz (sur 100)
+                </p>
+              </div>
             </div>
           </div>
 
@@ -454,7 +514,7 @@ export default function QuizEditPage(): React.JSX.Element {
             <div className="space-y-2.5">
               <StatRow label="Blocs" value={blocks.length.toString()} />
               <StatRow label="Questions" value={questionCount.toString()} />
-              <StatRow label="Points totaux" value={totalPoints.toString()} />
+              <StatRow label="Poids total" value={totalWeight.toString()} />
               <StatRow
                 label="Duree"
                 value={
@@ -481,7 +541,7 @@ export default function QuizEditPage(): React.JSX.Element {
                 {blocks.length} bloc{blocks.length !== 1 ? "s" : ""}
               </Badge>
               <Badge variant="outline" className="text-[10px]">
-                {totalPoints} pts
+                Poids: {totalWeight}
               </Badge>
             </div>
           </div>
@@ -505,6 +565,7 @@ export default function QuizEditPage(): React.JSX.Element {
                   index={idx}
                   total={blocks.length}
                   points={block.points}
+                  error={blockErrors[block.clientId]}
                   onMoveUp={() => moveBlock(block.clientId, "up")}
                   onMoveDown={() => moveBlock(block.clientId, "down")}
                   onDuplicate={() => duplicateBlock(block.clientId)}

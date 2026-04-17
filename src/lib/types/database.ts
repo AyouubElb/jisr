@@ -309,6 +309,7 @@ export type Database = {
           title: string;
           description: string;
           time_limit_minutes: number | null;
+          passing_score: number;
           order: number;
           created_at: string;
         };
@@ -318,6 +319,7 @@ export type Database = {
           title: string;
           description?: string;
           time_limit_minutes?: number | null;
+          passing_score?: number;
           order: number;
           created_at?: string;
         };
@@ -327,6 +329,7 @@ export type Database = {
           title?: string;
           description?: string;
           time_limit_minutes?: number | null;
+          passing_score?: number;
           order?: number;
           created_at?: string;
         };
@@ -344,27 +347,33 @@ export type Database = {
         Row: {
           id: string;
           quiz_id: string;
-          type: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text";
+          type: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text" | "voice";
           content: Record<string, unknown>;
-          points: number | null;
+          weight: number | null;
+          model_answer: string | null;
+          grading_notes: string | null;
           order: number;
           created_at: string;
         };
         Insert: {
           id?: string;
           quiz_id: string;
-          type: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text";
+          type: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text" | "voice";
           content: Record<string, unknown>;
-          points?: number | null;
+          weight?: number | null;
+          model_answer?: string | null;
+          grading_notes?: string | null;
           order: number;
           created_at?: string;
         };
         Update: {
           id?: string;
           quiz_id?: string;
-          type?: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text";
+          type?: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text" | "voice";
           content?: Record<string, unknown>;
-          points?: number | null;
+          weight?: number | null;
+          model_answer?: string | null;
+          grading_notes?: string | null;
           order?: number;
           created_at?: string;
         };
@@ -385,9 +394,11 @@ export type Database = {
           student_id: string;
           started_at: string;
           submitted_at: string | null;
-          score: number | null;
-          max_score: number | null;
-          status: "in_progress" | "submitted" | "graded";
+          auto_score: number | null;
+          final_score: number | null;
+          status: "in_progress" | "submitted" | "pending_review" | "graded";
+          graded_at: string | null;
+          graded_by: string | null;
           created_at: string;
         };
         Insert: {
@@ -396,9 +407,11 @@ export type Database = {
           student_id: string;
           started_at?: string;
           submitted_at?: string | null;
-          score?: number | null;
-          max_score?: number | null;
-          status?: "in_progress" | "submitted" | "graded";
+          auto_score?: number | null;
+          final_score?: number | null;
+          status?: "in_progress" | "submitted" | "pending_review" | "graded";
+          graded_at?: string | null;
+          graded_by?: string | null;
           created_at?: string;
         };
         Update: {
@@ -407,9 +420,11 @@ export type Database = {
           student_id?: string;
           started_at?: string;
           submitted_at?: string | null;
-          score?: number | null;
-          max_score?: number | null;
-          status?: "in_progress" | "submitted" | "graded";
+          auto_score?: number | null;
+          final_score?: number | null;
+          status?: "in_progress" | "submitted" | "pending_review" | "graded";
+          graded_at?: string | null;
+          graded_by?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -434,33 +449,33 @@ export type Database = {
           id: string;
           attempt_id: string;
           block_id: string;
-          selected_option_id: string | null;
-          text_answer: string | null;
+          answer: Record<string, unknown>;
           is_correct: boolean | null;
-          points_awarded: number | null;
+          earned_weight: number | null;
           instructor_feedback: string | null;
+          graded_at: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           attempt_id: string;
           block_id: string;
-          selected_option_id?: string | null;
-          text_answer?: string | null;
+          answer?: Record<string, unknown>;
           is_correct?: boolean | null;
-          points_awarded?: number | null;
+          earned_weight?: number | null;
           instructor_feedback?: string | null;
+          graded_at?: string | null;
           created_at?: string;
         };
         Update: {
           id?: string;
           attempt_id?: string;
           block_id?: string;
-          selected_option_id?: string | null;
-          text_answer?: string | null;
+          answer?: Record<string, unknown>;
           is_correct?: boolean | null;
-          points_awarded?: number | null;
+          earned_weight?: number | null;
           instructor_feedback?: string | null;
+          graded_at?: string | null;
           created_at?: string;
         };
         Relationships: [
