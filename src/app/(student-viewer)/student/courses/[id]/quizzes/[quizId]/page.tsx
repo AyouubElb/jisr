@@ -26,6 +26,7 @@ import {
   CurriculumSidebarSkeleton,
 } from "@/components/layout/curriculum-sidebar";
 import { QuizTimer } from "@/components/course/quiz-timer";
+import { AudioRecorder } from "@/components/course/audio-recorder";
 import { useCourse } from "@/lib/hooks/useCourses";
 import { useMyCompletions } from "@/lib/hooks/useCompletions";
 import { useQuiz } from "@/lib/hooks/useQuizzes";
@@ -46,6 +47,8 @@ interface AnswerState {
   selected_option_id?: string;
   selected_option_ids?: string[];
   text_answer?: string;
+  audio_url?: string;
+  duration_seconds?: number;
 }
 
 // ── localStorage helpers for draft answer persistence ─────────────────
@@ -227,7 +230,7 @@ export default function StudentQuizPage(): React.JSX.Element {
         : !!a.selected_option_id;
     }
     if (b.type === "fill_blank") return !!a.selected_option_id;
-    if (b.type === "voice") return false; // voice recording wiring comes later
+    if (b.type === "voice") return !!a.audio_url;
     return !!a.text_answer && a.text_answer.trim().length > 0;
   }).length;
 
@@ -287,7 +290,10 @@ export default function StudentQuizPage(): React.JSX.Element {
       } else if (b.type === "free_text") {
         answerShape = { text: a.text_answer ?? "" };
       } else if (b.type === "voice") {
-        answerShape = { audio_url: "", duration_seconds: 0 };
+        answerShape = {
+          audio_url: a.audio_url ?? "",
+          duration_seconds: a.duration_seconds ?? 0,
+        };
       }
       return { block_id: b.id, answer: answerShape };
     });
@@ -532,14 +538,36 @@ export default function StudentQuizPage(): React.JSX.Element {
                 </p>
               )}
 
-              <Button
-                size="lg"
-                disabled={isStarting}
-                onClick={handleStart}
-                className="w-full sm:w-auto"
-              >
-                {isStarting ? "Demarrage..." : "Commencer le quiz"}
-              </Button>
+              {(() => {
+                const used = attempts?.length ?? 0;
+                const cap = quiz.max_attempts;
+                const exhausted = cap != null && used >= cap;
+                const remaining = cap != null ? Math.max(cap - used, 0) : null;
+
+                return (
+                  <>
+                    {cap != null && (
+                      <p className="text-xs text-muted-foreground">
+                        {exhausted
+                          ? `Tentatives epuisees (${used} / ${cap}).`
+                          : `Tentative ${used + 1} sur ${cap} (${remaining} restante${remaining === 1 ? "" : "s"}).`}
+                      </p>
+                    )}
+                    <Button
+                      size="lg"
+                      disabled={isStarting || exhausted}
+                      onClick={handleStart}
+                      className="w-full sm:w-auto"
+                    >
+                      {exhausted
+                        ? "Tentatives epuisees"
+                        : isStarting
+                          ? "Demarrage..."
+                          : "Commencer le quiz"}
+                    </Button>
+                  </>
+                );
+              })()}
             </CardContent>
           </Card>
         )
@@ -562,6 +590,9 @@ export default function StudentQuizPage(): React.JSX.Element {
                   questionIndex={currentIndex}
                   answer={answers[block.id]}
                   onAnswerChange={(patch) => handleAnswerChange(block.id, patch)}
+                  courseId={courseId}
+                  quizId={quizId}
+                  attemptId={activeAttempt.id}
                 />
               );
             });
@@ -734,16 +765,41 @@ function StudentBlockView({
   questionIndex,
   answer,
   onAnswerChange,
+  courseId,
+  quizId,
+  attemptId,
 }: {
   block: QuizBlock;
   questionIndex: number;
   answer: AnswerState | undefined;
   onAnswerChange: (patch: AnswerState) => void;
+  courseId: string;
+  quizId: string;
+  attemptId: string;
 }): React.JSX.Element {
   const type = block.type as BlockType;
   const content = block.content as Record<string, unknown>;
   const isQuestion =
     type === "mcq" || type === "fill_blank" || type === "free_text" || type === "voice";
+
+  if (type === "section") {
+    const title = (content.title as string) || "";
+    const description = content.description as string | undefined;
+    return (
+      <div className="pt-2 pb-1">
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {title}
+          </span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+        {description && (
+          <p className="mt-1 text-center text-xs text-muted-foreground">{description}</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <Card>
@@ -786,21 +842,55 @@ function StudentBlockView({
             onChange={(text) => onAnswerChange({ text_answer: text })}
           />
         )}
-        {type === "voice" && <VoiceView content={content} />}
+        {type === "voice" && (
+          <VoiceView
+            content={content}
+            courseId={courseId}
+            quizId={quizId}
+            attemptId={attemptId}
+            blockId={block.id}
+            audioUrl={answer?.audio_url}
+            onRecorded={(audio_url, duration_seconds) =>
+              onAnswerChange({ audio_url, duration_seconds })
+            }
+          />
+        )}
       </CardContent>
     </Card>
   );
 }
 
-function VoiceView({ content }: { content: Record<string, unknown> }): React.JSX.Element {
+function VoiceView({
+  content,
+  courseId,
+  quizId,
+  attemptId,
+  blockId,
+  audioUrl,
+  onRecorded,
+}: {
+  content: Record<string, unknown>;
+  courseId: string;
+  quizId: string;
+  attemptId: string;
+  blockId: string;
+  audioUrl: string | undefined;
+  onRecorded: (path: string, durationSeconds: number) => void;
+}): React.JSX.Element {
   const prompt = (content.prompt as string) || "";
   const maxDuration = (content.max_duration_seconds as number) ?? 120;
   return (
     <div className="space-y-3">
       {prompt && <p className="text-sm font-medium text-amber-950">{prompt}</p>}
-      <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-xs text-muted-foreground">
-        Enregistrement vocal a venir (max {maxDuration}s)
-      </div>
+      <AudioRecorder
+        maxDurationSeconds={maxDuration}
+        courseId={courseId}
+        quizId={quizId}
+        attemptId={attemptId}
+        blockId={blockId}
+        currentPath={audioUrl || undefined}
+        onRecorded={onRecorded}
+      />
     </div>
   );
 }

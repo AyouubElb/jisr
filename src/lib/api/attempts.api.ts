@@ -1,9 +1,80 @@
 import { createClient } from "@/lib/supabase/client";
-import type { StudentAttempt, StudentAnswer, QuizBlock } from "@/lib/types";
-import { isGradableBlock, isManualBlock } from "@/lib/schemas/quiz.schema";
+import type {
+  StudentAttempt,
+  StudentAnswer,
+  QuizBlock,
+  CEFRLevel,
+} from "@/lib/types";
+import {
+  isGradableBlock,
+  isManualBlock,
+  type BlockType,
+} from "@/lib/schemas/quiz.schema";
 
 export interface AttemptWithAnswers extends StudentAttempt {
   student_answers: StudentAnswer[];
+}
+
+/**
+ * One row per submitted attempt that contains at least one manual block.
+ * Carries the full quiz shape (all blocks, all answers) so the grading pane
+ * can render the whole quiz in context — not just the answers awaiting review.
+ */
+export interface GradingAttempt {
+  attempt_id: string;
+  status: StudentAttempt["status"];
+  submitted_at: string;
+  auto_score: number | null;
+  final_score: number | null;
+  graded_at: string | null;
+  student_id: string;
+  student_name: string;
+  quiz_id: string;
+  quiz_title: string;
+  course_id: string;
+  course_title: string;
+  course_level: CEFRLevel;
+  blocks: QuizBlock[];
+  answers: GradingAnswer[];
+  manual_count: number;
+  pending_count: number;
+}
+
+export interface GradingAnswer {
+  id: string;
+  block_id: string;
+  answer: Record<string, unknown>;
+  is_correct: boolean | null;
+  earned_weight: number | null;
+  instructor_feedback: string | null;
+  graded_at: string | null;
+}
+
+/**
+ * Summary row for the student "mes notes" page — one per submitted attempt,
+ * with quiz + course joined and manual-grading counts computed so the list
+ * can show "en attente de correction" / "corrige" without extra queries.
+ */
+export interface MyAttemptSummary {
+  attempt_id: string;
+  status: StudentAttempt["status"];
+  submitted_at: string;
+  auto_score: number | null;
+  final_score: number | null;
+  graded_at: string | null;
+  quiz_id: string;
+  quiz_title: string;
+  course_id: string;
+  course_title: string;
+  course_level: CEFRLevel;
+  manual_count: number;
+  pending_count: number;
+}
+
+/** Full detail for the student review page — carries every block + answer */
+export interface MyAttemptReview extends MyAttemptSummary {
+  blocks: QuizBlock[];
+  answers: GradingAnswer[];
 }
 
 /**
@@ -121,11 +192,37 @@ export const attemptsApi = {
   /**
    * Start a new attempt — inserts an in_progress row with started_at set.
    * Returns the attempt so the client can key its timer off started_at.
+   *
+   * Enforces quizzes.max_attempts: if the student has already reached the
+   * cap (all statuses count, including in_progress), starting is refused.
+   * This is product behavior, not a security boundary — a determined user
+   * could bypass by calling Supabase directly.
    */
   start: async (quizId: string): Promise<StudentAttempt> => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Non authentifie");
+
+    const { data: quiz, error: quizError } = await supabase
+      .from("quizzes")
+      .select("max_attempts")
+      .eq("id", quizId)
+      .single();
+    if (quizError) throw quizError;
+
+    if (quiz?.max_attempts != null) {
+      const { count, error: countError } = await supabase
+        .from("student_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("quiz_id", quizId)
+        .eq("student_id", user.id);
+      if (countError) throw countError;
+      if ((count ?? 0) >= quiz.max_attempts) {
+        throw new Error(
+          "Vous avez atteint le nombre maximum de tentatives pour ce quiz.",
+        );
+      }
+    }
 
     const { data, error } = await supabase
       .from("student_attempts")
@@ -250,5 +347,374 @@ export const attemptsApi = {
     }
 
     return attempt;
+  },
+
+  // ── Instructor grading inbox ───────────────────────────────────────
+
+  /**
+   * Grading feed — one row per submitted attempt that has at least one
+   * manual block. Each row carries the full quiz (blocks + answers) so the
+   * grading pane can show the whole quiz in context. Filter modes:
+   *   - "pending" — attempts with >=1 ungraded manual answer
+   *   - "graded"  — attempts where every manual answer is graded
+   *   - "all"     — both
+   */
+  listGradingInbox: async (
+    filter: "pending" | "all" | "graded",
+  ): Promise<GradingAttempt[]> => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifie");
+
+    const { data, error } = await supabase
+      .from("student_attempts")
+      .select(
+        `
+        id, status, submitted_at, auto_score, final_score, graded_at,
+        student:profiles!student_attempts_student_id_fkey(id, full_name),
+        quiz:quizzes!inner(
+          id, title,
+          quiz_blocks(*),
+          section:sections!inner(
+            course:courses!inner(id, title, level, instructor_id)
+          )
+        ),
+        student_answers(
+          id, block_id, answer, is_correct, earned_weight,
+          instructor_feedback, graded_at
+        )
+        `,
+      )
+      .eq("quiz.section.course.instructor_id", user.id)
+      .not("submitted_at", "is", null)
+      .order("submitted_at", { ascending: true });
+
+    if (error) throw error;
+
+    type Row = {
+      id: string;
+      status: StudentAttempt["status"];
+      submitted_at: string;
+      auto_score: number | null;
+      final_score: number | null;
+      graded_at: string | null;
+      student: { id: string; full_name: string };
+      quiz: {
+        id: string;
+        title: string;
+        quiz_blocks: QuizBlock[];
+        section: {
+          course: { id: string; title: string; level: CEFRLevel };
+        };
+      };
+      student_answers: GradingAnswer[];
+    };
+
+    const out: GradingAttempt[] = [];
+    for (const r of (data ?? []) as unknown as Row[]) {
+      const blocks = [...r.quiz.quiz_blocks].sort((a, b) => a.order - b.order);
+      const manualBlockIds = new Set(
+        blocks.filter((b) => isManualBlock(b.type as BlockType)).map((b) => b.id),
+      );
+      if (manualBlockIds.size === 0) continue; // No manual grading needed, skip
+
+      const manualAnswers = r.student_answers.filter((a) =>
+        manualBlockIds.has(a.block_id),
+      );
+      const pendingCount = manualAnswers.filter((a) => a.graded_at === null).length;
+
+      if (filter === "pending" && pendingCount === 0) continue;
+      if (filter === "graded" && pendingCount > 0) continue;
+
+      out.push({
+        attempt_id: r.id,
+        status: r.status,
+        submitted_at: r.submitted_at,
+        auto_score: r.auto_score,
+        final_score: r.final_score,
+        graded_at: r.graded_at,
+        student_id: r.student.id,
+        student_name: r.student.full_name,
+        quiz_id: r.quiz.id,
+        quiz_title: r.quiz.title,
+        course_id: r.quiz.section.course.id,
+        course_title: r.quiz.section.course.title,
+        course_level: r.quiz.section.course.level,
+        blocks,
+        answers: r.student_answers,
+        manual_count: manualBlockIds.size,
+        pending_count: pendingCount,
+      });
+    }
+
+    return out;
+  },
+
+  /** Sidebar badge — number of attempts with at least one pending manual answer */
+  pendingGradingCount: async (): Promise<number> => {
+    const rows = await attemptsApi.listGradingInbox("pending");
+    return rows.length;
+  },
+
+  /**
+   * Batch-grade every manual answer on an attempt in one shot. After the
+   * updates, if every manual answer now has a grade we recompute final_score
+   * from all graded answers and flip the attempt to "graded".
+   */
+  gradeAttempt: async (input: {
+    attempt_id: string;
+    grades: {
+      answer_id: string;
+      block_weight: number;
+      earned_weight: number;
+      feedback: string | null;
+    }[];
+  }): Promise<void> => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifie");
+
+    const now = new Date().toISOString();
+
+    // Update each answer. Supabase has no bulk UPDATE-by-id, so we fan out;
+    // the grades array is capped by the number of manual blocks in a quiz.
+    await Promise.all(
+      input.grades.map((g) =>
+        supabase
+          .from("student_answers")
+          .update({
+            earned_weight: g.earned_weight,
+            is_correct: g.earned_weight >= g.block_weight,
+            instructor_feedback: g.feedback,
+            graded_at: now,
+          })
+          .eq("id", g.answer_id)
+          .then(({ error }) => {
+            if (error) throw error;
+          }),
+      ),
+    );
+
+    // Refetch attempt to see if we can finalize
+    const { data: attempt, error: fetchError } = await supabase
+      .from("student_attempts")
+      .select(
+        `
+        id,
+        quiz:quizzes!inner(quiz_blocks(id, type, weight)),
+        student_answers(block_id, earned_weight, graded_at)
+        `,
+      )
+      .eq("id", input.attempt_id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    type AttemptShape = {
+      id: string;
+      quiz: {
+        quiz_blocks: { id: string; type: BlockType; weight: number | null }[];
+      };
+      student_answers: {
+        block_id: string;
+        earned_weight: number | null;
+        graded_at: string | null;
+      }[];
+    };
+
+    const att = attempt as unknown as AttemptShape;
+    const gradableBlocks = att.quiz.quiz_blocks.filter((b) => isGradableBlock(b.type));
+    const manualBlocks = gradableBlocks.filter((b) => isManualBlock(b.type));
+
+    const allManualGraded = manualBlocks.every((b) => {
+      const a = att.student_answers.find((x) => x.block_id === b.id);
+      return a && a.graded_at !== null;
+    });
+
+    if (!allManualGraded) return;
+
+    const totalWeight = gradableBlocks.reduce(
+      (sum, b) => sum + Number(b.weight ?? 0),
+      0,
+    );
+    const earnedTotal = att.student_answers.reduce(
+      (sum, a) => sum + Number(a.earned_weight ?? 0),
+      0,
+    );
+    const finalScore =
+      totalWeight > 0 ? Math.round((earnedTotal / totalWeight) * 100) : null;
+
+    const { error: updateError } = await supabase
+      .from("student_attempts")
+      .update({
+        final_score: finalScore,
+        status: "graded",
+        graded_at: now,
+        graded_by: user.id,
+      })
+      .eq("id", input.attempt_id);
+
+    if (updateError) throw updateError;
+  },
+
+  // ── Student "mes notes" history ────────────────────────────────────
+
+  /**
+   * Every submitted attempt of the current student, across every course,
+   * with the counts needed to split the list into pending / graded sections.
+   */
+  listMine: async (): Promise<MyAttemptSummary[]> => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifie");
+
+    const { data, error } = await supabase
+      .from("student_attempts")
+      .select(
+        `
+        id, status, submitted_at, auto_score, final_score, graded_at,
+        quiz:quizzes!inner(
+          id, title,
+          quiz_blocks(id, type),
+          section:sections!inner(
+            course:courses!inner(id, title, level)
+          )
+        ),
+        student_answers(block_id, graded_at)
+        `,
+      )
+      .eq("student_id", user.id)
+      .not("submitted_at", "is", null)
+      .order("submitted_at", { ascending: false });
+
+    if (error) throw error;
+
+    type Row = {
+      id: string;
+      status: StudentAttempt["status"];
+      submitted_at: string;
+      auto_score: number | null;
+      final_score: number | null;
+      graded_at: string | null;
+      quiz: {
+        id: string;
+        title: string;
+        quiz_blocks: { id: string; type: BlockType }[];
+        section: {
+          course: { id: string; title: string; level: CEFRLevel };
+        };
+      };
+      student_answers: { block_id: string; graded_at: string | null }[];
+    };
+
+    return (data as unknown as Row[]).map((r) => {
+      const manualBlockIds = new Set(
+        r.quiz.quiz_blocks
+          .filter((b) => isManualBlock(b.type))
+          .map((b) => b.id),
+      );
+      const manualAnswers = r.student_answers.filter((a) =>
+        manualBlockIds.has(a.block_id),
+      );
+      const pendingCount = manualAnswers.filter((a) => a.graded_at === null).length;
+
+      return {
+        attempt_id: r.id,
+        status: r.status,
+        submitted_at: r.submitted_at,
+        auto_score: r.auto_score,
+        final_score: r.final_score,
+        graded_at: r.graded_at,
+        quiz_id: r.quiz.id,
+        quiz_title: r.quiz.title,
+        course_id: r.quiz.section.course.id,
+        course_title: r.quiz.section.course.title,
+        course_level: r.quiz.section.course.level,
+        manual_count: manualBlockIds.size,
+        pending_count: pendingCount,
+      };
+    });
+  },
+
+  /**
+   * Single attempt with the full quiz (blocks + student's answers) for the
+   * review page. RLS restricts to the owning student.
+   */
+  mineReview: async (attemptId: string): Promise<MyAttemptReview> => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifie");
+
+    const { data, error } = await supabase
+      .from("student_attempts")
+      .select(
+        `
+        id, status, submitted_at, auto_score, final_score, graded_at,
+        quiz:quizzes!inner(
+          id, title,
+          quiz_blocks(*),
+          section:sections!inner(
+            course:courses!inner(id, title, level)
+          )
+        ),
+        student_answers(
+          id, block_id, answer, is_correct, earned_weight,
+          instructor_feedback, graded_at
+        )
+        `,
+      )
+      .eq("id", attemptId)
+      .eq("student_id", user.id)
+      .single();
+
+    if (error) throw error;
+
+    type Row = {
+      id: string;
+      status: StudentAttempt["status"];
+      submitted_at: string;
+      auto_score: number | null;
+      final_score: number | null;
+      graded_at: string | null;
+      quiz: {
+        id: string;
+        title: string;
+        quiz_blocks: QuizBlock[];
+        section: {
+          course: { id: string; title: string; level: CEFRLevel };
+        };
+      };
+      student_answers: GradingAnswer[];
+    };
+
+    const r = data as unknown as Row;
+    const blocks = [...r.quiz.quiz_blocks].sort((a, b) => a.order - b.order);
+    const manualBlockIds = new Set(
+      blocks
+        .filter((b) => isManualBlock(b.type as BlockType))
+        .map((b) => b.id),
+    );
+    const manualAnswers = r.student_answers.filter((a) =>
+      manualBlockIds.has(a.block_id),
+    );
+    const pendingCount = manualAnswers.filter((a) => a.graded_at === null).length;
+
+    return {
+      attempt_id: r.id,
+      status: r.status,
+      submitted_at: r.submitted_at,
+      auto_score: r.auto_score,
+      final_score: r.final_score,
+      graded_at: r.graded_at,
+      quiz_id: r.quiz.id,
+      quiz_title: r.quiz.title,
+      course_id: r.quiz.section.course.id,
+      course_title: r.quiz.section.course.title,
+      course_level: r.quiz.section.course.level,
+      manual_count: manualBlockIds.size,
+      pending_count: pendingCount,
+      blocks,
+      answers: r.student_answers,
+    };
   },
 };

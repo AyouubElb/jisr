@@ -7,16 +7,21 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
   FileText,
+  Heading,
   HelpCircle,
   ImageIcon,
   ListChecks,
+  Map,
   Music,
   Pencil,
   Plus,
   Save,
-  Timer,
+  ToggleLeft,
+  Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -25,8 +30,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   BlockWrapper,
+  SectionBlockEditor,
   TextBlockEditor,
   McqBlockEditor,
   FillBlankBlockEditor,
@@ -46,9 +53,12 @@ import {
   useQuiz,
   useUpdateQuiz,
   useSaveQuizBlocks,
+  useDeleteQuiz,
 } from "@/lib/hooks/useQuizzes";
+import { useResolveAIGeneration } from "@/lib/hooks/useAIQuiz";
 
 const AVAILABLE_BLOCK_TYPES: BlockType[] = [
+  "section",
   "text",
   "audio",
   "image",
@@ -59,6 +69,7 @@ const AVAILABLE_BLOCK_TYPES: BlockType[] = [
 ];
 
 const BLOCK_TYPE_ICONS: Record<BlockType, React.ComponentType<{ className?: string }>> = {
+  section: Heading,
   text: FileText,
   audio: Music,
   image: ImageIcon,
@@ -98,6 +109,7 @@ function cloneBlockContent(
 
 function createEmptyBlock(type: BlockType, order: number): LocalBlock {
   const defaults: Record<BlockType, Record<string, unknown>> = {
+    section: { title: "", description: "" },
     text: { html: "" },
     audio: { audio_url: "", caption: "" },
     image: { image_url: "", alt: "" },
@@ -126,6 +138,7 @@ const EMPTY_VALUES: CreateQuizInput = {
   description: "",
   time_limit_minutes: null,
   passing_score: 60,
+  max_attempts: null,
 };
 
 export default function QuizEditPage(): React.JSX.Element {
@@ -137,9 +150,13 @@ export default function QuizEditPage(): React.JSX.Element {
   const { data: quiz, isLoading } = useQuiz(quizId);
   const { mutate: updateQuiz, isPending: isUpdatingQuiz } = useUpdateQuiz(courseId);
   const { mutate: saveBlocks, isPending: isSavingBlocks } = useSaveQuizBlocks(courseId);
+  const { mutate: deleteQuiz, isPending: isDeleting } = useDeleteQuiz(courseId);
+  const { mutate: resolveGeneration } = useResolveAIGeneration();
 
   const [blocks, setBlocks] = useState<LocalBlock[]>([]);
   const [blockErrors, setBlockErrors] = useState<Record<string, string>>({});
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [openPanel, setOpenPanel] = useState<"add-block" | "settings">("add-block");
 
   const form = useForm({
     resolver: zodResolver(createQuizSchema),
@@ -154,6 +171,7 @@ export default function QuizEditPage(): React.JSX.Element {
       description: quiz.description ?? "",
       time_limit_minutes: quiz.time_limit_minutes,
       passing_score: quiz.passing_score ?? 60,
+      max_attempts: quiz.max_attempts,
     });
     setBlocks(
       quiz.quiz_blocks
@@ -173,6 +191,44 @@ export default function QuizEditPage(): React.JSX.Element {
   // ── Block ops ────────────────────────────────────────────────────
   const addBlock = (type: BlockType): void => {
     setBlocks((prev) => [...prev, createEmptyBlock(type, prev.length)]);
+  };
+
+  const moveBlockToTop = (clientId: string): void => {
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.clientId === clientId);
+      if (idx <= 0) return prev;
+      const block = prev[idx]!;
+      return [block, ...prev.filter((_, i) => i !== idx)];
+    });
+  };
+
+  const moveBlockToBottom = (clientId: string): void => {
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.clientId === clientId);
+      if (idx === prev.length - 1) return prev;
+      const block = prev[idx]!;
+      return [...prev.filter((_, i) => i !== idx), block];
+    });
+  };
+
+  const addVraiFauxBlock = (): void => {
+    setBlocks((prev) => [
+      ...prev,
+      {
+        clientId: `block-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type: "mcq",
+        content: {
+          prompt: "",
+          allow_multiple: false,
+          options: [
+            { id: `opt-${Date.now()}-vrai`, label: "Vrai", is_correct: false },
+            { id: `opt-${Date.now()}-faux`, label: "Faux", is_correct: false },
+          ],
+        },
+        points: 1,
+        order: prev.length,
+      },
+    ]);
   };
 
   const removeBlock = (clientId: string): void => {
@@ -268,7 +324,31 @@ export default function QuizEditPage(): React.JSX.Element {
       { id: quizId, updates: data },
       {
         onSuccess: () => {
-          saveBlocks({ quizId, blocks: blockInserts });
+          saveBlocks(
+            { quizId, blocks: blockInserts },
+            {
+              onSuccess: () => {
+                resolveGeneration({ quizId, action: "save" });
+              },
+            },
+          );
+        },
+      },
+    );
+  };
+
+  const onDeleteConfirmed = (): void => {
+    // Resolve first so instructor_rejected is set even if the user
+    // navigates away before the delete mutation's success callback runs.
+    resolveGeneration(
+      { quizId, action: "delete" },
+      {
+        onSettled: () => {
+          deleteQuiz(quizId, {
+            onSuccess: () => {
+              router.push(`/instructor/courses/${courseId}`);
+            },
+          });
         },
       },
     );
@@ -279,6 +359,13 @@ export default function QuizEditPage(): React.JSX.Element {
   // ── Block renderer ───────────────────────────────────────────────
   const renderBlockEditor = (block: LocalBlock): React.JSX.Element | null => {
     switch (block.type) {
+      case "section":
+        return (
+          <SectionBlockEditor
+            content={block.content as { title?: string; description?: string }}
+            onChange={(c) => updateBlockContent(block.clientId, c)}
+          />
+        );
       case "text":
         return (
           <TextBlockEditor
@@ -354,6 +441,24 @@ export default function QuizEditPage(): React.JSX.Element {
       b.type === "voice",
   ).length;
 
+  const scrollToBlock = (clientId: string): void => {
+    document
+      .getElementById(`block-${clientId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  const blockTocLabel = (block: LocalBlock): string => {
+    const c = block.content;
+    if (block.type === "mcq") return (c.prompt as string) || "QCM";
+    if (block.type === "fill_blank") return (c.sentence as string) || "Texte à trous";
+    if (block.type === "free_text") return (c.prompt as string) || "Réponse écrite";
+    if (block.type === "voice") return (c.prompt as string) || "Réponse vocale";
+    if (block.type === "text") return "Passage";
+    if (block.type === "audio") return (c.caption as string) || "Audio";
+    if (block.type === "image") return (c.alt as string) || "Image";
+    return BLOCK_TYPE_LABELS[block.type];
+  };
+
   // ── Loading ──────────────────────────────────────────────────────
   if (isLoading) {
     return (
@@ -408,122 +513,236 @@ export default function QuizEditPage(): React.JSX.Element {
             <span>Poids: {totalWeight}</span>
           </div>
         </div>
-        <Button type="submit" disabled={isSaving} className="gap-1.5">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setDeleteConfirmOpen(true)}
+          disabled={isSaving || isDeleting}
+          className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Supprimer</span>
+        </Button>
+        <Button type="submit" disabled={isSaving || isDeleting} className="gap-1.5">
           <Save className="h-4 w-4" />
           {isSaving ? "Enregistrement..." : "Enregistrer"}
         </Button>
       </div>
 
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Supprimer ce quiz ?"
+        description="Cette action est irréversible. Tous les blocs et réponses associés seront perdus."
+        confirmLabel="Supprimer"
+        onConfirm={onDeleteConfirmed}
+        isPending={isDeleting}
+      />
+
       {/* ── Bento grid ────────────────────────────────────────── */}
       <div className="grid min-h-0 flex-1 gap-3 sm:gap-4 lg:grid-cols-4">
-        {/* ── Left column: settings + add-block + stats ─────── */}
+        {/* ── Left column: plan (TOC) + add-block + settings ── */}
         <div className="flex min-h-0 flex-col gap-3 sm:gap-4 lg:col-span-1">
-          {/* Settings card */}
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <Pencil className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-amber-950">
-                Parametres
-              </h2>
-            </div>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Titre</Label>
-                <Input
-                  placeholder="ex : Present Simple"
-                  {...form.register("title")}
-                />
-                {form.formState.errors.title && (
-                  <p className="text-xs text-destructive">
-                    {form.formState.errors.title.message}
-                  </p>
+
+          {/* Plan / TOC — fills remaining height, scrollable */}
+          <div className="hidden min-h-0 flex-1 flex-col rounded-xl border border-border bg-card shadow-sm lg:flex">
+            <div className="shrink-0 border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Map className="h-4 w-4 text-muted-foreground" />
+                <h2 className="flex-1 text-sm font-semibold text-amber-950">Plan</h2>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                <span>{blocks.length} bloc{blocks.length !== 1 ? "s" : ""}</span>
+                <span>{questionCount} question{questionCount !== 1 ? "s" : ""}</span>
+                <span>Poids: {totalWeight}</span>
+                {form.watch("time_limit_minutes") && (
+                  <span>{form.watch("time_limit_minutes")} min</span>
                 )}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Description</Label>
-                <Textarea
-                  rows={3}
-                  placeholder="Courte description..."
-                  className="resize-none"
-                  {...form.register("description")}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Duree limite (min)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={180}
-                  placeholder="Aucune"
-                  {...form.register("time_limit_minutes", {
-                    setValueAs: (v) =>
-                      v === "" || v === null ? null : Number(v),
-                  })}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Note de passage (%)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="60"
-                  {...form.register("passing_score", {
-                    setValueAs: (v) => (v === "" || v === null ? 60 : Number(v)),
-                  })}
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Seuil minimum pour reussir le quiz (sur 100)
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto py-2">
+              {blocks.length === 0 ? (
+                <p className="px-4 py-3 text-xs text-muted-foreground">
+                  Aucun bloc pour le moment
                 </p>
-              </div>
+              ) : (
+                <ul className="space-y-0.5 px-2">
+                  {blocks.map((block) => {
+                    const Icon = BLOCK_TYPE_ICONS[block.type];
+                    if (block.type === "section") {
+                      return (
+                        <li key={block.clientId}>
+                          <button
+                            type="button"
+                            onClick={() => scrollToBlock(block.clientId)}
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/40"
+                          >
+                            <div className="h-3.5 w-0.5 shrink-0 rounded-full bg-violet-400" />
+                            <span className="truncate text-[11px] font-semibold uppercase tracking-wider text-violet-700">
+                              {(block.content.title as string) || "Section"}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={block.clientId}>
+                        <button
+                          type="button"
+                          onClick={() => scrollToBlock(block.clientId)}
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-muted/40"
+                        >
+                          <Icon className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          <span className="truncate text-[11px] text-muted-foreground">
+                            {blockTocLabel(block)}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </div>
 
-          {/* Add-block panel */}
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <Plus className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-amber-950">
+          {/* Add-block panel — accordion */}
+          <div className="shrink-0 rounded-xl border border-border bg-card shadow-sm">
+            <button
+              type="button"
+              onClick={() => setOpenPanel("add-block")}
+              className="flex w-full items-center gap-2 px-4 py-3 text-left"
+            >
+              <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-sm font-semibold text-amber-950">
                 Ajouter un bloc
-              </h2>
-            </div>
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 xl:grid-cols-2">
-              {AVAILABLE_BLOCK_TYPES.map((type) => {
-                const Icon = BLOCK_TYPE_ICONS[type];
-                return (
+              </span>
+              {openPanel === "add-block" ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+            {openPanel === "add-block" && (
+              <div className="border-t border-border px-4 pb-4 pt-3">
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 xl:grid-cols-2">
+                  {AVAILABLE_BLOCK_TYPES.map((type) => {
+                    const Icon = BLOCK_TYPE_ICONS[type];
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => addBlock(type)}
+                        className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-xs font-medium text-amber-950 transition-colors hover:border-violet-500/50 hover:bg-violet-50"
+                      >
+                        <Icon className="h-3.5 w-3.5 shrink-0 text-violet-600" />
+                        <span className="truncate">{BLOCK_TYPE_LABELS[type]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 border-t border-border pt-2">
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Modèles
+                  </p>
                   <button
-                    key={type}
                     type="button"
-                    onClick={() => addBlock(type)}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-xs font-medium text-amber-950 transition-colors hover:border-violet-500/50 hover:bg-violet-50"
+                    onClick={addVraiFauxBlock}
+                    className="flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-xs font-medium text-amber-950 transition-colors hover:border-violet-500/50 hover:bg-violet-50"
                   >
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-violet-600" />
-                    <span className="truncate">{BLOCK_TYPE_LABELS[type]}</span>
+                    <ToggleLeft className="h-3.5 w-3.5 shrink-0 text-violet-600" />
+                    <span>Vrai / Faux</span>
                   </button>
-                );
-              })}
-            </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Stats card — hidden on small screens to save space */}
-          <div className="hidden flex-1 rounded-xl border border-border bg-gradient-to-br from-violet-50 to-amber-50/40 p-4 shadow-sm lg:block">
-            <div className="mb-3 flex items-center gap-2">
-              <Timer className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-amber-950">Apercu</h2>
-            </div>
-            <div className="space-y-2.5">
-              <StatRow label="Blocs" value={blocks.length.toString()} />
-              <StatRow label="Questions" value={questionCount.toString()} />
-              <StatRow label="Poids total" value={totalWeight.toString()} />
-              <StatRow
-                label="Duree"
-                value={
-                  form.watch("time_limit_minutes")
-                    ? `${form.watch("time_limit_minutes")} min`
-                    : "—"
-                }
-              />
-            </div>
+          {/* Settings — accordion */}
+          <div className="shrink-0 rounded-xl border border-border bg-card shadow-sm">
+            <button
+              type="button"
+              onClick={() => setOpenPanel("settings")}
+              className="flex w-full items-center gap-2 px-4 py-3 text-left"
+            >
+              <Pencil className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-sm font-semibold text-amber-950">
+                Paramètres
+              </span>
+              {openPanel === "settings" ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
+            </button>
+            {openPanel === "settings" && (
+              <div className="space-y-3 border-t border-border px-4 pb-4 pt-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Titre</Label>
+                  <Input
+                    placeholder="ex : Present Simple"
+                    {...form.register("title")}
+                  />
+                  {form.formState.errors.title && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.title.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Description</Label>
+                  <Textarea
+                    rows={3}
+                    placeholder="Courte description..."
+                    className="resize-none"
+                    {...form.register("description")}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Durée limite (min)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={180}
+                    placeholder="Aucune"
+                    {...form.register("time_limit_minutes", {
+                      setValueAs: (v) =>
+                        v === "" || v === null ? null : Number(v),
+                    })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Note de passage (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    placeholder="60"
+                    {...form.register("passing_score", {
+                      setValueAs: (v) => (v === "" || v === null ? 60 : Number(v)),
+                    })}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Seuil minimum pour réussir le quiz (sur 100)
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Tentatives max</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    placeholder="Illimitées"
+                    {...form.register("max_attempts", {
+                      setValueAs: (v) =>
+                        v === "" || v === null ? null : Number(v),
+                    })}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Laissez vide pour des tentatives illimitées
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -559,21 +778,24 @@ export default function QuizEditPage(): React.JSX.Element {
               </div>
             ) : (
               blocks.map((block, idx) => (
+                <div key={block.clientId} id={`block-${block.clientId}`}>
                 <BlockWrapper
-                  key={block.clientId}
                   type={block.type}
                   index={idx}
                   total={blocks.length}
                   points={block.points}
                   error={blockErrors[block.clientId]}
+                  onMoveToTop={() => moveBlockToTop(block.clientId)}
                   onMoveUp={() => moveBlock(block.clientId, "up")}
                   onMoveDown={() => moveBlock(block.clientId, "down")}
+                  onMoveToBottom={() => moveBlockToBottom(block.clientId)}
                   onDuplicate={() => duplicateBlock(block.clientId)}
                   onRemove={() => removeBlock(block.clientId)}
                   onPointsChange={(p) => updateBlockPoints(block.clientId, p)}
                 >
                   {renderBlockEditor(block)}
                 </BlockWrapper>
+                </div>
               ))
             )}
           </div>
@@ -583,17 +805,3 @@ export default function QuizEditPage(): React.JSX.Element {
   );
 }
 
-function StatRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}): React.JSX.Element {
-  return (
-    <div className="flex items-center justify-between text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-semibold text-amber-950">{value}</span>
-    </div>
-  );
-}
