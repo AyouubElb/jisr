@@ -14,6 +14,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import * as Sentry from "@sentry/nextjs";
+import { useEffect } from "react";
 
 interface AppHeaderProps {
   fullName: string;
@@ -21,6 +23,18 @@ interface AppHeaderProps {
 
 export function AppHeader({ fullName }: AppHeaderProps): React.JSX.Element {
   const router = useRouter();
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        Sentry.setUser({ id: user.id, email: user.email, username: fullName });
+      }
+    });
+    return () => {
+      Sentry.setUser(null);
+    };
+  }, [fullName]);
   const initials = fullName
     .split(" ")
     .map((n) => n[0])
@@ -37,7 +51,7 @@ export function AppHeader({ fullName }: AppHeaderProps): React.JSX.Element {
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
-      <SidebarTrigger />
+      <SidebarTrigger className="hidden md:flex" />
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Avatar className="h-8 w-8">

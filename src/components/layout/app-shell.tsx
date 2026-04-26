@@ -1,6 +1,7 @@
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppHeader } from "./app-header";
 import { AppSidebar } from "./app-sidebar";
+import { BottomNav } from "./bottom-nav";
 import type { UserRole } from "@/lib/types";
 import type { ReactNode } from "react";
 
@@ -16,8 +17,9 @@ export function AppShell({ role, fullName, children }: AppShellProps): React.JSX
       <AppSidebar role={role} />
       <SidebarInset>
         <AppHeader fullName={fullName} />
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-6 pb-20 md:pb-6">{children}</main>
       </SidebarInset>
+      <BottomNav role={role} />
     </SidebarProvider>
   );
 }

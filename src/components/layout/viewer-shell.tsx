@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -42,9 +42,9 @@ export function ViewerShell({
   loading = false,
 }: ViewerShellProps): React.JSX.Element {
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col print:block print:h-auto">
       {/* ── Top bar ────────────────────────────────────────────── */}
-      <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-card px-4">
+      <header className="flex h-14 shrink-0 items-center gap-4 border-b border-border bg-card px-4 print:hidden">
         <div className="min-w-0 flex-1">
           {loading ? (
             <Skeleton className="h-5 w-64" />
@@ -65,31 +65,32 @@ export function ViewerShell({
           )}
         </div>
         {topRight && <div className="shrink-0">{topRight}</div>}
-        <Link href={exitHref} aria-label="Fermer">
-          <Button variant="ghost" size="icon" className="shrink-0">
-            <X className="h-4 w-4" />
+        <Link href={exitHref}>
+          <Button variant="ghost" size="sm" className="shrink-0 gap-1.5 text-muted-foreground">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Retour au cours</span>
           </Button>
         </Link>
       </header>
 
       {/* ── Body: sidebar + content ────────────────────────────── */}
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 print:block">
         <aside
           className={cn(
-            "hidden w-72 shrink-0 overflow-y-auto border-r border-border bg-card lg:block",
+            "hidden w-72 shrink-0 overflow-y-auto border-r border-border bg-card lg:block print:hidden",
           )}
         >
           {sidebar}
         </aside>
 
-        <main className="min-w-0 flex-1 overflow-y-auto">
-          <div className="max-w-4xl p-6 lg:px-10 lg:py-10">{children}</div>
+        <main className="min-w-0 flex-1 overflow-y-auto print:overflow-visible">
+          <div className="max-w-4xl p-6 lg:px-10 lg:py-10 print:p-0">{children}</div>
         </main>
       </div>
 
       {/* ── Bottom bar ─────────────────────────────────────────── */}
       {bottomBar && (
-        <footer className="flex h-16 shrink-0 items-center justify-between gap-4 border-t border-border bg-card px-4 lg:px-6">
+        <footer className="flex h-16 shrink-0 items-center justify-between gap-4 border-t border-border bg-card px-4 lg:px-6 print:hidden">
           {bottomBar}
         </footer>
       )}
