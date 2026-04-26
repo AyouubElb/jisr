@@ -20,15 +20,15 @@ function ResumeButton({ courseId }: { courseId: string }): React.JSX.Element | n
 
   const resumeLesson = useMemo(() => {
     if (!course?.sections || completions === undefined) return null;
+    const completedIds = new Set(completions.map((c) => c.lesson_id));
     for (const section of course.sections as SectionWithContent[]) {
-      const completedIds = new Set(completions.map((c) => c.lesson_id));
       const sorted = [...(section.lessons ?? [])].sort((a, b) => a.order - b.order);
       for (const lesson of sorted) {
         if (!completedIds.has(lesson.id)) return lesson;
       }
     }
     return null;
-  }, [course?.sections, completions]);
+  }, [course, completions]);
 
   if (!resumeLesson) return null;
 

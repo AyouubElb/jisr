@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -29,44 +29,70 @@ export function AttendanceDialog({
   open,
   onOpenChange,
 }: AttendanceDialogProps): React.JSX.Element {
-  const { data: rows, isLoading } = useSessionAttendance(
-    open ? sessionId : "",
-    open ? courseId : "",
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* key={sessionId} resets the inner state when the instructor switches sessions */}
+      <AttendanceDialogBody
+        key={sessionId}
+        sessionId={sessionId}
+        courseId={courseId}
+        sessionTitle={sessionTitle}
+        onClose={() => onOpenChange(false)}
+      />
+    </Dialog>
   );
+}
+
+interface AttendanceDialogBodyProps {
+  sessionId: string;
+  courseId: string;
+  sessionTitle: string;
+  onClose: () => void;
+}
+
+function AttendanceDialogBody({
+  sessionId,
+  courseId,
+  sessionTitle,
+  onClose,
+}: AttendanceDialogBodyProps): React.JSX.Element {
+  const { data: rows, isLoading } = useSessionAttendance(sessionId, courseId);
   const { mutate: save, isPending: isSaving } = useSaveAttendance(sessionId);
 
-  const [attendance, setAttendance] = useState<Record<string, boolean>>({});
+  // overrides[studentId] = true|false means the user toggled it; missing keys
+  // fall back to the row's stored attended value.
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (rows) {
-      setAttendance(
-        Object.fromEntries(rows.map((r) => [r.studentId, r.attended])),
-      );
-    }
-  }, [rows]);
+  const isAttended = (studentId: string, fallback: boolean): boolean =>
+    overrides[studentId] ?? fallback;
 
-  const toggle = (studentId: string): void => {
-    setAttendance((prev) => ({ ...prev, [studentId]: !prev[studentId] }));
+  const toggle = (studentId: string, current: boolean): void => {
+    setOverrides((prev) => ({ ...prev, [studentId]: !current }));
   };
 
   const setAll = (value: boolean): void => {
     if (!rows) return;
-    setAttendance(Object.fromEntries(rows.map((r) => [r.studentId, value])));
+    setOverrides(Object.fromEntries(rows.map((r) => [r.studentId, value])));
   };
 
   const handleSave = (): void => {
     if (!rows) return;
     save(
-      rows.map((r) => ({ studentId: r.studentId, attended: attendance[r.studentId] ?? false })),
-      { onSuccess: () => onOpenChange(false) },
+      rows.map((r) => ({
+        studentId: r.studentId,
+        attended: isAttended(r.studentId, r.attended),
+      })),
+      { onSuccess: onClose },
     );
   };
 
-  const presentCount = Object.values(attendance).filter(Boolean).length;
+  const presentCount = rows
+    ? rows.filter((r) => isAttended(r.studentId, r.attended)).length
+    : 0;
   const totalCount = rows?.length ?? 0;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Presence — {sessionTitle}</DialogTitle>
@@ -106,12 +132,12 @@ export function AttendanceDialog({
             {/* Student rows */}
             <div className="max-h-[50vh] space-y-1 overflow-y-auto">
               {rows.map((row) => {
-                const isPresent = attendance[row.studentId] ?? false;
+                const isPresent = isAttended(row.studentId, row.attended);
                 return (
                   <button
                     type="button"
                     key={row.studentId}
-                    onClick={() => toggle(row.studentId)}
+                    onClick={() => toggle(row.studentId, isPresent)}
                     className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
                       isPresent
                         ? "border-emerald-300 bg-emerald-50"
@@ -141,7 +167,7 @@ export function AttendanceDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={onClose}>
             Annuler
           </Button>
           <Button onClick={handleSave} disabled={isSaving || !rows?.length}>
@@ -149,6 +175,6 @@ export function AttendanceDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
+    </>
   );
 }

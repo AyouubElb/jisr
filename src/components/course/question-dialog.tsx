@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
@@ -35,9 +35,8 @@ export function QuestionDialog({
   const [open, setOpen] = useState(false);
   const { mutate: createQuestion, isPending } = useCreateQuestion(courseId);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<CreateQuestionInput>({
-    resolver: zodResolver(createQuestionSchema) as any,
+    resolver: zodResolver(createQuestionSchema) as Resolver<CreateQuestionInput>,
     defaultValues: {
       title: "",
       body: "",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -45,9 +45,8 @@ export function QuestionThreadDialog({
   const { mutate: setStatus, isPending: isTogglingStatus } =
     useSetQuestionStatus(courseId);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<ReplyQuestionInput>({
-    resolver: zodResolver(replyQuestionSchema) as any,
+    resolver: zodResolver(replyQuestionSchema) as Resolver<ReplyQuestionInput>,
     defaultValues: { body: "" },
   });
 

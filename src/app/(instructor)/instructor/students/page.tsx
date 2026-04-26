@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,11 +57,27 @@ export default function InstructorStudentsPage(): React.JSX.Element {
   const { data: courses, isLoading } = useInstructorStudents();
   const { mutate: removeStudent, isPending: isRemoving } = useRemoveStudent();
 
-  const [selected, setSelected] = useState<{
+  type Selection = {
     studentId: string;
     courseId: string;
     fullName: string;
-  } | null>(null);
+  };
+
+  const urlStudentId = searchParams.get("student");
+  const urlCourseId = searchParams.get("courseId");
+
+  const urlSelection = useMemo<Selection | null>(() => {
+    if (!urlStudentId || !urlCourseId || !courses) return null;
+    const course = courses.find((c) => c.courseId === urlCourseId);
+    const student = course?.students.find((s) => s.studentId === urlStudentId);
+    if (!student) return null;
+    return { studentId: urlStudentId, courseId: urlCourseId, fullName: student.fullName };
+  }, [urlStudentId, urlCourseId, courses]);
+
+  // override = undefined means "follow the URL"; null = explicitly closed.
+  const [override, setOverride] = useState<Selection | null | undefined>(undefined);
+  const selected = override !== undefined ? override : urlSelection;
+  const setSelected = (next: Selection | null): void => setOverride(next);
 
   const [confirmRemove, setConfirmRemove] = useState<{
     courseId: string;
@@ -69,19 +85,6 @@ export default function InstructorStudentsPage(): React.JSX.Element {
     studentName: string;
     courseTitle: string;
   } | null>(null);
-
-  // Hydrate selection from URL params (for links from dashboard at-risk card)
-  useEffect(() => {
-    const studentId = searchParams.get("student");
-    const courseId = searchParams.get("courseId");
-    if (studentId && courseId && courses) {
-      const course = courses.find((c) => c.courseId === courseId);
-      const student = course?.students.find((s) => s.studentId === studentId);
-      if (student) {
-        setSelected({ studentId, courseId, fullName: student.fullName });
-      }
-    }
-  }, [searchParams, courses]);
 
   const totalStudents = courses
     ? new Set(courses.flatMap((c) => c.students.map((s) => s.studentId))).size

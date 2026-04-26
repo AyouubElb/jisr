@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import {
@@ -46,26 +46,46 @@ export function QuizAIGenerateDialog({
   sectionId,
   lessons,
 }: QuizAIGenerateDialogProps): React.JSX.Element {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Body is mounted only while open, so its state resets on each open */}
+      {open ? (
+        <QuizAIGenerateDialogBody
+          courseId={courseId}
+          sectionId={sectionId}
+          lessons={lessons}
+          onClose={() => onOpenChange(false)}
+        />
+      ) : null}
+    </Dialog>
+  );
+}
+
+interface QuizAIGenerateDialogBodyProps {
+  courseId: string;
+  sectionId: string;
+  lessons: Pick<Lesson, "id" | "title" | "type">[];
+  onClose: () => void;
+}
+
+function QuizAIGenerateDialogBody({
+  courseId,
+  sectionId,
+  lessons,
+  onClose,
+}: QuizAIGenerateDialogBodyProps): React.JSX.Element {
   const router = useRouter();
   const { mutate: generate, isPending } = useGenerateAIQuiz(courseId, sectionId);
 
-  const [selectedLessonIds, setSelectedLessonIds] = useState<string[]>([]);
+  const [selectedLessonIds, setSelectedLessonIds] = useState<string[]>(() =>
+    lessons.length === 1 ? [lessons[0].id] : [],
+  );
   const [numQuestions, setNumQuestions] = useState<number>(DEFAULT_TOTAL);
   const [mix, setMix] = useState<Mix>(DEFAULT_MIX);
   const [questionsPerPassage, setQuestionsPerPassage] = useState<number>(
     DEFAULT_QUESTIONS_PER_PASSAGE,
   );
   const [focusTopic, setFocusTopic] = useState<string>("");
-
-  useEffect(() => {
-    if (open) {
-      setSelectedLessonIds(lessons.length === 1 ? [lessons[0].id] : []);
-      setNumQuestions(DEFAULT_TOTAL);
-      setMix(DEFAULT_MIX);
-      setQuestionsPerPassage(DEFAULT_QUESTIONS_PER_PASSAGE);
-      setFocusTopic("");
-    }
-  }, [open, lessons]);
 
   const toggleLesson = (id: string): void => {
     setSelectedLessonIds((prev) =>
@@ -99,7 +119,7 @@ export function QuizAIGenerateDialog({
       },
       {
         onSuccess: (res) => {
-          onOpenChange(false);
+          onClose();
           router.push(`/instructor/courses/${courseId}/quizzes/${res.quizId}/edit`);
         },
       },
@@ -107,12 +127,11 @@ export function QuizAIGenerateDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+    <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Générer un quiz avec l'IA
+            Générer un quiz avec l&apos;IA
           </DialogTitle>
           <DialogDescription>
             Choisissez les leçons sources et la répartition des questions. Le
@@ -282,7 +301,7 @@ export function QuizAIGenerateDialog({
           <Button
             type="button"
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={onClose}
             disabled={isPending}
           >
             Annuler
@@ -296,6 +315,5 @@ export function QuizAIGenerateDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
   );
 }

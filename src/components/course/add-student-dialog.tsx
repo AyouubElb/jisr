@@ -36,6 +36,10 @@ export function AddStudentDialog({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  const { data: enrollments } = useCourseEnrollments(courseId);
+  const { data: allStudents } = useAllStudents();
+  const { mutate: addStudent } = useAddStudent();
+
   if (!isPublished) {
     return (
       <Tooltip>
@@ -46,10 +50,6 @@ export function AddStudentDialog({
       </Tooltip>
     );
   }
-
-  const { data: enrollments } = useCourseEnrollments(courseId);
-  const { data: allStudents } = useAllStudents();
-  const { mutate: addStudent } = useAddStudent();
 
   const enrolledIds = new Set(enrollments?.map((e) => e.student_id) ?? []);
   const filtered = (allStudents ?? []).filter(

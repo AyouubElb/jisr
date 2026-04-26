@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Dialog,
@@ -37,9 +37,8 @@ export function SessionDialog({
   const [mode, setMode] = useState<MeetingMode>("auto");
   const { mutate: createSession, isPending } = useCreateSession(courseId);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<CreateSessionInput>({
-    resolver: zodResolver(createSessionSchema) as any,
+    resolver: zodResolver(createSessionSchema) as Resolver<CreateSessionInput>,
     defaultValues: {
       title: "",
       meeting_link: "",
