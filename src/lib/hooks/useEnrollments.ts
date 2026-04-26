@@ -4,6 +4,31 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { enrollmentKeys } from "@/lib/constants/queryKeys";
 import { enrollmentsApi } from "@/lib/api/enrollments.api";
 import { toast } from "sonner";
+import type { CreateStudentInput } from "@/lib/schemas/auth.schema";
+
+export function useCreateStudent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: CreateStudentInput): Promise<{ password: string }> => {
+      const res = await fetch("/api/students/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur inconnue");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...enrollmentKeys.all, "instructor-overview"] });
+      queryClient.invalidateQueries({ queryKey: ["students", "all"] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
 
 /** Current user's enrollments with course info (student view) */
 export function useMyEnrollments() {
@@ -45,8 +70,13 @@ export function useAddStudent() {
   return useMutation({
     mutationFn: ({ courseId, studentId }: { courseId: string; studentId: string }) =>
       enrollmentsApi.addStudent(courseId, studentId),
-    onSuccess: (_, { courseId }) => {
-      queryClient.invalidateQueries({ queryKey: enrollmentKeys.byCourse(courseId) });
+    onSuccess: (_, { studentId, courseId }) => {
+      // Catches byCourse, mine, and instructor-overview in one shot.
+      queryClient.invalidateQueries({ queryKey: enrollmentKeys.all });
+      // Engagement panel for this (student, course) may now show fresh data.
+      queryClient.invalidateQueries({
+        queryKey: ["engagement", "student", studentId, "course", courseId],
+      });
       toast.success("Etudiant ajouté au cours");
     },
     onError: (error: Error) => {
@@ -62,8 +92,11 @@ export function useRemoveStudent() {
   return useMutation({
     mutationFn: ({ courseId, studentId }: { courseId: string; studentId: string }) =>
       enrollmentsApi.removeStudent(courseId, studentId),
-    onSuccess: (_, { courseId }) => {
-      queryClient.invalidateQueries({ queryKey: enrollmentKeys.byCourse(courseId) });
+    onSuccess: (_, { studentId, courseId }) => {
+      queryClient.invalidateQueries({ queryKey: enrollmentKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: ["engagement", "student", studentId, "course", courseId],
+      });
       toast.success("Etudiant retiré du cours");
     },
     onError: (error: Error) => {

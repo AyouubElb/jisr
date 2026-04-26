@@ -23,13 +23,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { LessonDialog } from "@/components/course/lesson-dialog";
-import { ExerciseDialog } from "@/components/course/exercise-dialog";
 import { QuizDialog } from "@/components/course/quiz-dialog";
+import { QuizAIGenerateDialog } from "@/components/course/quiz-ai-generate-dialog";
 import { QuizPreviewModal } from "@/components/course/quiz-preview-modal";
 import { SectionDialog } from "@/components/course/section-dialog";
 import { SessionDialog } from "@/components/course/session-dialog";
 import { AddStudentDialog } from "@/components/course/add-student-dialog";
 import { AttendanceDialog } from "@/components/course/attendance-dialog";
+import { QuestionsPanel } from "@/components/course/questions-panel";
+import { useCourseQuestions } from "@/lib/hooks/useQuestions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   useCourse,
@@ -38,7 +40,6 @@ import {
 } from "@/lib/hooks/useCourses";
 import { useSections, useDeleteSection } from "@/lib/hooks/useSections";
 import { useDeleteLesson } from "@/lib/hooks/useLessons";
-import { useDeleteExercise } from "@/lib/hooks/useExercises";
 import { useDeleteQuiz, useDuplicateQuiz } from "@/lib/hooks/useQuizzes";
 import { useDeleteSession } from "@/lib/hooks/useSessions";
 import {
@@ -66,16 +67,17 @@ import {
   ClipboardList,
   Clock,
   Copy,
-  Dumbbell,
   ClipboardCheck,
   ExternalLink,
   Eye,
   EyeOff,
   FolderPlus,
   GraduationCap,
+  MessageCircle,
   Pencil,
   Plus,
   Settings,
+  Sparkles,
   Trash2,
   UserMinus,
   UserPlus,
@@ -87,7 +89,6 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type {
   CEFRLevel,
-  Exercise,
   Lesson,
   QuizWithBlocks,
   SectionWithContent,
@@ -97,13 +98,12 @@ type LessonDialogState =
   | { mode: "create"; sectionId: string; nextOrder: number }
   | null;
 
-type ExerciseDialogState =
-  | { mode: "create"; sectionId: string; nextOrder: number }
-  | { mode: "edit"; exercise: Exercise }
-  | null;
-
 type QuizDialogState =
   | { mode: "create"; sectionId: string; nextOrder: number }
+  | null;
+
+type AIQuizDialogState =
+  | { sectionId: string; lessons: Pick<Lesson, "id" | "title" | "type">[] }
   | null;
 
 export default function InstructorCourseDetailPage(): React.JSX.Element {
@@ -117,21 +117,23 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
   const { mutate: deleteCourse } = useDeleteCourse();
   const { mutate: deleteSection } = useDeleteSection(courseId);
   const { mutate: deleteLesson } = useDeleteLesson(courseId);
-  const { mutate: deleteExercise } = useDeleteExercise(courseId);
   const { mutate: deleteQuiz } = useDeleteQuiz(courseId);
   const { mutate: duplicateQuiz } = useDuplicateQuiz(courseId);
   const { mutate: deleteSession } = useDeleteSession(courseId);
   const { data: enrollments } = useCourseEnrollments(courseId);
   const { mutate: removeStudent } = useRemoveStudent();
+  const { data: questions } = useCourseQuestions(courseId);
+  const openQuestionsCount =
+    questions?.filter((q) => q.status === "open").length ?? 0;
 
   const [lessonDialog, setLessonDialog] = useState<LessonDialogState>(null);
-  const [exerciseDialog, setExerciseDialog] = useState<ExerciseDialogState>(null);
   const [quizDialog, setQuizDialog] = useState<QuizDialogState>(null);
+  const [aiQuizDialog, setAIQuizDialog] = useState<AIQuizDialogState>(null);
   const [previewQuizId, setPreviewQuizId] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
-    description: string;
+    description: React.ReactNode;
     confirmLabel?: string;
     onConfirm: () => void;
   } | null>(null);
@@ -187,7 +189,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 p-6">
+      <div className="space-y-6">
         <div className="flex items-center gap-3">
           <Skeleton className="h-9 w-9 rounded-lg" />
           <div className="space-y-2">
@@ -220,13 +222,12 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
         : "Ressource";
 
   const totalLessons = sections?.reduce((acc, s) => acc + (s.lessons?.length ?? 0), 0) ?? 0;
-  const totalExercises = sections?.reduce((acc, s) => acc + (s.exercises?.length ?? 0), 0) ?? 0;
   const totalQuizzes = sections?.reduce((acc, s) => acc + (s.quizzes?.length ?? 0), 0) ?? 0;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <Link href="/instructor/courses">
             <Button variant="ghost" size="icon" className="mt-0.5 shrink-0">
@@ -281,50 +282,60 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
         <TabsList className="w-full justify-start gap-1 rounded-xl border border-border bg-muted/40 p-2">
           <TabsTrigger
             value="content"
-            className="gap-2 rounded-lg px-5 py-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <BookOpen className="h-4 w-4" />
-            <span>Contenu</span>
-            <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+            <span className="hidden md:inline">Contenu</span>
+            <span className="hidden lg:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {sections?.length ?? 0}
             </span>
           </TabsTrigger>
           <TabsTrigger
             value="sessions"
-            className="gap-2 rounded-lg px-5 py-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <Calendar className="h-4 w-4" />
-            <span>Sessions</span>
-            <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+            <span className="hidden md:inline">Sessions</span>
+            <span className="hidden lg:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {course.live_sessions?.length ?? 0}
             </span>
           </TabsTrigger>
           <TabsTrigger
             value="students"
-            className="gap-2 rounded-lg px-5 py-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <Users className="h-4 w-4" />
-            <span>Etudiants</span>
-            <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+            <span className="hidden md:inline">Etudiants</span>
+            <span className="hidden lg:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {enrollments?.length ?? 0}
             </span>
           </TabsTrigger>
           <TabsTrigger
+            value="questions"
+            className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+          >
+            <MessageCircle className="h-4 w-4" />
+            <span className="hidden md:inline">Questions</span>
+            <span className="hidden lg:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+              {openQuestionsCount}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger
             value="settings"
-            className="gap-2 rounded-lg px-5 py-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <Settings className="h-4 w-4" />
-            <span>Parametres</span>
+            <span className="hidden md:inline">Parametres</span>
           </TabsTrigger>
         </TabsList>
 
-        {/* ── CONTENT (Sections → Lessons + Exercises) ─────────────── */}
+        {/* ── CONTENT (Sections → Lessons + Quizzes) ─────────────── */}
         <TabsContent value="content" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-lg font-semibold text-amber-950">Contenu du cours</p>
               <p className="text-sm text-muted-foreground">
-                {sections?.length ?? 0} section{(sections?.length ?? 0) !== 1 ? "s" : ""} · {totalLessons} lecon{totalLessons !== 1 ? "s" : ""} · {totalExercises} exercice{totalExercises !== 1 ? "s" : ""} · {totalQuizzes} quiz{totalQuizzes !== 1 ? "s" : ""}
+                {sections?.length ?? 0} section{(sections?.length ?? 0) !== 1 ? "s" : ""} · {totalLessons} lecon{totalLessons !== 1 ? "s" : ""} · {totalQuizzes} quiz{totalQuizzes !== 1 ? "s" : ""}
               </p>
             </div>
             <SectionDialog
@@ -352,31 +363,6 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
             />
           )}
 
-          {/* Exercise dialog (create + edit) */}
-          {exerciseDialog &&
-            (exerciseDialog.mode === "create" ? (
-              <ExerciseDialog
-                open
-                onOpenChange={(open) => {
-                  if (!open) setExerciseDialog(null);
-                }}
-                courseId={courseId}
-                mode="create"
-                sectionId={exerciseDialog.sectionId}
-                nextOrder={exerciseDialog.nextOrder}
-              />
-            ) : (
-              <ExerciseDialog
-                open
-                onOpenChange={(open) => {
-                  if (!open) setExerciseDialog(null);
-                }}
-                courseId={courseId}
-                mode="edit"
-                exercise={exerciseDialog.exercise}
-              />
-            ))}
-
           {/* Quiz create dialog (edit is a dedicated page) */}
           {quizDialog && (
             <QuizDialog
@@ -387,6 +373,19 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
               courseId={courseId}
               sectionId={quizDialog.sectionId}
               nextOrder={quizDialog.nextOrder}
+            />
+          )}
+
+          {/* AI quiz generation dialog */}
+          {aiQuizDialog && (
+            <QuizAIGenerateDialog
+              open
+              onOpenChange={(open) => {
+                if (!open) setAIQuizDialog(null);
+              }}
+              courseId={courseId}
+              sectionId={aiQuizDialog.sectionId}
+              lessons={aiQuizDialog.lessons}
             />
           )}
 
@@ -428,20 +427,10 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                       nextOrder: (section.lessons?.length ?? 0) + 1,
                     })
                   }
-                  onAddExercise={() =>
-                    setExerciseDialog({
-                      mode: "create",
-                      sectionId: section.id,
-                      nextOrder: (section.exercises?.length ?? 0) + 1,
-                    })
-                  }
                   onEditLesson={(lesson) =>
                     router.push(
                       `/instructor/courses/${courseId}/lessons/${lesson.id}/edit`,
                     )
-                  }
-                  onEditExercise={(exercise) =>
-                    setExerciseDialog({ mode: "edit", exercise })
                   }
                   onDeleteLesson={(id) =>
                     setConfirmDialog({
@@ -450,18 +439,21 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                       onConfirm: () => deleteLesson(id),
                     })
                   }
-                  onDeleteExercise={(id) =>
-                    setConfirmDialog({
-                      title: "Supprimer cet exercice",
-                      description: "Le contenu et les documents associes seront supprimes.",
-                      onConfirm: () => deleteExercise(id),
-                    })
-                  }
                   onAddQuiz={() =>
                     setQuizDialog({
                       mode: "create",
                       sectionId: section.id,
                       nextOrder: (section.quizzes?.length ?? 0) + 1,
+                    })
+                  }
+                  onAIQuiz={() =>
+                    setAIQuizDialog({
+                      sectionId: section.id,
+                      lessons: (section.lessons ?? []).map((l) => ({
+                        id: l.id,
+                        title: l.title,
+                        type: l.type,
+                      })),
                     })
                   }
                   onPreviewQuiz={(quiz) => setPreviewQuizId(quiz.id)}
@@ -498,7 +490,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
 
         {/* ── SESSIONS ─────────────────────────────────────────────── */}
         <TabsContent value="sessions" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-lg font-semibold text-amber-950">Sessions en direct</p>
               <p className="text-sm text-muted-foreground">
@@ -630,7 +622,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
             </div>
           )}
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-lg font-semibold text-amber-950">Etudiants inscrits</p>
               <p className="text-sm text-muted-foreground">
@@ -699,9 +691,21 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                     size="icon"
                     className="shrink-0 text-muted-foreground hover:text-destructive"
                     onClick={() =>
-                      removeStudent({
-                        courseId,
-                        studentId: enrollment.student_id,
+                      setConfirmDialog({
+                        title: "Retirer l'etudiant",
+                        description: (
+                          <span className="space-y-1">
+                            <span className="block">
+                              Retirer {enrollment.profiles.full_name} de ce cours ?
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              L&apos;historique (quiz, lecons, presence) est conserve. Vous pourrez le reinscrire a tout moment.
+                            </span>
+                          </span>
+                        ),
+                        confirmLabel: "Retirer",
+                        onConfirm: () =>
+                          removeStudent({ courseId, studentId: enrollment.student_id }),
                       })
                     }
                   >
@@ -711,6 +715,15 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* ── QUESTIONS ────────────────────────────────────────────── */}
+        <TabsContent value="questions" className="mt-4 w-full !overflow-x-hidden">
+          <QuestionsPanel
+            courseId={courseId}
+            currentUserId={course.instructor_id}
+            role="instructor"
+          />
         </TabsContent>
 
         {/* ── SETTINGS ─────────────────────────────────────────────── */}
@@ -832,15 +845,13 @@ function SectionCard({
   expanded,
   onToggle,
   onAddLesson,
-  onAddExercise,
   onAddQuiz,
+  onAIQuiz,
   onEditLesson,
-  onEditExercise,
   onPreviewQuiz,
   onEditQuiz,
   onDuplicateQuiz,
   onDeleteLesson,
-  onDeleteExercise,
   onDeleteQuiz,
   onDeleteSection,
   lessonTypeLabel,
@@ -850,15 +861,13 @@ function SectionCard({
   expanded: boolean;
   onToggle: () => void;
   onAddLesson: () => void;
-  onAddExercise: () => void;
   onAddQuiz: () => void;
+  onAIQuiz: () => void;
   onEditLesson: (lesson: Lesson) => void;
-  onEditExercise: (exercise: Exercise) => void;
   onPreviewQuiz: (quiz: QuizWithBlocks) => void;
   onEditQuiz: (quiz: QuizWithBlocks) => void;
   onDuplicateQuiz: (quiz: QuizWithBlocks) => void;
   onDeleteLesson: (id: string) => void;
-  onDeleteExercise: (id: string) => void;
   onDeleteQuiz: (id: string) => void;
   onDeleteSection: () => void;
   lessonTypeLabel: (type: string) => string;
@@ -881,10 +890,10 @@ function SectionCard({
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-amber-950">{section.title}</p>
           <p className="text-xs text-muted-foreground">
-            {section.lessons?.length ?? 0} lecon{(section.lessons?.length ?? 0) !== 1 ? "s" : ""} · {section.exercises?.length ?? 0} exercice{(section.exercises?.length ?? 0) !== 1 ? "s" : ""} · {section.quizzes?.length ?? 0} quiz{(section.quizzes?.length ?? 0) !== 1 ? "s" : ""}
+            {section.lessons?.length ?? 0} lecon{(section.lessons?.length ?? 0) !== 1 ? "s" : ""} · {section.quizzes?.length ?? 0} quiz{(section.quizzes?.length ?? 0) !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="hidden sm:flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="ghost"
             size="sm"
@@ -892,16 +901,7 @@ function SectionCard({
             onClick={onAddLesson}
           >
             <BookOpen className="h-3.5 w-3.5" />
-            Lecon
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            onClick={onAddExercise}
-          >
-            <Dumbbell className="h-3.5 w-3.5" />
-            Exercice
+            <span className="hidden sm:inline">Lecon</span>
           </Button>
           <Button
             variant="ghost"
@@ -910,7 +910,22 @@ function SectionCard({
             onClick={onAddQuiz}
           >
             <ClipboardList className="h-3.5 w-3.5" />
-            Quiz
+            <span className="hidden sm:inline">Quiz</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 text-xs text-primary hover:text-primary"
+            onClick={onAIQuiz}
+            disabled={(section.lessons?.length ?? 0) === 0}
+            title={
+              (section.lessons?.length ?? 0) === 0
+                ? "Ajoutez au moins une leçon pour générer avec l'IA"
+                : "Générer un quiz avec l'IA"
+            }
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Quiz IA</span>
           </Button>
           <Button
             variant="ghost"
@@ -923,13 +938,12 @@ function SectionCard({
         </div>
       </div>
 
-      {/* Expanded content — interleaved timeline (lessons + exercises + quizzes sorted by order) */}
+      {/* Expanded content — interleaved timeline (lessons + quizzes sorted by order) */}
       {expanded && (
         <div className="border-t border-border">
           {(() => {
             type TimelineItem =
               | { kind: "lesson"; order: number; lesson: Lesson }
-              | { kind: "exercise"; order: number; exercise: Exercise }
               | { kind: "quiz"; order: number; quiz: QuizWithBlocks };
 
             const items: TimelineItem[] = [
@@ -937,11 +951,6 @@ function SectionCard({
                 kind: "lesson",
                 order: l.order,
                 lesson: l,
-              })),
-              ...(section.exercises ?? []).map<TimelineItem>((e) => ({
-                kind: "exercise",
-                order: e.order,
-                exercise: e,
               })),
               ...(section.quizzes ?? []).map<TimelineItem>((q) => ({
                 kind: "quiz",
@@ -987,46 +996,6 @@ function SectionCard({
                             size="icon"
                             className="h-7 w-7 text-muted-foreground hover:text-destructive"
                             onClick={() => onDeleteLesson(lesson.id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (item.kind === "exercise") {
-                    const exercise = item.exercise;
-                    return (
-                      <div
-                        key={`exercise-${exercise.id}`}
-                        className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 group"
-                      >
-                        <Dumbbell className="h-4 w-4 shrink-0 text-orange-500/60" />
-                        <span className="text-xs text-muted-foreground font-medium w-5">
-                          {idx + 1}.
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{exercise.title}</p>
-                          <Badge variant="outline" className="mt-0.5 text-[10px]">
-                            Exercice
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            title="Modifier le contenu"
-                            onClick={() => onEditExercise(exercise)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            onClick={() => onDeleteExercise(exercise.id)}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -1106,7 +1075,7 @@ function SectionCard({
           })()}
 
           {/* Empty state inside section */}
-          {!section.lessons?.length && !section.exercises?.length && !section.quizzes?.length && (
+          {!section.lessons?.length && !section.quizzes?.length && (
             <div className="px-4 py-8 text-center">
               <p className="text-sm text-muted-foreground">
                 Cette section est vide. Ajoutez des lecons, des exercices ou des quiz.

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useInstructorStudents, useRemoveStudent } from "@/lib/hooks/useEnrollments";
+import { CreateStudentDialog } from "@/components/course/create-student-dialog";
 import { useStudentEngagement } from "@/lib/hooks/useEngagement";
 import { LEVEL_BADGE_COLORS } from "@/lib/constants/levels";
 import {
@@ -92,9 +93,14 @@ export default function InstructorStudentsPage(): React.JSX.Element {
     <>
       <div className="space-y-6">
         {/* Page header */}
-        <div>
-          <h1 className="text-2xl font-bold">Etudiants</h1>
-          <p className="text-muted-foreground">Vue d&apos;ensemble de vos etudiants par cours</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-amber-950">Etudiants</h1>
+            <p className="text-muted-foreground">Vue d&apos;ensemble de vos etudiants par cours</p>
+          </div>
+          <div className="self-start sm:self-auto">
+            <CreateStudentDialog />
+          </div>
         </div>
 
         {/* ── STAT CARDS ───────────────────────────────────────── */}
@@ -202,7 +208,7 @@ export default function InstructorStudentsPage(): React.JSX.Element {
                           return (
                             <div
                               key={student.enrollmentId}
-                              className={`flex items-center justify-between gap-2 px-4 py-2.5 transition-colors ${
+                              className={`flex items-center justify-between gap-2 px-4 py-2.5 transition-colors active:bg-muted/40 ${
                                 isActive
                                   ? "bg-primary/5 border-l-2 border-l-primary"
                                   : "hover:bg-muted/30"
@@ -277,9 +283,16 @@ export default function InstructorStudentsPage(): React.JSX.Element {
         onOpenChange={(open) => { if (!open) setConfirmRemove(null); }}
         title="Retirer l'etudiant"
         description={
-          confirmRemove
-            ? `Retirer ${confirmRemove.studentName} du cours "${confirmRemove.courseTitle}" ?`
-            : ""
+          confirmRemove ? (
+            <span className="space-y-1">
+              <span className="block">
+                Retirer {confirmRemove.studentName} du cours &quot;{confirmRemove.courseTitle}&quot; ?
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                L&apos;historique de l&apos;etudiant (quiz, lecons, presence) est conserve. Vous pourrez le reinscrire a tout moment.
+              </span>
+            </span>
+          ) : ""
         }
         confirmLabel="Retirer"
         isPending={isRemoving}
