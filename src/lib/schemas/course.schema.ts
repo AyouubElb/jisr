@@ -23,10 +23,3 @@ export const createLessonSchema = z.object({
 });
 
 export type CreateLessonInput = z.infer<typeof createLessonSchema>;
-
-export const createExerciseSchema = z.object({
-  title: z.string().min(3, "Le titre doit contenir au moins 3 caracteres"),
-  content: z.string(),
-});
-
-export type CreateExerciseInput = z.infer<typeof createExerciseSchema>;

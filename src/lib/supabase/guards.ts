@@ -23,13 +23,14 @@ export async function requireStudent(): Promise<Profile> {
 
   if (!profile) redirect("/login");
   if (profile.role === "instructor") redirect("/instructor");
+  if (profile.role === "admin") redirect("/admin");
 
   return profile;
 }
 
 /**
  * Server-side guard: require a logged-in instructor. Redirects students to
- * their dashboard and unauthenticated users to /login.
+ * their dashboard, admins to admin home, and unauthenticated users to /login.
  */
 export async function requireInstructor(): Promise<Profile> {
   const supabase = await createServerSupabase();
@@ -45,7 +46,35 @@ export async function requireInstructor(): Promise<Profile> {
     .eq("id", user.id)
     .single();
 
-  if (!profile || profile.role !== "instructor") redirect("/student");
+  if (!profile) redirect("/login");
+  if (profile.role === "admin") redirect("/admin");
+  if (profile.role !== "instructor") redirect("/student");
+
+  return profile;
+}
+
+/**
+ * Server-side guard: require a logged-in admin. Non-admins are redirected
+ * to their regular dashboard; unauthenticated users go to /login.
+ */
+export async function requireAdmin(): Promise<Profile> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile) redirect("/login");
+  if (profile.role !== "admin") {
+    redirect(profile.role === "instructor" ? "/instructor" : "/student");
+  }
 
   return profile;
 }

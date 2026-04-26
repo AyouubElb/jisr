@@ -2,16 +2,15 @@ import { createClient } from "@/lib/supabase/client";
 import type { Section, SectionInsert, SectionUpdate, SectionWithContent } from "@/lib/types";
 
 export const sectionsApi = {
-  /** List sections for a course with their lessons and exercises */
+  /** List sections for a course with their lessons and quizzes */
   listByCourse: async (courseId: string): Promise<SectionWithContent[]> => {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("sections")
-      .select("*, lessons(*), exercises(*), quizzes(*, quiz_blocks(*))")
+      .select("*, lessons(*), quizzes(*, quiz_blocks(*))")
       .eq("course_id", courseId)
       .order("order", { ascending: true })
       .order("order", { referencedTable: "lessons", ascending: true })
-      .order("order", { referencedTable: "exercises", ascending: true })
       .order("order", { referencedTable: "quizzes", ascending: true })
       .order("order", { referencedTable: "quizzes.quiz_blocks", ascending: true });
 
@@ -43,7 +42,7 @@ export const sectionsApi = {
     if (error) throw error;
   },
 
-  /** Delete a section (cascades to lessons + exercises + quizzes) */
+  /** Delete a section (cascades to lessons + quizzes) */
   delete: async (id: string): Promise<void> => {
     const supabase = createClient();
     const { error } = await supabase.from("sections").delete().eq("id", id);

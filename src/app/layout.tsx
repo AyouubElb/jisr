@@ -11,8 +11,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "English Learn",
-  description: "Plateforme d'apprentissage de l'anglais",
+  title: "TeachSpace — La plateforme des profs d'anglais au Maroc",
+  description:
+    "Créez vos cours, organisez vos sessions en direct, et suivez l'engagement de vos élèves — dans un seul outil pensé pour les instructeurs marocains.",
 };
 
 export default function RootLayout({

@@ -32,16 +32,9 @@ export const lessonKeys = {
   detail: (id: string) => [...lessonKeys.details(), id] as const,
 };
 
-export const exerciseKeys = {
-  all: ["exercises"] as const,
-  bySection: (sectionId: string) => [...exerciseKeys.all, "section", sectionId] as const,
-  detail: (id: string) => [...exerciseKeys.all, "detail", id] as const,
-};
-
 export const materialKeys = {
   all: ["materials"] as const,
   byLesson: (lessonId: string) => [...materialKeys.all, "lesson", lessonId] as const,
-  byExercise: (exerciseId: string) => [...materialKeys.all, "exercise", exerciseId] as const,
 };
 
 export const quizKeys = {
@@ -55,7 +48,12 @@ export const attemptKeys = {
   byQuiz: (quizId: string) => [...attemptKeys.all, "quiz", quizId] as const,
   mine: (quizId: string) => [...attemptKeys.all, "mine", quizId] as const,
   mineByCourse: (courseId: string) => [...attemptKeys.all, "mine", "course", courseId] as const,
+  mineAll: () => [...attemptKeys.all, "mine", "all"] as const,
+  mineReview: (id: string) => [...attemptKeys.all, "mine", "review", id] as const,
   detail: (id: string) => [...attemptKeys.all, "detail", id] as const,
+  inbox: (filter: "pending" | "all" | "graded") =>
+    [...attemptKeys.all, "inbox", filter] as const,
+  pendingCount: () => [...attemptKeys.all, "pending-count"] as const,
 };
 
 export const profileKeys = {
@@ -78,4 +76,18 @@ export const attendanceKeys = {
   all: ["session_attendance"] as const,
   bySession: (sessionId: string) => [...attendanceKeys.all, "session", sessionId] as const,
   byCourse: (courseId: string) => [...attendanceKeys.all, "course", courseId] as const,
+};
+
+export const questionKeys = {
+  all: ["course_questions"] as const,
+  byCourse: (courseId: string) => [...questionKeys.all, "course", courseId] as const,
+  detail: (id: string) => [...questionKeys.all, "detail", id] as const,
+};
+
+export const adminKeys = {
+  all: ["admin"] as const,
+  stats: () => [...adminKeys.all, "stats"] as const,
+  recentInvites: () => [...adminKeys.all, "recent-invites"] as const,
+  instructors: () => [...adminKeys.all, "instructors"] as const,
+  students: () => [...adminKeys.all, "students"] as const,
 };

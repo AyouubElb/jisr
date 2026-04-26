@@ -14,15 +14,6 @@ export function useLessonMaterials(lessonId: string | undefined) {
   });
 }
 
-/** Materials for an exercise */
-export function useExerciseMaterials(exerciseId: string | undefined) {
-  return useQuery({
-    queryKey: materialKeys.byExercise(exerciseId!),
-    queryFn: () => materialsApi.listByExercise(exerciseId!),
-    enabled: !!exerciseId,
-  });
-}
-
 /** Upload a file */
 export function useUploadMaterial() {
   const queryClient = useQueryClient();
@@ -32,22 +23,15 @@ export function useUploadMaterial() {
       file,
       courseId,
       lessonId,
-      exerciseId,
     }: {
       file: File;
       courseId: string;
-      lessonId?: string;
-      exerciseId?: string;
-    }) => materialsApi.upload(file, { courseId, lessonId, exerciseId }),
+      lessonId: string;
+    }) => materialsApi.upload(file, { courseId, lessonId }),
     onSuccess: (material) => {
       if (material.lesson_id) {
         queryClient.invalidateQueries({
           queryKey: materialKeys.byLesson(material.lesson_id),
-        });
-      }
-      if (material.exercise_id) {
-        queryClient.invalidateQueries({
-          queryKey: materialKeys.byExercise(material.exercise_id),
         });
       }
       toast.success("Document ajoute");
@@ -70,17 +54,11 @@ export function useDeleteMaterial() {
       id: string;
       fileUrl: string;
       lessonId?: string;
-      exerciseId?: string;
     }) => materialsApi.delete(id, fileUrl),
-    onSuccess: (_, { lessonId, exerciseId }) => {
+    onSuccess: (_, { lessonId }) => {
       if (lessonId) {
         queryClient.invalidateQueries({
           queryKey: materialKeys.byLesson(lessonId),
-        });
-      }
-      if (exerciseId) {
-        queryClient.invalidateQueries({
-          queryKey: materialKeys.byExercise(exerciseId),
         });
       }
       toast.success("Document supprime");

@@ -17,6 +17,13 @@ const textBlockContentSchema = z.object({
 const audioBlockContentSchema = z.object({
   audio_url: z.string().min(1, "Fichier audio requis"),
   caption: z.string().optional(),
+  // AI-generated audio carries its source script so instructors can edit
+  // the text and regenerate the audio without losing the transcript.
+  script: z.string().optional(),
+  voice_id: z.string().optional(),
+  speed: z.number().min(0.5).max(2).optional(),
+  duration_seconds: z.number().min(0).optional(),
+  transcript_visible: z.boolean().optional(),
 });
 
 const imageBlockContentSchema = z.object({
@@ -31,6 +38,10 @@ const mcqBlockContentSchema = z
     options: z
       .array(mcqOptionSchema)
       .min(2, "Au moins 2 options sont requises"),
+    // Set when this MCQ is a listening-comprehension question tied to a
+    // preceding audio block. The player uses it to render the audio
+    // alongside the question.
+    audio_block_id: z.string().uuid().optional(),
   })
   .refine((data) => data.options.some((o) => o.is_correct), {
     message: "Au moins une option doit etre correcte",
@@ -83,6 +94,13 @@ const voiceBlockContentSchema = z.object({
     .default(120),
 });
 
+// Pure marker block — positional divider that groups the following blocks
+// into a named part of the quiz (e.g. "Partie 1: Vocabulaire"). Non-gradable.
+const sectionBlockContentSchema = z.object({
+  title: z.string().min(1, "Le titre est requis"),
+  description: z.string().optional(),
+});
+
 // Map type → content schema for validation
 export const blockContentSchemas = {
   text: textBlockContentSchema,
@@ -92,6 +110,7 @@ export const blockContentSchemas = {
   fill_blank: fillBlankBlockContentSchema,
   free_text: freeTextBlockContentSchema,
   voice: voiceBlockContentSchema,
+  section: sectionBlockContentSchema,
 } as const;
 
 export type BlockType = keyof typeof blockContentSchemas;
@@ -103,6 +122,7 @@ export type McqBlockContent = z.infer<typeof mcqBlockContentSchema>;
 export type FillBlankBlockContent = z.infer<typeof fillBlankBlockContentSchema>;
 export type FreeTextBlockContent = z.infer<typeof freeTextBlockContentSchema>;
 export type VoiceBlockContent = z.infer<typeof voiceBlockContentSchema>;
+export type SectionBlockContent = z.infer<typeof sectionBlockContentSchema>;
 
 export type BlockContent =
   | TextBlockContent
@@ -111,7 +131,8 @@ export type BlockContent =
   | McqBlockContent
   | FillBlankBlockContent
   | FreeTextBlockContent
-  | VoiceBlockContent;
+  | VoiceBlockContent
+  | SectionBlockContent;
 
 // Gradable block types — only these contribute to scoring and generate answers
 export const GRADABLE_BLOCK_TYPES = ["mcq", "fill_blank", "free_text", "voice"] as const;
@@ -130,6 +151,7 @@ export const isManualBlock = (type: BlockType): type is ManualBlockType =>
 // ── Quiz-level schemas ────────────────────────────────────────────────
 
 export const BLOCK_TYPES = [
+  "section",
   "text",
   "audio",
   "image",
@@ -140,6 +162,7 @@ export const BLOCK_TYPES = [
 ] as const;
 
 export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
+  section: "Section",
   text: "Texte / Passage",
   audio: "Audio",
   image: "Image",
@@ -161,6 +184,11 @@ export const createQuizSchema = z.object({
     .min(0, "Minimum 0%")
     .max(100, "Maximum 100%")
     .default(60),
+  // null = unlimited retakes; 1+ caps the number of attempts per student.
+  max_attempts: z.union([
+    z.number().int().min(1, "Minimum 1").max(20, "Maximum 20"),
+    z.null(),
+  ]).optional(),
 });
 
 export type CreateQuizInput = z.infer<typeof createQuizSchema>;

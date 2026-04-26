@@ -14,6 +14,8 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  ChevronsDown,
+  ChevronsUp,
   Copy,
   GripVertical,
   ImageIcon,
@@ -34,8 +36,10 @@ interface BlockWrapperProps {
   total: number;
   points: number | null;
   error?: string;
+  onMoveToTop: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onMoveToBottom: () => void;
   onDuplicate: () => void;
   onRemove: () => void;
   onPointsChange: (p: number | null) => void;
@@ -48,8 +52,10 @@ export function BlockWrapper({
   total,
   points,
   error,
+  onMoveToTop,
   onMoveUp,
   onMoveDown,
+  onMoveToBottom,
   onDuplicate,
   onRemove,
   onPointsChange,
@@ -89,6 +95,16 @@ export function BlockWrapper({
             size="icon"
             className="h-7 w-7"
             disabled={index === 0}
+            title="Monter tout en haut"
+            onClick={onMoveToTop}
+          >
+            <ChevronsUp className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            disabled={index === 0}
             onClick={onMoveUp}
           >
             <ArrowUp className="h-3.5 w-3.5" />
@@ -101,6 +117,16 @@ export function BlockWrapper({
             onClick={onMoveDown}
           >
             <ArrowDown className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            disabled={index === total - 1}
+            title="Descendre tout en bas"
+            onClick={onMoveToBottom}
+          >
+            <ChevronsDown className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
@@ -156,6 +182,41 @@ export function TextBlockEditor({
   );
 }
 
+// ── Section block editor ──────────────────────────────────────────────
+
+interface SectionBlockEditorProps {
+  content: { title?: string; description?: string };
+  onChange: (content: { title: string; description?: string }) => void;
+}
+
+export function SectionBlockEditor({
+  content,
+  onChange,
+}: SectionBlockEditorProps): React.JSX.Element {
+  const title = content.title ?? "";
+  const description = content.description ?? "";
+  return (
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <Label>Titre de la section</Label>
+        <Input
+          value={title}
+          onChange={(e) => onChange({ title: e.target.value, description })}
+          placeholder="ex : Partie 1 — Vocabulaire"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Description (optionnel)</Label>
+        <Input
+          value={description}
+          onChange={(e) => onChange({ title, description: e.target.value })}
+          placeholder="Consignes ou contexte pour cette section"
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── MCQ block editor ──────────────────────────────────────────────────
 
 interface McqBlockEditorProps {
@@ -175,6 +236,7 @@ export function McqBlockEditor({
   const prompt = content.prompt ?? "";
   const options = content.options ?? [];
   const allowMultiple = content.allow_multiple ?? false;
+  const isBinary = options.length <= 2;
 
   const emit = (next: {
     prompt?: string;
@@ -250,32 +312,34 @@ export function McqBlockEditor({
         />
       </div>
 
-      {/* Mode toggle — single vs multiple correct answers */}
-      <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-2.5 py-1.5">
-        <div className="flex flex-col">
-          <span className="text-xs font-medium">Plusieurs bonnes reponses</span>
-          <span className="text-[11px] text-muted-foreground">
-            {allowMultiple
-              ? "Toutes les bonnes options doivent etre cochees"
-              : "Une seule bonne reponse"}
-          </span>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={allowMultiple}
-          onClick={() => toggleMode(!allowMultiple)}
-          className={`relative h-4 w-8 shrink-0 rounded-full transition-colors ${
-            allowMultiple ? "bg-primary" : "bg-muted-foreground/30"
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
-              allowMultiple ? "-translate-x-3" : "translate-x-0.5"
+      {/* Mode toggle — hidden for binary (2-option) choices like Vrai/Faux */}
+      {!isBinary && (
+        <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-2.5 py-1.5">
+          <div className="flex flex-col">
+            <span className="text-xs font-medium">Plusieurs bonnes reponses</span>
+            <span className="text-[11px] text-muted-foreground">
+              {allowMultiple
+                ? "Toutes les bonnes options doivent etre cochees"
+                : "Une seule bonne reponse"}
+            </span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={allowMultiple}
+            onClick={() => toggleMode(!allowMultiple)}
+            className={`relative h-4 w-8 shrink-0 rounded-full transition-colors ${
+              allowMultiple ? "bg-primary" : "bg-muted-foreground/30"
             }`}
-          />
-        </button>
-      </div>
+          >
+            <span
+              className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${
+                allowMultiple ? "-translate-x-3" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+      )}
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -312,26 +376,30 @@ export function McqBlockEditor({
               onChange={(e) => updateOption(idx, { label: e.target.value })}
               placeholder={`Option ${idx + 1}`}
             />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-              onClick={() => removeOption(idx)}
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
+            {!isBinary && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                onClick={() => removeOption(idx)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addOption}
-          className="gap-1.5"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Ajouter une option
-        </Button>
+        {!isBinary && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addOption}
+            className="gap-1.5"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Ajouter une option
+          </Button>
+        )}
       </div>
     </div>
   );

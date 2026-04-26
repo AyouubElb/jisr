@@ -6,7 +6,7 @@ import { sectionsApi } from "@/lib/api/sections.api";
 import { toast } from "sonner";
 import type { SectionInsert, SectionUpdate } from "@/lib/types";
 
-/** Sections for a course (with nested lessons + exercises) */
+/** Sections for a course (with nested lessons + quizzes) */
 export function useSections(courseId: string) {
   return useQuery({
     queryKey: sectionKeys.byCourse(courseId),

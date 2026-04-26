@@ -138,6 +138,15 @@ function BlockViewer({
         </div>
       )}
       <div className="p-4">
+        {type === "section" && (
+          <div className="flex items-center gap-3 py-1">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {(content.title as string) || ""}
+            </span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+        )}
         {type === "text" && <TextBlockViewer content={content} />}
         {type === "audio" && <AudioBlockViewer content={content} />}
         {type === "image" && <ImageBlockViewer content={content} />}

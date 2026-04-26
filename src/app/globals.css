@@ -126,5 +126,17 @@
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+  }
+}
+
+@media print {
+  @page {
+    margin: 2cm;
+  }
+  body {
+    background: white;
+    color: black;
   }
 }

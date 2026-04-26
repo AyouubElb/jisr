@@ -4,7 +4,6 @@ import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   useLessonMaterials,
-  useExerciseMaterials,
   useUploadMaterial,
   useDeleteMaterial,
   useSignedUrl,
@@ -24,8 +23,7 @@ const MAX_SIZE_MB = 10;
 
 interface SavedFileUploadProps {
   courseId: string;
-  lessonId?: string;
-  exerciseId?: string;
+  lessonId: string;
   /** Not used in saved mode — omit */
   pendingFiles?: never;
   onPendingFilesChange?: never;
@@ -35,7 +33,6 @@ interface PendingFileUploadProps {
   /** Not used in pending mode */
   courseId?: never;
   lessonId?: never;
-  exerciseId?: never;
   /** Local files queued before save */
   pendingFiles: File[];
   onPendingFilesChange: (files: File[]) => void;
@@ -47,20 +44,16 @@ export function FileUpload(props: FileUploadProps): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const isPendingMode = "pendingFiles" in props && props.pendingFiles !== undefined;
 
-  // Saved-mode hooks — only valid when IDs exist
-  const { data: lessonMaterials, isLoading: isLoadingLesson } =
-    useLessonMaterials(!isPendingMode ? props.lessonId : undefined);
-  const { data: exerciseMaterials, isLoading: isLoadingExercise } =
-    useExerciseMaterials(!isPendingMode ? props.exerciseId : undefined);
+  // Saved-mode hook — only valid when lessonId exists
+  const { data: lessonMaterials, isLoading } = useLessonMaterials(
+    !isPendingMode ? props.lessonId : undefined,
+  );
 
   const { mutate: upload, isPending: isUploading } = useUploadMaterial();
   const { mutate: deleteMaterial } = useDeleteMaterial();
   const { mutate: getSignedUrl } = useSignedUrl();
 
-  const isLoading = isLoadingLesson || isLoadingExercise;
-  const savedMaterials = !isPendingMode
-    ? (props.lessonId ? lessonMaterials : exerciseMaterials) ?? []
-    : [];
+  const savedMaterials = !isPendingMode ? lessonMaterials ?? [] : [];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
@@ -79,7 +72,6 @@ export function FileUpload(props: FileUploadProps): React.JSX.Element {
         file,
         courseId: props.courseId,
         lessonId: props.lessonId,
-        exerciseId: props.exerciseId,
       });
     }
 
@@ -142,7 +134,6 @@ export function FileUpload(props: FileUploadProps): React.JSX.Element {
                     id: mat.id,
                     fileUrl: mat.file_url,
                     lessonId: props.lessonId,
-                    exerciseId: props.exerciseId,
                   })
                 }
               >

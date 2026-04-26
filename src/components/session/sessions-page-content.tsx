@@ -73,24 +73,33 @@ export function SessionsPageContent({
     <div className="space-y-4">
       {/* Tabs */}
       <Tabs value={tab} onValueChange={handleTabChange}>
-        <TabsList>
-          <TabsTrigger value="all">
-            Toutes
-            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
+        <TabsList className="w-full justify-start gap-1 rounded-xl border border-border bg-muted/40 p-2">
+          <TabsTrigger
+            value="all"
+            className="gap-1.5 rounded-lg px-3 py-2 md:px-5 md:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+          >
+            <span>Toutes</span>
+            <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {sessions?.length ?? 0}
-            </Badge>
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="upcoming">
-            A venir
-            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
+          <TabsTrigger
+            value="upcoming"
+            className="gap-1.5 rounded-lg px-3 py-2 md:px-5 md:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+          >
+            <span>A venir</span>
+            <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {upcomingCount}
-            </Badge>
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="past">
-            Passees
-            <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-[10px]">
+          <TabsTrigger
+            value="past"
+            className="gap-1.5 rounded-lg px-3 py-2 md:px-5 md:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+          >
+            <span>Passees</span>
+            <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {pastCount}
-            </Badge>
+            </span>
           </TabsTrigger>
         </TabsList>
       </Tabs>

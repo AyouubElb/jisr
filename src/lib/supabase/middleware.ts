@@ -31,7 +31,15 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
 
   // Public routes that don't require auth
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/register");
-  const isPublicRoute = pathname === "/" || isAuthRoute;
+  const isCallbackRoute = pathname.startsWith("/auth/callback");
+  const isInstructorSignup = pathname.startsWith("/instructor/signup");
+  const isInstructorSignupApi = pathname.startsWith("/api/auth/instructor-signup");
+  const isPublicRoute =
+    pathname === "/" ||
+    isAuthRoute ||
+    isCallbackRoute ||
+    isInstructorSignup ||
+    isInstructorSignupApi;
 
   // Not logged in and trying to access protected route
   if (!user && !isPublicRoute) {
@@ -40,11 +48,21 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     return NextResponse.redirect(url);
   }
 
-  // Logged in and trying to access auth pages — redirect to dashboard
+  // Logged in and trying to access auth pages — redirect based on role.
   if (user && isAuthRoute) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
     const url = request.nextUrl.clone();
-    // We'll determine role-based redirect after profile fetch
-    url.pathname = "/student";
+    url.pathname =
+      profile?.role === "admin"
+        ? "/admin"
+        : profile?.role === "instructor"
+          ? "/instructor"
+          : "/student";
     return NextResponse.redirect(url);
   }
 

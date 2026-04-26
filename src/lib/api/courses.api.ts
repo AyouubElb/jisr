@@ -36,16 +36,15 @@ export const coursesApi = {
     return data as unknown as CourseWithInstructor[];
   },
 
-  /** Get a single course with sections (containing lessons + exercises + quizzes) and sessions */
+  /** Get a single course with sections (containing lessons + quizzes) and sessions */
   detail: async (id: string): Promise<CourseWithDetails> => {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("courses")
-      .select("*, profiles(full_name, avatar_url), sections(*, lessons(*), exercises(*), quizzes(*, quiz_blocks(*))), live_sessions(*)")
+      .select("*, profiles(full_name, avatar_url), sections(*, lessons(*), quizzes(*, quiz_blocks(*))), live_sessions(*)")
       .eq("id", id)
       .order("order", { referencedTable: "sections", ascending: true })
       .order("order", { referencedTable: "sections.lessons", ascending: true })
-      .order("order", { referencedTable: "sections.exercises", ascending: true })
       .order("order", { referencedTable: "sections.quizzes", ascending: true })
       .order("order", { referencedTable: "sections.quizzes.quiz_blocks", ascending: true })
       .order("scheduled_at", { referencedTable: "live_sessions", ascending: true })

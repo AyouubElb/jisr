@@ -93,12 +93,12 @@ export default function InstructorDashboardPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Tableau de bord</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-amber-950">Tableau de bord</h1>
           <p className="text-muted-foreground">Gerez vos cours et suivez vos etudiants</p>
         </div>
-        <Link href="/instructor/courses/new">
+        <Link href="/instructor/courses/new" className="self-start sm:self-auto">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Nouveau cours
@@ -206,10 +206,20 @@ export default function InstructorDashboardPage(): React.JSX.Element {
         {/* Activity feed — spans 3 cols */}
         <Card className="lg:col-span-3">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Activite recente</CardTitle>
-            <CardDescription>
-              Dernieres actions de vos etudiants
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Activite recente</CardTitle>
+                <CardDescription>
+                  Dernieres actions de vos etudiants
+                </CardDescription>
+              </div>
+              <Link
+                href="/instructor/activite"
+                className="text-xs text-primary hover:underline"
+              >
+                Voir tout
+              </Link>
+            </div>
           </CardHeader>
           <CardContent>
             {activityLoading ? (
@@ -227,7 +237,7 @@ export default function InstructorDashboardPage(): React.JSX.Element {
               </div>
             ) : (
               <div className="space-y-1">
-                {activity.map((item) => (
+                {activity.slice(0, 5).map((item) => (
                   <div
                     key={`${item.type}-${item.id}`}
                     className="flex items-start gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/30"

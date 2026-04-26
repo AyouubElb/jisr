@@ -11,26 +11,86 @@ export type Database = {
         Row: {
           id: string;
           full_name: string;
-          role: "student" | "instructor";
+          role: "student" | "instructor" | "admin";
           avatar_url: string | null;
           level: string | null;
+          status: "pending" | "active";
+          tier: "free" | "pro" | "studio";
           created_at: string;
         };
         Insert: {
           id: string;
           full_name: string;
-          role: "student" | "instructor";
+          role: "student" | "instructor" | "admin";
           avatar_url?: string | null;
           level?: string | null;
+          status?: "pending" | "active";
+          tier?: "free" | "pro" | "studio";
           created_at?: string;
         };
         Update: {
           id?: string;
           full_name?: string;
-          role?: "student" | "instructor";
+          role?: "student" | "instructor" | "admin";
           avatar_url?: string | null;
           level?: string | null;
+          status?: "pending" | "active";
+          tier?: "free" | "pro" | "studio";
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      invites: {
+        Row: {
+          id: string;
+          token: string;
+          email: string;
+          kind: "student" | "instructor";
+          instructor_id: string | null;
+          full_name: string | null;
+          expires_at: string;
+          consumed_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          token: string;
+          email: string;
+          kind: "student" | "instructor";
+          instructor_id?: string | null;
+          full_name?: string | null;
+          expires_at: string;
+          consumed_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          token?: string;
+          email?: string;
+          kind?: "student" | "instructor";
+          instructor_id?: string | null;
+          full_name?: string | null;
+          expires_at?: string;
+          consumed_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      instructor_students: {
+        Row: {
+          instructor_id: string;
+          student_id: string;
+          added_at: string;
+        };
+        Insert: {
+          instructor_id: string;
+          student_id: string;
+          added_at?: string;
+        };
+        Update: {
+          instructor_id?: string;
+          student_id?: string;
+          added_at?: string;
         };
         Relationships: [];
       };
@@ -145,41 +205,6 @@ export type Database = {
           }
         ];
       };
-      exercises: {
-        Row: {
-          id: string;
-          section_id: string;
-          title: string;
-          content: string;
-          order: number;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          section_id: string;
-          title: string;
-          content?: string;
-          order: number;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          section_id?: string;
-          title?: string;
-          content?: string;
-          order?: number;
-          created_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "exercises_section_id_fkey";
-            columns: ["section_id"];
-            isOneToOne: false;
-            referencedRelation: "sections";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
       live_sessions: {
         Row: {
           id: string;
@@ -225,6 +250,7 @@ export type Database = {
           course_id: string;
           enrolled_at: string;
           last_active_at: string | null;
+          removed_at: string | null;
         };
         Insert: {
           id?: string;
@@ -232,6 +258,7 @@ export type Database = {
           course_id: string;
           enrolled_at?: string;
           last_active_at?: string | null;
+          removed_at?: string | null;
         };
         Update: {
           id?: string;
@@ -239,6 +266,7 @@ export type Database = {
           course_id?: string;
           enrolled_at?: string;
           last_active_at?: string | null;
+          removed_at?: string | null;
         };
         Relationships: [
           {
@@ -260,8 +288,7 @@ export type Database = {
       materials: {
         Row: {
           id: string;
-          lesson_id: string | null;
-          exercise_id: string | null;
+          lesson_id: string;
           name: string;
           file_url: string;
           file_type: string;
@@ -269,8 +296,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          lesson_id?: string | null;
-          exercise_id?: string | null;
+          lesson_id: string;
           name: string;
           file_url: string;
           file_type: string;
@@ -278,8 +304,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          lesson_id?: string | null;
-          exercise_id?: string | null;
+          lesson_id?: string;
           name?: string;
           file_url?: string;
           file_type?: string;
@@ -292,13 +317,6 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "lessons";
             referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "materials_exercise_id_fkey";
-            columns: ["exercise_id"];
-            isOneToOne: false;
-            referencedRelation: "exercises";
-            referencedColumns: ["id"];
           }
         ];
       };
@@ -310,6 +328,7 @@ export type Database = {
           description: string;
           time_limit_minutes: number | null;
           passing_score: number;
+          max_attempts: number | null;
           order: number;
           created_at: string;
         };
@@ -320,6 +339,7 @@ export type Database = {
           description?: string;
           time_limit_minutes?: number | null;
           passing_score?: number;
+          max_attempts?: number | null;
           order: number;
           created_at?: string;
         };
@@ -330,6 +350,7 @@ export type Database = {
           description?: string;
           time_limit_minutes?: number | null;
           passing_score?: number;
+          max_attempts?: number | null;
           order?: number;
           created_at?: string;
         };
@@ -347,7 +368,7 @@ export type Database = {
         Row: {
           id: string;
           quiz_id: string;
-          type: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text" | "voice";
+          type: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text" | "voice" | "section";
           content: Record<string, unknown>;
           weight: number | null;
           model_answer: string | null;
@@ -358,7 +379,7 @@ export type Database = {
         Insert: {
           id?: string;
           quiz_id: string;
-          type: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text" | "voice";
+          type: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text" | "voice" | "section";
           content: Record<string, unknown>;
           weight?: number | null;
           model_answer?: string | null;
@@ -570,11 +591,292 @@ export type Database = {
           }
         ];
       };
+      course_questions: {
+        Row: {
+          id: string;
+          course_id: string;
+          student_id: string;
+          title: string;
+          body: string;
+          status: "open" | "resolved";
+          created_at: string;
+          last_activity_at: string;
+          resolved_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          course_id: string;
+          student_id: string;
+          title: string;
+          body: string;
+          status?: "open" | "resolved";
+          created_at?: string;
+          last_activity_at?: string;
+          resolved_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          course_id?: string;
+          student_id?: string;
+          title?: string;
+          body?: string;
+          status?: "open" | "resolved";
+          created_at?: string;
+          last_activity_at?: string;
+          resolved_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "course_questions_course_id_fkey";
+            columns: ["course_id"];
+            isOneToOne: false;
+            referencedRelation: "courses";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "course_questions_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      course_question_replies: {
+        Row: {
+          id: string;
+          question_id: string;
+          author_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          question_id: string;
+          author_id: string;
+          body: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          question_id?: string;
+          author_id?: string;
+          body?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "course_question_replies_question_id_fkey";
+            columns: ["question_id"];
+            isOneToOne: false;
+            referencedRelation: "course_questions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "course_question_replies_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      ai_generations: {
+        Row: {
+          id: string;
+          created_at: string;
+          user_id: string | null;
+          feature: string;
+          model: string;
+          provider: string;
+          prompt_version: string;
+          input_context: Record<string, unknown> | null;
+          input_hash: string | null;
+          output: Record<string, unknown> | null;
+          schema_valid: boolean;
+          retry_count: number;
+          input_tokens: number | null;
+          output_tokens: number | null;
+          cache_read_tokens: number | null;
+          latency_ms: number | null;
+          cost_cents: number | null;
+          output_quiz_id: string | null;
+          instructor_accepted: boolean | null;
+          instructor_edited: boolean | null;
+          instructor_rejected: boolean | null;
+          instructor_rating: number | null;
+          error: string | null;
+          eval_cefr_alignment: number | null;
+          eval_instruction_following: number | null;
+          eval_pedagogical_quality: number | null;
+          eval_language_correctness: boolean | null;
+          eval_notes: string | null;
+          evaluated_at: string | null;
+          evaluated_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          user_id?: string | null;
+          feature: string;
+          model: string;
+          provider: string;
+          prompt_version: string;
+          input_context?: Record<string, unknown> | null;
+          input_hash?: string | null;
+          output?: Record<string, unknown> | null;
+          schema_valid?: boolean;
+          retry_count?: number;
+          input_tokens?: number | null;
+          output_tokens?: number | null;
+          cache_read_tokens?: number | null;
+          latency_ms?: number | null;
+          cost_cents?: number | null;
+          output_quiz_id?: string | null;
+          instructor_accepted?: boolean | null;
+          instructor_edited?: boolean | null;
+          instructor_rejected?: boolean | null;
+          instructor_rating?: number | null;
+          error?: string | null;
+          eval_cefr_alignment?: number | null;
+          eval_instruction_following?: number | null;
+          eval_pedagogical_quality?: number | null;
+          eval_language_correctness?: boolean | null;
+          eval_notes?: string | null;
+          evaluated_at?: string | null;
+          evaluated_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          user_id?: string | null;
+          feature?: string;
+          model?: string;
+          provider?: string;
+          prompt_version?: string;
+          input_context?: Record<string, unknown> | null;
+          input_hash?: string | null;
+          output?: Record<string, unknown> | null;
+          schema_valid?: boolean;
+          retry_count?: number;
+          input_tokens?: number | null;
+          output_tokens?: number | null;
+          cache_read_tokens?: number | null;
+          latency_ms?: number | null;
+          cost_cents?: number | null;
+          output_quiz_id?: string | null;
+          instructor_accepted?: boolean | null;
+          instructor_edited?: boolean | null;
+          instructor_rejected?: boolean | null;
+          instructor_rating?: number | null;
+          error?: string | null;
+          eval_cefr_alignment?: number | null;
+          eval_instruction_following?: number | null;
+          eval_pedagogical_quality?: number | null;
+          eval_language_correctness?: boolean | null;
+          eval_notes?: string | null;
+          evaluated_at?: string | null;
+          evaluated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_generations_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_generations_output_quiz_id_fkey";
+            columns: ["output_quiz_id"];
+            isOneToOne: false;
+            referencedRelation: "quizzes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_generations_evaluated_by_fkey";
+            columns: ["evaluated_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      ai_audio_cache: {
+        Row: {
+          id: string;
+          created_at: string;
+          script_hash: string;
+          voice_id: string;
+          speed: number;
+          audio_url: string;
+          storage_path: string;
+          char_count: number;
+          duration_seconds: number | null;
+          provider: string;
+          model: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          script_hash: string;
+          voice_id: string;
+          speed?: number;
+          audio_url: string;
+          storage_path: string;
+          char_count: number;
+          duration_seconds?: number | null;
+          provider?: string;
+          model?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          script_hash?: string;
+          voice_id?: string;
+          speed?: number;
+          audio_url?: string;
+          storage_path?: string;
+          char_count?: number;
+          duration_seconds?: number | null;
+          provider?: string;
+          model?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
       touch_enrollment_activity: {
         Args: { p_course_id: string };
+        Returns: void;
+      };
+      get_invite_by_token: {
+        Args: { p_token: string };
+        Returns: {
+          email: string;
+          kind: "student" | "instructor";
+          full_name: string | null;
+          expires_at: string;
+        }[];
+      };
+      consume_invite_and_create_profile: {
+        Args: {
+          p_token: string;
+          p_email: string;
+          p_user_id: string;
+          p_full_name: string;
+        };
+        Returns: void;
+      };
+      create_student_profile_and_enroll: {
+        Args: {
+          p_student_id: string;
+          p_full_name: string;
+          p_level: string | null;
+          p_instructor_id: string;
+          p_course_id: string | null;
+        };
         Returns: void;
       };
     };

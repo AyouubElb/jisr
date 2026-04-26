@@ -57,7 +57,6 @@ export function useSubmitQuiz() {
   return useMutation({
     mutationFn: async ({
       attemptId,
-      quizId: _quizId,
       blocks,
       answers,
       courseId,
@@ -81,7 +80,64 @@ export function useSubmitQuiz() {
         queryClient.invalidateQueries({ queryKey: attemptKeys.mineByCourse(courseId) });
       }
       queryClient.invalidateQueries({ queryKey: enrollmentKeys.all });
+      queryClient.invalidateQueries({ queryKey: attemptKeys.all });
       toast.success("Quiz soumis");
+    },
+    onError: (error: Error) => {
+      toast.error(`Erreur : ${error.message}`);
+    },
+  });
+}
+
+// ── Student "mes notes" history ───────────────────────────────────
+
+/** Every submitted attempt of the current student, across all courses */
+export function useMyAllAttempts() {
+  return useQuery({
+    queryKey: attemptKeys.mineAll(),
+    queryFn: () => attemptsApi.listMine(),
+  });
+}
+
+/** Full attempt detail for the student review page */
+export function useMyAttemptReview(attemptId: string) {
+  return useQuery({
+    queryKey: attemptKeys.mineReview(attemptId),
+    queryFn: () => attemptsApi.mineReview(attemptId),
+    enabled: !!attemptId,
+  });
+}
+
+// ── Instructor grading inbox ───────────────────────────────────────
+
+/** Grading inbox feed — one row per manual answer matching the filter */
+export function useGradingInbox(filter: "pending" | "all" | "graded") {
+  return useQuery({
+    queryKey: attemptKeys.inbox(filter),
+    queryFn: () => attemptsApi.listGradingInbox(filter),
+  });
+}
+
+/** Pending-count badge for the sidebar */
+export function usePendingGradingCount() {
+  return useQuery({
+    queryKey: attemptKeys.pendingCount(),
+    queryFn: () => attemptsApi.pendingGradingCount(),
+    // Refresh every minute so the badge stays roughly current while the
+    // instructor is on other pages
+    refetchInterval: 60_000,
+  });
+}
+
+/** Batch-save grades for every manual answer on one attempt; auto-finalizes if complete */
+export function useGradeAttempt() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: attemptsApi.gradeAttempt,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: attemptKeys.all });
+      toast.success("Notes enregistrees");
     },
     onError: (error: Error) => {
       toast.error(`Erreur : ${error.message}`);

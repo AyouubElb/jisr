@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Download,
   FileText,
+  Printer,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -217,6 +218,19 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
       courseTitle={course.title}
       breadcrumb={current.sectionTitle}
       exitHref={`/student/courses/${courseId}`}
+      topRight={
+        lesson.content ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground print:hidden"
+            onClick={() => window.print()}
+          >
+            <Printer className="h-4 w-4" />
+            <span className="hidden sm:inline">Télécharger PDF</span>
+          </Button>
+        ) : undefined
+      }
       sidebar={
         <CurriculumSidebar
           sections={course.sections ?? []}
@@ -282,7 +296,7 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
     >
       {/* Header */}
       <div className="space-y-3 pb-6">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
           <Badge variant="outline" className="text-[10px]">
             {LESSON_TYPE_LABEL[lesson.type]}
           </Badge>
@@ -290,14 +304,14 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
             Section {current.sectionIndex + 1} &middot; {current.sectionTitle}
           </span>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight text-amber-950">
+        <h1 className="text-3xl font-bold tracking-tight text-amber-950 print:text-black print:text-2xl">
           {lesson.title}
         </h1>
       </div>
 
       {/* Body */}
       {lesson.content ? (
-        <RichTextViewer content={lesson.content} />
+        <RichTextViewer content={lesson.content} className="print:text-black" />
       ) : (
         <div className="rounded-lg border border-dashed border-border p-8 text-center">
           <p className="text-sm text-muted-foreground">
@@ -308,7 +322,7 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
 
       {/* Materials */}
       {(materialsLoading || (materials && materials.length > 0)) && (
-        <div className="mt-10 space-y-3 border-t border-border pt-6">
+        <div className="mt-10 space-y-3 border-t border-border pt-6 print:hidden">
           <h2 className="text-lg font-semibold text-amber-950">
             Documents attaches
           </h2>

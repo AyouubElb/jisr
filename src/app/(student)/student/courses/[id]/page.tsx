@@ -6,10 +6,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RichTextViewer } from "@/components/ui/rich-text-viewer";
 import { useCourse } from "@/lib/hooks/useCourses";
 import { useMyEnrollments } from "@/lib/hooks/useEnrollments";
 import { useMyCompletions } from "@/lib/hooks/useCompletions";
+import { useProfile } from "@/lib/hooks/useAuth";
+import { useCourseQuestions } from "@/lib/hooks/useQuestions";
+import { QuestionsPanel } from "@/components/course/questions-panel";
 import { LEVEL_BADGE_COLORS, LEVEL_LABELS } from "@/lib/constants/levels";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -21,12 +23,12 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
-  Dumbbell,
   Lock,
+  MessageCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CEFRLevel, SectionWithContent } from "@/lib/types";
 
 export default function StudentCourseDetailPage(): React.JSX.Element {
@@ -35,16 +37,44 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
 
   const { data: course, isLoading } = useCourse(courseId);
   const { data: enrollments, isLoading: enrollLoading } = useMyEnrollments();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
-  const [openItem, setOpenItem] = useState<string | null>(null);
+  // null until the user has manually toggled a section — before that, the
+  // default-expanded logic below drives the UI purely from derived state.
+  const [userExpanded, setUserExpanded] = useState<Set<string> | null>(null);
 
-  const isEnrolled = enrollments?.some((e) => e.courses?.id === courseId) ?? false;
+  const isEnrolled =
+    enrollments?.some((e) => e.courses?.id === courseId) ?? false;
   const { data: completions } = useMyCompletions(isEnrolled ? courseId : "");
-  const completedLessonIds = new Set(completions?.map((c) => c.lesson_id) ?? []);
+  const completedLessonIds = useMemo(
+    () => new Set(completions?.map((c) => c.lesson_id) ?? []),
+    [completions],
+  );
+
+  // Default section to expand: first with incomplete lessons, fallback to last section
+  const defaultExpandedId = useMemo(() => {
+    if (!course?.sections || completions === undefined) return null;
+    const active = course.sections.find((s) =>
+      s.lessons?.some((l) => !completedLessonIds.has(l.id)),
+    );
+    return (
+      active?.id ?? course.sections[course.sections.length - 1]?.id ?? null
+    );
+  }, [course, completions, completedLessonIds]);
+
+  const expandedSections =
+    userExpanded ??
+    (defaultExpandedId ? new Set([defaultExpandedId]) : new Set<string>());
+
+  const { data: profile } = useProfile();
+  const { data: questions } = useCourseQuestions(isEnrolled ? courseId : "");
+  const openQuestionsCount =
+    questions?.filter((q) => q.status === "open").length ?? 0;
 
   const toggleSection = (id: string): void => {
-    setExpandedSections((prev) => {
-      const next = new Set(prev);
+    setUserExpanded((prev) => {
+      const base =
+        prev ??
+        (defaultExpandedId ? new Set([defaultExpandedId]) : new Set<string>());
+      const next = new Set(base);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
@@ -71,8 +101,8 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
     );
   }
 
-  const totalLessons = course.sections?.reduce((acc, s) => acc + (s.lessons?.length ?? 0), 0) ?? 0;
-  const totalExercises = course.sections?.reduce((acc, s) => acc + (s.exercises?.length ?? 0), 0) ?? 0;
+  const totalLessons =
+    course.sections?.reduce((acc, s) => acc + (s.lessons?.length ?? 0), 0) ?? 0;
 
   return (
     <div className="space-y-6">
@@ -84,13 +114,17 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
           </Button>
         </Link>
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-amber-950">{course.title}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-amber-950">
+            {course.title}
+          </h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
             <Badge className={LEVEL_BADGE_COLORS[course.level as CEFRLevel]}>
               {course.level} — {LEVEL_LABELS[course.level as CEFRLevel]}
             </Badge>
+            <p className="text-muted-foreground">
+              par {course.profiles.full_name}
+            </p>
           </div>
-          <p className="text-muted-foreground">par {course.profiles.full_name}</p>
         </div>
       </div>
 
@@ -103,25 +137,49 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <Lock className="h-12 w-12 text-muted-foreground" />
-            <p className="text-lg font-medium text-amber-950">Contenu reserve aux inscrits</p>
+            <p className="text-lg font-medium text-amber-950">
+              Contenu reserve aux inscrits
+            </p>
             <p className="text-muted-foreground">
-              Ce cours contient {course.sections?.length ?? 0} section{(course.sections?.length ?? 0) > 1 ? "s" : ""},{" "}
-              {totalLessons} lecon{totalLessons > 1 ? "s" : ""} et{" "}
-              {totalExercises} exercice{totalExercises > 1 ? "s" : ""}.
-              Contactez votre instructeur pour etre inscrit.
+              Ce cours contient {course.sections?.length ?? 0} section
+              {(course.sections?.length ?? 0) > 1 ? "s" : ""} et {totalLessons}{" "}
+              lecon{totalLessons > 1 ? "s" : ""}. Contactez votre instructeur pour
+              etre inscrit.
             </p>
           </CardContent>
         </Card>
       ) : (
         <Tabs defaultValue="content">
-          <TabsList>
-            <TabsTrigger value="content">
-              <BookOpen className="mr-2 h-4 w-4" />
-              Contenu ({course.sections?.length ?? 0})
+          <TabsList className="w-full justify-start gap-1 rounded-xl border border-border bg-muted/40 p-2">
+            <TabsTrigger
+              value="content"
+              className="gap-1.5 rounded-lg px-3 py-2 md:px-5 md:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+            >
+              <BookOpen className="h-4 w-4" />
+              <span>Contenu</span>
+              <span className="hidden sm:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+                {course.sections?.length ?? 0}
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="sessions">
-              <Calendar className="mr-2 h-4 w-4" />
-              Sessions ({course.live_sessions?.length ?? 0})
+            <TabsTrigger
+              value="sessions"
+              className="gap-1.5 rounded-lg px-3 py-2 md:px-5 md:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+            >
+              <Calendar className="h-4 w-4" />
+              <span>Sessions</span>
+              <span className="hidden sm:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+                {course.live_sessions?.length ?? 0}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="questions"
+              className="gap-1.5 rounded-lg px-3 py-2 md:px-5 md:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+            >
+              <MessageCircle className="h-4 w-4" />
+              <span>Questions</span>
+              <span className="hidden sm:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+                {openQuestionsCount}
+              </span>
             </TabsTrigger>
           </TabsList>
 
@@ -131,177 +189,174 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
               <Card>
                 <CardContent className="flex flex-col items-center gap-3 py-8">
                   <BookOpen className="h-10 w-10 text-muted-foreground" />
-                  <p className="text-muted-foreground">Aucun contenu disponible pour le moment</p>
+                  <p className="text-muted-foreground">
+                    Aucun contenu disponible pour le moment
+                  </p>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-3">
-                {course.sections.map((section: SectionWithContent, sIndex: number) => (
-                  <div key={section.id} className="rounded-xl border border-border bg-card overflow-hidden">
-                    {/* Section header */}
+                {course.sections.map(
+                  (section: SectionWithContent, sIndex: number) => (
                     <div
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
-                      onClick={() => toggleSection(section.id)}
+                      key={section.id}
+                      className="rounded-xl border border-border bg-card overflow-hidden"
                     >
-                      {expandedSections.has(section.id) ? (
-                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      )}
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
-                        {sIndex + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-amber-950">{section.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {section.lessons?.length ?? 0} lecon{(section.lessons?.length ?? 0) !== 1 ? "s" : ""} · {section.exercises?.length ?? 0} exercice{(section.exercises?.length ?? 0) !== 1 ? "s" : ""}
-                        </p>
+                      {/* Section header */}
+                      <div
+                        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
+                        onClick={() => toggleSection(section.id)}
+                      >
+                        {expandedSections.has(section.id) ? (
+                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        )}
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
+                          {sIndex + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-amber-950">
+                            {section.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {section.lessons?.length ?? 0} lecon
+                            {(section.lessons?.length ?? 0) !== 1 ? "s" : ""}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Expanded content — interleaved timeline */}
-                    {expandedSections.has(section.id) && (
-                      <div className="border-t border-border">
-                        {(() => {
-                          type Lesson = SectionWithContent["lessons"][number];
-                          type Exercise = SectionWithContent["exercises"][number];
-                          type Quiz = SectionWithContent["quizzes"][number];
-                          type TimelineItem =
-                            | { kind: "lesson"; order: number; lesson: Lesson }
-                            | { kind: "exercise"; order: number; exercise: Exercise }
-                            | { kind: "quiz"; order: number; quiz: Quiz };
-
-                          const items: TimelineItem[] = [
-                            ...(section.lessons ?? []).map<TimelineItem>((l) => ({
-                              kind: "lesson",
-                              order: l.order,
-                              lesson: l,
-                            })),
-                            ...(section.exercises ?? []).map<TimelineItem>((e) => ({
-                              kind: "exercise",
-                              order: e.order,
-                              exercise: e,
-                            })),
-                            ...(section.quizzes ?? []).map<TimelineItem>((q) => ({
-                              kind: "quiz",
-                              order: q.order,
-                              quiz: q,
-                            })),
-                          ].sort((a, b) => a.order - b.order);
-
-                          if (items.length === 0) {
-                            return (
-                              <div className="px-4 py-6 text-center">
-                                <p className="text-sm text-muted-foreground">
-                                  Aucun contenu dans cette section
-                                </p>
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div className="px-4 py-3 space-y-2">
-                              {items.map((item, idx) => {
-                                if (item.kind === "lesson") {
-                                  const lesson = item.lesson;
-                                  const isDone = completedLessonIds.has(lesson.id);
-                                  return (
-                                    <Link
-                                      key={`lesson-${lesson.id}`}
-                                      href={`/student/courses/${courseId}/lessons/${lesson.id}`}
-                                      className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors"
-                                    >
-                                      {isDone ? (
-                                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-                                      ) : (
-                                        <BookOpen className="h-4 w-4 shrink-0 text-primary/60" />
-                                      )}
-                                      <span className="text-xs text-muted-foreground font-medium w-5">
-                                        {idx + 1}.
-                                      </span>
-                                      <div className="min-w-0 flex-1">
-                                        <p className={`text-sm font-medium ${isDone ? "text-muted-foreground" : ""}`}>
-                                          {lesson.title}
-                                        </p>
-                                      </div>
-                                      <Badge variant="outline" className="text-[10px] shrink-0">
-                                        {lesson.type === "grammar" ? "Grammaire" : lesson.type === "vocabulary" ? "Vocabulaire" : "Ressource"}
-                                      </Badge>
-                                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                    </Link>
-                                  );
+                      {/* Expanded content — interleaved timeline */}
+                      {expandedSections.has(section.id) && (
+                        <div className="border-t border-border">
+                          {(() => {
+                            type Lesson = SectionWithContent["lessons"][number];
+                            type Quiz = SectionWithContent["quizzes"][number];
+                            type TimelineItem =
+                              | {
+                                  kind: "lesson";
+                                  order: number;
+                                  lesson: Lesson;
                                 }
+                              | { kind: "quiz"; order: number; quiz: Quiz };
 
-                                if (item.kind === "exercise") {
-                                  const exercise = item.exercise;
-                                  return (
-                                    <div key={`exercise-${exercise.id}`}>
-                                      <div
-                                        className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
-                                        onClick={() =>
-                                          setOpenItem(openItem === exercise.id ? null : exercise.id)
-                                        }
+                            const items: TimelineItem[] = [
+                              ...(section.lessons ?? []).map<TimelineItem>(
+                                (l) => ({
+                                  kind: "lesson",
+                                  order: l.order,
+                                  lesson: l,
+                                }),
+                              ),
+                              ...(section.quizzes ?? []).map<TimelineItem>(
+                                (q) => ({
+                                  kind: "quiz",
+                                  order: q.order,
+                                  quiz: q,
+                                }),
+                              ),
+                            ].sort((a, b) => a.order - b.order);
+
+                            if (items.length === 0) {
+                              return (
+                                <div className="px-4 py-6 text-center">
+                                  <p className="text-sm text-muted-foreground">
+                                    Aucun contenu dans cette section
+                                  </p>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="px-4 py-3 space-y-2">
+                                {items.map((item, idx) => {
+                                  if (item.kind === "lesson") {
+                                    const lesson = item.lesson;
+                                    const isDone = completedLessonIds.has(
+                                      lesson.id,
+                                    );
+                                    return (
+                                      <Link
+                                        key={`lesson-${lesson.id}`}
+                                        href={`/student/courses/${courseId}/lessons/${lesson.id}`}
+                                        className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors"
                                       >
-                                        <Dumbbell className="h-4 w-4 shrink-0 text-orange-500/60" />
+                                        {isDone ? (
+                                          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                                        ) : (
+                                          <BookOpen className="h-4 w-4 shrink-0 text-primary/60" />
+                                        )}
                                         <span className="text-xs text-muted-foreground font-medium w-5">
                                           {idx + 1}.
                                         </span>
                                         <div className="min-w-0 flex-1">
-                                          <p className="text-sm font-medium">{exercise.title}</p>
+                                          <p
+                                            className={`text-sm font-medium ${isDone ? "text-muted-foreground" : ""}`}
+                                          >
+                                            {lesson.title}
+                                          </p>
                                         </div>
-                                        <Badge variant="outline" className="text-[10px] shrink-0">
-                                          Exercice
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[10px] shrink-0"
+                                        >
+                                          {lesson.type === "grammar"
+                                            ? "Grammaire"
+                                            : lesson.type === "vocabulary"
+                                              ? "Vocabulaire"
+                                              : "Ressource"}
                                         </Badge>
-                                        {openItem === exercise.id ? (
-                                          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                        ) : (
-                                          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                        )}
-                                      </div>
-                                      {openItem === exercise.id && exercise.content && (
-                                        <div className="ml-12 mt-1 rounded-lg border border-border/50 bg-background p-4">
-                                          <RichTextViewer content={exercise.content} />
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                }
+                                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                      </Link>
+                                    );
+                                  }
 
-                                const quiz = item.quiz;
-                                const questionCount = quiz.quiz_blocks.filter(
-                                  (b) => b.type === "mcq" || b.type === "fill_blank" || b.type === "free_text",
-                                ).length;
-                                return (
-                                  <Link
-                                    key={`quiz-${quiz.id}`}
-                                    href={`/student/courses/${courseId}/quizzes/${quiz.id}`}
-                                    className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors"
-                                  >
-                                    <ClipboardList className="h-4 w-4 shrink-0 text-purple-500/70" />
-                                    <span className="text-xs text-muted-foreground font-medium w-5">
-                                      {idx + 1}.
-                                    </span>
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-sm font-medium">{quiz.title}</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {questionCount} question{questionCount !== 1 ? "s" : ""}
-                                        {quiz.time_limit_minutes && ` · ${quiz.time_limit_minutes} min`}
-                                      </p>
-                                    </div>
-                                    <Badge variant="outline" className="text-[10px] shrink-0">
-                                      Quiz
-                                    </Badge>
-                                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                  </Link>
-                                );
-                              })}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                                  const quiz = item.quiz;
+                                  const questionCount = quiz.quiz_blocks.filter(
+                                    (b) =>
+                                      b.type === "mcq" ||
+                                      b.type === "fill_blank" ||
+                                      b.type === "free_text",
+                                  ).length;
+                                  return (
+                                    <Link
+                                      key={`quiz-${quiz.id}`}
+                                      href={`/student/courses/${courseId}/quizzes/${quiz.id}`}
+                                      className="flex items-center gap-3 rounded-lg bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors"
+                                    >
+                                      <ClipboardList className="h-4 w-4 shrink-0 text-purple-500/70" />
+                                      <span className="text-xs text-muted-foreground font-medium w-5">
+                                        {idx + 1}.
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium">
+                                          {quiz.title}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {questionCount} question
+                                          {questionCount !== 1 ? "s" : ""}
+                                          {quiz.time_limit_minutes &&
+                                            ` · ${quiz.time_limit_minutes} min`}
+                                        </p>
+                                      </div>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] shrink-0"
+                                      >
+                                        Quiz
+                                      </Badge>
+                                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  ),
+                )}
               </div>
             )}
           </TabsContent>
@@ -312,7 +367,9 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
               <Card>
                 <CardContent className="flex flex-col items-center gap-3 py-8">
                   <Calendar className="h-10 w-10 text-muted-foreground" />
-                  <p className="text-muted-foreground">Aucune session planifiee</p>
+                  <p className="text-muted-foreground">
+                    Aucune session planifiee
+                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -322,17 +379,27 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
                   const isPast = sessionDate < new Date();
 
                   return (
-                    <Card key={session.id} className={isPast ? "opacity-60" : ""}>
+                    <Card
+                      key={session.id}
+                      className={isPast ? "opacity-60" : ""}
+                    >
                       <CardContent className="flex items-center justify-between pt-6">
                         <div>
                           <p className="font-medium">{session.title}</p>
                           <p className="text-sm text-muted-foreground">
-                            {format(sessionDate, "EEEE d MMMM yyyy 'a' HH:mm", { locale: fr })}
-                            {" · "}{session.duration_minutes} min
+                            {format(sessionDate, "EEEE d MMMM yyyy 'a' HH:mm", {
+                              locale: fr,
+                            })}
+                            {" · "}
+                            {session.duration_minutes} min
                           </p>
                         </div>
                         {!isPast && (
-                          <a href={session.meeting_link} target="_blank" rel="noopener noreferrer">
+                          <a
+                            href={session.meeting_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             <Button size="sm">Rejoindre</Button>
                           </a>
                         )}
@@ -342,6 +409,22 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
                   );
                 })}
               </div>
+            )}
+          </TabsContent>
+
+          {/* QUESTIONS */}
+          <TabsContent
+            value="questions"
+            className="w-full !overflow-x-hidden space-y-4"
+          >
+            {profile ? (
+              <QuestionsPanel
+                courseId={courseId}
+                currentUserId={profile.id}
+                role="student"
+              />
+            ) : (
+              <Skeleton className="h-40 w-full" />
             )}
           </TabsContent>
         </Tabs>

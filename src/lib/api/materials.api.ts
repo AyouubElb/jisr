@@ -17,27 +17,13 @@ export const materialsApi = {
     return data;
   },
 
-  /** List materials for an exercise */
-  listByExercise: async (exerciseId: string): Promise<Material[]> => {
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("materials")
-      .select("*")
-      .eq("exercise_id", exerciseId)
-      .order("created_at", { ascending: true });
-
-    if (error) throw error;
-    return data;
-  },
-
   /** Upload a file and create a material row */
   upload: async (
     file: File,
-    params: { courseId: string; lessonId?: string; exerciseId?: string },
+    params: { courseId: string; lessonId: string },
   ): Promise<Material> => {
     const supabase = createClient();
-    const parentId = params.lessonId ?? params.exerciseId;
-    const path = `${params.courseId}/${parentId}/${Date.now()}_${file.name}`;
+    const path = `${params.courseId}/${params.lessonId}/${Date.now()}_${file.name}`;
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
@@ -48,8 +34,7 @@ export const materialsApi = {
       name: file.name,
       file_url: path,
       file_type: file.type,
-      lesson_id: params.lessonId ?? null,
-      exercise_id: params.exerciseId ?? null,
+      lesson_id: params.lessonId,
     };
 
     const { data, error } = await supabase
@@ -80,6 +65,27 @@ export const materialsApi = {
   ): Promise<string> => {
     const supabase = createClient();
     const path = `${params.courseId}/quizzes/${params.quizId}/${Date.now()}_${file.name}`;
+
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, { upsert: false });
+    if (error) throw error;
+
+    return path;
+  },
+
+  /** Upload a student's voice answer for a quiz block — path stored in student_answers.answer */
+  uploadQuizAnswer: async (
+    file: File,
+    params: {
+      courseId: string;
+      quizId: string;
+      attemptId: string;
+      blockId: string;
+    },
+  ): Promise<string> => {
+    const supabase = createClient();
+    const path = `${params.courseId}/quizzes/${params.quizId}/answers/${params.attemptId}/${params.blockId}_${Date.now()}_${file.name}`;
 
     const { error } = await supabase.storage
       .from(BUCKET)

@@ -5,7 +5,6 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Course = Database["public"]["Tables"]["courses"]["Row"];
 export type Section = Database["public"]["Tables"]["sections"]["Row"];
 export type Lesson = Database["public"]["Tables"]["lessons"]["Row"];
-export type Exercise = Database["public"]["Tables"]["exercises"]["Row"];
 export type LiveSession = Database["public"]["Tables"]["live_sessions"]["Row"];
 export type Enrollment = Database["public"]["Tables"]["enrollments"]["Row"];
 export type Quiz = Database["public"]["Tables"]["quizzes"]["Row"];
@@ -15,29 +14,35 @@ export type StudentAnswer = Database["public"]["Tables"]["student_answers"]["Row
 export type Material = Database["public"]["Tables"]["materials"]["Row"];
 export type LessonCompletion = Database["public"]["Tables"]["lesson_completions"]["Row"];
 export type SessionAttendance = Database["public"]["Tables"]["session_attendance"]["Row"];
+export type CourseQuestion = Database["public"]["Tables"]["course_questions"]["Row"];
+export type CourseQuestionReply = Database["public"]["Tables"]["course_question_replies"]["Row"];
+export type AIGeneration = Database["public"]["Tables"]["ai_generations"]["Row"];
 
 // Insert types (what you send to INSERT)
 export type CourseInsert = Database["public"]["Tables"]["courses"]["Insert"];
 export type SectionInsert = Database["public"]["Tables"]["sections"]["Insert"];
 export type LessonInsert = Database["public"]["Tables"]["lessons"]["Insert"];
-export type ExerciseInsert = Database["public"]["Tables"]["exercises"]["Insert"];
 export type LiveSessionInsert = Database["public"]["Tables"]["live_sessions"]["Insert"];
 export type QuizInsert = Database["public"]["Tables"]["quizzes"]["Insert"];
 export type QuizBlockInsert = Database["public"]["Tables"]["quiz_blocks"]["Insert"];
 export type StudentAttemptInsert = Database["public"]["Tables"]["student_attempts"]["Insert"];
 export type StudentAnswerInsert = Database["public"]["Tables"]["student_answers"]["Insert"];
 export type MaterialInsert = Database["public"]["Tables"]["materials"]["Insert"];
+export type CourseQuestionInsert = Database["public"]["Tables"]["course_questions"]["Insert"];
+export type CourseQuestionReplyInsert = Database["public"]["Tables"]["course_question_replies"]["Insert"];
+export type AIGenerationInsert = Database["public"]["Tables"]["ai_generations"]["Insert"];
 
 // Update types (what you send to UPDATE)
 export type CourseUpdate = Database["public"]["Tables"]["courses"]["Update"];
 export type SectionUpdate = Database["public"]["Tables"]["sections"]["Update"];
 export type LessonUpdate = Database["public"]["Tables"]["lessons"]["Update"];
-export type ExerciseUpdate = Database["public"]["Tables"]["exercises"]["Update"];
 export type QuizUpdate = Database["public"]["Tables"]["quizzes"]["Update"];
 export type QuizBlockUpdate = Database["public"]["Tables"]["quiz_blocks"]["Update"];
 export type StudentAttemptUpdate = Database["public"]["Tables"]["student_attempts"]["Update"];
 export type StudentAnswerUpdate = Database["public"]["Tables"]["student_answers"]["Update"];
 export type LiveSessionUpdate = Database["public"]["Tables"]["live_sessions"]["Update"];
+export type CourseQuestionUpdate = Database["public"]["Tables"]["course_questions"]["Update"];
+export type AIGenerationUpdate = Database["public"]["Tables"]["ai_generations"]["Update"];
 
 // Derived types
 export type UserRole = Profile["role"];
@@ -45,16 +50,31 @@ export type CEFRLevel = Course["level"];
 export type LessonType = Lesson["type"];
 export type QuizBlockType = QuizBlock["type"];
 export type AttemptStatus = StudentAttempt["status"];
+export type QuestionStatus = CourseQuestion["status"];
+
+// Question with joined student profile + replies (each reply with author profile)
+export interface CourseQuestionWithDetails extends CourseQuestion {
+  student: Pick<Profile, "id" | "full_name" | "avatar_url">;
+  reply_count: number;
+}
+
+export interface CourseQuestionReplyWithAuthor extends CourseQuestionReply {
+  author: Pick<Profile, "id" | "full_name" | "avatar_url" | "role">;
+}
+
+export interface CourseQuestionThread extends CourseQuestion {
+  student: Pick<Profile, "id" | "full_name" | "avatar_url">;
+  replies: CourseQuestionReplyWithAuthor[];
+}
 
 // Quiz with nested blocks
 export interface QuizWithBlocks extends Quiz {
   quiz_blocks: QuizBlock[];
 }
 
-// Section with nested lessons, exercises, and quizzes
+// Section with nested lessons and quizzes
 export interface SectionWithContent extends Section {
   lessons: Lesson[];
-  exercises: Exercise[];
   quizzes: QuizWithBlocks[];
 }
 
