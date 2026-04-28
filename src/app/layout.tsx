@@ -11,9 +11,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "TeachSpace — La plateforme des profs d'anglais au Maroc",
+  title: "Jisr — La boîte à outils du prof d'anglais au Maroc",
   description:
-    "Créez vos cours, organisez vos sessions en direct, et suivez l'engagement de vos élèves — dans un seul outil pensé pour les instructeurs marocains.",
+    "Enseignez en direct, sans intermédiaire. Jisr réunit cours, sessions live, suivi et IA dans un seul outil pensé pour les profs d'anglais marocains.",
 };
 
 export default function RootLayout({

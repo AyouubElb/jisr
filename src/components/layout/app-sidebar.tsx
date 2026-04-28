@@ -20,6 +20,7 @@ import {
   LayoutDashboard,
   Mail,
   Settings,
+  Sparkles,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -59,6 +60,7 @@ const adminNav: NavItem[] = [
   { title: "Invitations", href: "/admin/invites", icon: Mail },
   { title: "Instructeurs", href: "/admin/instructors", icon: GraduationCap },
   { title: "Etudiants", href: "/admin/students", icon: Users },
+  { title: "Générations IA", href: "/admin/ai/generations", icon: Sparkles },
 ];
 
 export function AppSidebar({ role }: AppSidebarProps): React.JSX.Element {

@@ -44,8 +44,8 @@ export function useStartAttempt() {
     onSuccess: (_, quizId) => {
       queryClient.invalidateQueries({ queryKey: attemptKeys.mine(quizId) });
     },
-    onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+    onError: () => {
+      toast.error("Impossible de démarrer le quiz. Veuillez réessayer.");
     },
   });
 }
@@ -81,10 +81,10 @@ export function useSubmitQuiz() {
       }
       queryClient.invalidateQueries({ queryKey: enrollmentKeys.all });
       queryClient.invalidateQueries({ queryKey: attemptKeys.all });
-      toast.success("Quiz soumis");
+      toast.success("Quiz envoyé !");
     },
-    onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+    onError: () => {
+      toast.error("Impossible d'envoyer le quiz. Veuillez réessayer.");
     },
   });
 }

@@ -77,32 +77,35 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
     [attempts],
   );
 
-  // Build flat navigation: lessons + quizzes interleaved per section, sorted by `order`.
+  // Build flat navigation from the section_items timeline (shared ordering
+  // across lessons + quizzes).
   const flatItems = useMemo<FlatItem[]>(() => {
     if (!course?.sections) return [];
     const out: FlatItem[] = [];
     course.sections.forEach((section, sIdx) => {
-      const lessonItems: FlatItem[] = (section.lessons ?? []).map((l) => ({
-        kind: "lesson",
-        id: l.id,
-        title: l.title,
-        sectionTitle: section.title,
-        sectionIndex: sIdx,
-        order: l.order,
-        lesson: l,
-      }));
-      const quizItems: FlatItem[] = (section.quizzes ?? []).map((q) => ({
-        kind: "quiz",
-        id: q.id,
-        title: q.title,
-        sectionTitle: section.title,
-        sectionIndex: sIdx,
-        order: q.order,
-        quiz: q,
-      }));
-      [...lessonItems, ...quizItems]
-        .sort((a, b) => a.order - b.order)
-        .forEach((item) => out.push(item));
+      (section.items ?? []).forEach((entry) => {
+        if (entry.item_type === "lesson") {
+          out.push({
+            kind: "lesson",
+            id: entry.data.id,
+            title: entry.data.title,
+            sectionTitle: section.title,
+            sectionIndex: sIdx,
+            order: entry.position,
+            lesson: entry.data,
+          });
+        } else {
+          out.push({
+            kind: "quiz",
+            id: entry.data.id,
+            title: entry.data.title,
+            sectionTitle: section.title,
+            sectionIndex: sIdx,
+            order: entry.position,
+            quiz: entry.data,
+          });
+        }
+      });
     });
     return out;
   }, [course]);

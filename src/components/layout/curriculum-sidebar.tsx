@@ -165,23 +165,26 @@ function buildItems(
   completedLessonIds: Set<string>,
   submittedQuizIds: Set<string>,
 ): SidebarItem[] {
-  const lessons: SidebarItem[] = (section.lessons ?? []).map((l) => ({
-    kind: "lesson",
-    id: l.id,
-    title: l.title,
-    href: `/student/courses/${courseId}/lessons/${l.id}`,
-    order: l.order,
-    done: completedLessonIds.has(l.id),
-  }));
-  const quizzes: SidebarItem[] = (section.quizzes ?? []).map((q) => ({
-    kind: "quiz",
-    id: q.id,
-    title: q.title,
-    href: `/student/courses/${courseId}/quizzes/${q.id}`,
-    order: q.order,
-    done: submittedQuizIds.has(q.id),
-  }));
-  // Interleave lessons + quizzes by their `order` field so instructors
-  // control the pedagogical flow (e.g. 3 lessons then a quiz then a lesson).
-  return [...lessons, ...quizzes].sort((a, b) => a.order - b.order);
+  // Use the shared section_items timeline — single source of truth for the
+  // interleaved order of lessons and quizzes within a section.
+  return (section.items ?? []).map((entry) => {
+    if (entry.item_type === "lesson") {
+      return {
+        kind: "lesson",
+        id: entry.data.id,
+        title: entry.data.title,
+        href: `/student/courses/${courseId}/lessons/${entry.data.id}`,
+        order: entry.position,
+        done: completedLessonIds.has(entry.data.id),
+      };
+    }
+    return {
+      kind: "quiz",
+      id: entry.data.id,
+      title: entry.data.title,
+      href: `/student/courses/${courseId}/quizzes/${entry.data.id}`,
+      order: entry.position,
+      done: submittedQuizIds.has(entry.data.id),
+    };
+  });
 }

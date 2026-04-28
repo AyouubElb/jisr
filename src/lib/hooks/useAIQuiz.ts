@@ -2,8 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   aiApi,
+  type ApplyQuizEditInput,
+  type ApplyQuizEditResponse,
   type GenerateQuizInput,
   type GenerateQuizResponse,
+  type ProposeQuizEditInput,
+  type ProposeQuizEditResponse,
   type ResolveGenerationInput,
   type ResolveGenerationResponse,
 } from "@/lib/api/ai.api";
@@ -32,6 +36,34 @@ export const useResolveAIGeneration = () => {
     mutationFn: aiApi.resolveGeneration,
     onError: (error) => {
       console.error("[ai.resolve] failed:", error.message);
+    },
+  });
+};
+
+// Stage 1 quiz editor — propose changes (no DB write yet).
+export const useProposeAIQuizEdit = () => {
+  return useMutation<ProposeQuizEditResponse, Error, ProposeQuizEditInput>({
+    mutationFn: aiApi.proposeQuizEdit,
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+};
+
+// Apply the changes the instructor accepted. Invalidates the quiz detail
+// so the editor refreshes from the DB.
+export const useApplyAIQuizEdit = (quizId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation<ApplyQuizEditResponse, Error, ApplyQuizEditInput>({
+    mutationFn: aiApi.applyQuizEdit,
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: quizKeys.detail(quizId) });
+      toast.success(
+        `${res.applied} changement${res.applied > 1 ? "s" : ""} appliqué${res.applied > 1 ? "s" : ""}`,
+      );
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 };

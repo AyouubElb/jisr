@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { GraduationCap, Mail, Phone, MapPin } from "lucide-react";
 import { SmoothScrollLink } from "@/components/home/smooth-scroll-link";
+import {
+  CONTACT_EMAIL,
+  CONTACT_PHONE_DISPLAY,
+  CONTACT_PHONE_TEL,
+  CONTACT_WHATSAPP_URL,
+} from "@/lib/constants/contact";
 
 export function SiteFooter(): React.JSX.Element {
   return (
@@ -13,12 +19,11 @@ export function SiteFooter(): React.JSX.Element {
                 <GraduationCap className="h-5 w-5 text-primary-foreground" />
               </span>
               <span className="text-base font-semibold text-amber-950">
-                TeachSpace
+                Jisr
               </span>
             </Link>
             <p className="mt-3 text-xs text-muted-foreground">
-              Conçu au Maroc pour les profs d&apos;anglais. Une boîte à outils
-              simple, en français.
+              Le pont entre vous et vos élèves. Sans intermédiaire.
             </p>
           </div>
 
@@ -47,9 +52,14 @@ export function SiteFooter(): React.JSX.Element {
                 </SmoothScrollLink>
               </li>
               <li>
-                <Link href="/register" className="hover:text-amber-950">
-                  Créer un compte
-                </Link>
+                <a
+                  href={CONTACT_WHATSAPP_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-amber-950"
+                >
+                  Demander un accès
+                </a>
               </li>
             </ul>
           </div>
@@ -84,16 +94,19 @@ export function SiteFooter(): React.JSX.Element {
               <li className="flex items-start gap-2">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 <a
-                  href="mailto:contact@teachspace.ma"
+                  href={`mailto:${CONTACT_EMAIL}`}
                   className="hover:text-amber-950"
                 >
-                  contact@teachspace.ma
+                  {CONTACT_EMAIL}
                 </a>
               </li>
               <li className="flex items-start gap-2">
                 <Phone className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <a href="tel:+212600000000" className="hover:text-amber-950">
-                  +212 6 00 00 00 00
+                <a
+                  href={`tel:${CONTACT_PHONE_TEL}`}
+                  className="hover:text-amber-950"
+                >
+                  {CONTACT_PHONE_DISPLAY}
                 </a>
               </li>
               <li className="flex items-start gap-2">
@@ -105,7 +118,7 @@ export function SiteFooter(): React.JSX.Element {
         </div>
 
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
-          <span>© {new Date().getFullYear()} TeachSpace. Tous droits réservés.</span>
+          <span>© {new Date().getFullYear()} Jisr. Tous droits réservés.</span>
           <span>Fait avec soin à Casablanca</span>
         </div>
       </div>

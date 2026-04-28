@@ -44,6 +44,19 @@ const aiFreeTextBlockSchema = z.object({
 });
 
 /**
+ * Speaking practice — student records audio. Output shape mirrors free_text
+ * (prompt + rubric + model answer), the route handler maps it to a `voice`
+ * quiz_block. No TTS for the prompt itself; the prompt is shown as text.
+ */
+const aiVoiceResponseBlockSchema = z.object({
+  type: z.literal("voice_response"),
+  question: z.string(),
+  rubric: z.string(),
+  model_answer: z.string(),
+  max_seconds: z.number().int().optional(),
+});
+
+/**
  * A listening passage + its comprehension MCQs in one block. The route
  * handler runs TTS on `script`, then expands this into one audio block
  * followed by N MCQ blocks linked back to it. Keeping script and
@@ -65,11 +78,33 @@ const aiAudioPassageBlockSchema = z.object({
   ),
 });
 
+/**
+ * Reading comprehension — text passage + comprehension MCQs in one block.
+ * Same shape as audio_passage minus TTS. The route handler stores the
+ * passage as a `text` quiz_block followed by N MCQ blocks linked via
+ * `passage_block_id`.
+ */
+const aiTextPassageBlockSchema = z.object({
+  type: z.literal("text_passage"),
+  passage: z.string(),
+  caption: z.string().optional(),
+  questions: z.array(
+    z.object({
+      question: z.string(),
+      options: z.array(z.string()),
+      correct_index: z.number().int(),
+      explanation: z.string().optional(),
+    }),
+  ),
+});
+
 export const aiQuizBlockSchema = z.discriminatedUnion("type", [
   aiMcqBlockSchema,
   aiFillBlankBlockSchema,
   aiFreeTextBlockSchema,
+  aiVoiceResponseBlockSchema,
   aiAudioPassageBlockSchema,
+  aiTextPassageBlockSchema,
 ]);
 
 export const aiQuizOutputSchema = z.object({
@@ -84,5 +119,7 @@ export type AIQuizBlock = z.infer<typeof aiQuizBlockSchema>;
 export type AIMcqBlock = z.infer<typeof aiMcqBlockSchema>;
 export type AIFillBlankBlock = z.infer<typeof aiFillBlankBlockSchema>;
 export type AIFreeTextBlock = z.infer<typeof aiFreeTextBlockSchema>;
+export type AIVoiceResponseBlock = z.infer<typeof aiVoiceResponseBlockSchema>;
 export type AIAudioPassageBlock = z.infer<typeof aiAudioPassageBlockSchema>;
+export type AITextPassageBlock = z.infer<typeof aiTextPassageBlockSchema>;
 export type AIQuizOutput = z.infer<typeof aiQuizOutputSchema>;

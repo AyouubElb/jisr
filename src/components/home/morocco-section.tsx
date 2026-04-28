@@ -1,10 +1,10 @@
 import { Check } from "lucide-react";
 
 const points = [
+  "Aucune commission sur vos élèves existants — ce que vous gagnez, vous le gardez",
   "Niveaux CEFR natifs (A1 à C2) — adaptés aux examens IELTS, TOEFL et bac",
   "Interface 100 % en français — intuitive pour vous et vos élèves",
-  "Tarifs en dirhams — sans commission sur vos élèves existants",
-  "Conçu pour le contexte marocain — pas une copie d'un outil américain",
+  "Tarifs en dirhams, paiement par virement — pas de carte étrangère obligatoire",
 ];
 
 export function MoroccoSection(): React.JSX.Element {
@@ -17,9 +17,9 @@ export function MoroccoSection(): React.JSX.Element {
               Pensé pour les profs marocains
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Les grandes plateformes sont conçues pour des marchés éloignés du
-              vôtre. TeachSpace est construit localement, avec les vrais
-              besoins des instructeurs au Maroc.
+              Les grandes plateformes prennent une commission sur chaque
+              élève. Jisr ne prend rien sur les élèves que vous amenez. Construit
+              au Maroc, avec les vrais besoins des instructeurs ici.
             </p>
           </div>
 

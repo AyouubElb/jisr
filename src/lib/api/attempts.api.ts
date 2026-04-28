@@ -190,53 +190,19 @@ function computeScores(
 
 export const attemptsApi = {
   /**
-   * Start a new attempt — inserts an in_progress row with started_at set.
-   * Returns the attempt so the client can key its timer off started_at.
-   *
-   * Enforces quizzes.max_attempts: if the student has already reached the
-   * cap (all statuses count, including in_progress), starting is refused.
-   * This is product behavior, not a security boundary — a determined user
-   * could bypass by calling Supabase directly.
+   * Start a new attempt via the start_quiz_attempt RPC. The RPC runs with
+   * SECURITY DEFINER and atomically: verifies enrollment, checks
+   * quizzes.max_attempts (all statuses count, including in_progress), then
+   * inserts the in_progress row. Bypassing the cap with a direct table
+   * INSERT is impossible — that path would skip the check.
    */
   start: async (quizId: string): Promise<StudentAttempt> => {
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Non authentifie");
-
-    const { data: quiz, error: quizError } = await supabase
-      .from("quizzes")
-      .select("max_attempts")
-      .eq("id", quizId)
-      .single();
-    if (quizError) throw quizError;
-
-    if (quiz?.max_attempts != null) {
-      const { count, error: countError } = await supabase
-        .from("student_attempts")
-        .select("id", { count: "exact", head: true })
-        .eq("quiz_id", quizId)
-        .eq("student_id", user.id);
-      if (countError) throw countError;
-      if ((count ?? 0) >= quiz.max_attempts) {
-        throw new Error(
-          "Vous avez atteint le nombre maximum de tentatives pour ce quiz.",
-        );
-      }
-    }
-
     const { data, error } = await supabase
-      .from("student_attempts")
-      .insert({
-        quiz_id: quizId,
-        student_id: user.id,
-        started_at: new Date().toISOString(),
-        status: "in_progress",
-      })
-      .select()
+      .rpc("start_quiz_attempt", { p_quiz_id: quizId })
       .single();
-
     if (error) throw error;
-    return data;
+    return data as StudentAttempt;
   },
 
   /**

@@ -3,6 +3,10 @@
  * fetch directly; they go through here so error handling and shapes stay
  * consistent across every AI feature.
  */
+import type {
+  AIQuizChange,
+  AIQuizEditOutput,
+} from "@/lib/ai/schemas/quiz-edit.schema";
 
 export interface GenerateQuizInput {
   sectionId: string;
@@ -12,9 +16,11 @@ export interface GenerateQuizInput {
     mcq: number;
     fill_blank: number;
     free_text: number;
+    voice_response: number;
     audio_passage: number;
+    text_passage: number;
   };
-  questionsPerAudioPassage: number;
+  questionsPerPassage: number;
   focusTopic?: string;
 }
 
@@ -29,6 +35,27 @@ export interface GenerateQuizResponse {
 export interface ResolveGenerationInput {
   quizId: string;
   action: "save" | "delete";
+}
+
+export interface ProposeQuizEditInput {
+  quizId: string;
+  instruction: string;
+}
+
+export interface ProposeQuizEditResponse {
+  generationId: string;
+  summary: AIQuizEditOutput["summary"];
+  changes: AIQuizEditOutput["changes"];
+}
+
+export interface ApplyQuizEditInput {
+  quizId: string;
+  generationId: string;
+  changes: AIQuizChange[];
+}
+
+export interface ApplyQuizEditResponse {
+  applied: number;
 }
 
 export interface ResolveGenerationResponse {
@@ -53,6 +80,47 @@ export const aiApi = {
       throw new Error(payload?.error ?? "Résolution de la génération échouée");
     }
     return (await res.json()) as ResolveGenerationResponse;
+  },
+
+  proposeQuizEdit: async (
+    input: ProposeQuizEditInput,
+  ): Promise<ProposeQuizEditResponse> => {
+    const res = await fetch("/api/ai/edit-quiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "propose", ...input }),
+    });
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as
+        | { error?: string; rawText?: string | null }
+        | null;
+      if (payload?.rawText) {
+        console.groupCollapsed(
+          "[AI quiz edit] raw model output (schema mismatch)",
+        );
+        console.log(payload.rawText);
+        console.groupEnd();
+      }
+      throw new Error(payload?.error ?? "L'édition IA a échoué");
+    }
+    return (await res.json()) as ProposeQuizEditResponse;
+  },
+
+  applyQuizEdit: async (
+    input: ApplyQuizEditInput,
+  ): Promise<ApplyQuizEditResponse> => {
+    const res = await fetch("/api/ai/edit-quiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "apply", ...input }),
+    });
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      throw new Error(payload?.error ?? "Application des changements échouée");
+    }
+    return (await res.json()) as ApplyQuizEditResponse;
   },
 
   generateQuiz: async (input: GenerateQuizInput): Promise<GenerateQuizResponse> => {

@@ -36,14 +36,14 @@ export function useMarkLessonComplete(courseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: completionKeys.mineByCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: enrollmentKeys.all });
-      toast.success("Lecon marquee comme terminee");
+      toast.success("Leçon terminée !");
     },
     onError: (error: Error) => {
       if (error.message.includes("duplicate")) {
-        toast.info("Deja marquee comme terminee");
+        toast.info("Déjà complétée");
         return;
       }
-      toast.error(`Erreur : ${error.message}`);
+      toast.error("Impossible de sauvegarder. Veuillez réessayer.");
     },
   });
 }
@@ -57,8 +57,8 @@ export function useUnmarkLessonComplete(courseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: completionKeys.mineByCourse(courseId) });
     },
-    onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+    onError: () => {
+      toast.error("Impossible de sauvegarder. Veuillez réessayer.");
     },
   });
 }

@@ -30,10 +30,12 @@ const BodySchema = z.object({
     mcq: z.number().int().min(0),
     fill_blank: z.number().int().min(0),
     free_text: z.number().int().min(0),
+    voice_response: z.number().int().min(0),
     audio_passage: z.number().int().min(0).max(3),
+    text_passage: z.number().int().min(0).max(3),
   }),
-  questionsPerAudioPassage: z.number().int().min(1).max(5),
-  focusTopic: z.string().max(200).optional(),
+  questionsPerPassage: z.number().int().min(1).max(5),
+  focusTopic: z.string().max(500).optional(),
 });
 
 export async function POST(req: Request): Promise<Response> {
@@ -59,9 +61,13 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: message ?? "Requête invalide" }, { status: 400 });
   }
 
-  // Direct gradable questions only — audio-passage MCQs are derived
-  // from `audio_passage * questionsPerAudioPassage` and added on top.
-  const totalMix = body.mix.mcq + body.mix.fill_blank + body.mix.free_text;
+  // Direct gradable questions only — passage-derived MCQs are added on top
+  // (audio_passage + text_passage) × questionsPerPassage.
+  const totalMix =
+    body.mix.mcq +
+    body.mix.fill_blank +
+    body.mix.free_text +
+    body.mix.voice_response;
   if (totalMix !== body.numQuestions) {
     return NextResponse.json(
       { error: "La répartition des types ne correspond pas au nombre de questions" },
@@ -130,7 +136,7 @@ export async function POST(req: Request): Promise<Response> {
     focusTopic: body.focusTopic,
     numQuestions: body.numQuestions,
     mix: body.mix,
-    questionsPerAudioPassage: body.questionsPerAudioPassage,
+    questionsPerPassage: body.questionsPerPassage,
   };
 
   let result;
@@ -252,21 +258,24 @@ export async function POST(req: Request): Promise<Response> {
       is_correct: idx === correctIndex,
     }));
 
-  // Audio passages need TTS + a two-pass insert (audio row first to get
-  // its id, then comprehension MCQs that reference it via
-  // content.audio_block_id). We pre-build a plan describing the final
-  // row sequence, run it, then walk it twice.
+  // Passage blocks (audio + text) need a two-pass insert: parent row first
+  // to get its id, then comprehension MCQs that reference it via
+  // content.audio_block_id / content.passage_block_id. We pre-build a plan
+  // describing the final row sequence, run it, then walk it twice.
+  type PassageQuestion = {
+    question: string;
+    options: string[];
+    correct_index: number;
+    explanation?: string;
+  };
+
   type PlannedBlock =
     | { kind: "direct"; insert: QuizBlockInsert }
     | {
-        kind: "audio";
-        audioInsert: QuizBlockInsert;
-        questions: Array<{
-          question: string;
-          options: string[];
-          correct_index: number;
-          explanation?: string;
-        }>;
+        kind: "passage";
+        parentInsert: QuizBlockInsert;
+        childKey: "audio_block_id" | "passage_block_id";
+        questions: PassageQuestion[];
       };
 
   const plannedBlocks: PlannedBlock[] = [];
@@ -321,6 +330,22 @@ export async function POST(req: Request): Promise<Response> {
           order: cursor++,
         },
       });
+    } else if (b.type === "voice_response") {
+      plannedBlocks.push({
+        kind: "direct",
+        insert: {
+          quiz_id: quiz.id,
+          type: "voice",
+          content: {
+            prompt: b.question,
+            max_seconds: b.max_seconds,
+          },
+          weight: 1,
+          model_answer: b.model_answer,
+          grading_notes: b.rubric,
+          order: cursor++,
+        },
+      });
     } else if (b.type === "audio_passage") {
       // Run TTS now — failure aborts the whole quiz so we don't persist
       // a broken listening exercise. The TTS layer handles caching.
@@ -346,8 +371,9 @@ export async function POST(req: Request): Promise<Response> {
 
       const audioOrder = cursor++;
       plannedBlocks.push({
-        kind: "audio",
-        audioInsert: {
+        kind: "passage",
+        childKey: "audio_block_id",
+        parentInsert: {
           quiz_id: quiz.id,
           type: "audio",
           content: {
@@ -359,48 +385,65 @@ export async function POST(req: Request): Promise<Response> {
             duration_seconds: tts.durationSeconds ?? undefined,
             transcript_visible: false,
           },
-          weight: 0, // ungraded; the questions below carry the weight
+          weight: null, // ungraded parent; child MCQs carry the weight
           order: audioOrder,
         },
         questions: b.questions,
       });
-      // Reserve `order` slots for the comprehension questions that
-      // will follow this audio block.
+      cursor += b.questions.length;
+    } else if (b.type === "text_passage") {
+      const passageOrder = cursor++;
+      plannedBlocks.push({
+        kind: "passage",
+        childKey: "passage_block_id",
+        parentInsert: {
+          quiz_id: quiz.id,
+          type: "text",
+          content: {
+            passage: b.passage,
+            caption: b.caption,
+          },
+          weight: null,
+          order: passageOrder,
+        },
+        questions: b.questions,
+      });
       cursor += b.questions.length;
     }
   }
 
-  // ── Pass 1: insert audio rows so we get their ids ───────────────────
-  const audioPlanned = plannedBlocks.filter(
-    (p): p is Extract<PlannedBlock, { kind: "audio" }> => p.kind === "audio",
+  // ── Pass 1: insert passage parents (audio + text) so we get their ids ─
+  const passagePlanned = plannedBlocks.filter(
+    (p): p is Extract<PlannedBlock, { kind: "passage" }> =>
+      p.kind === "passage",
   );
 
-  const audioIdsByOrder = new Map<number, string>();
-  if (audioPlanned.length > 0) {
-    const { data: audioRows, error: audioErr } = await supabase
+  const parentIdsByOrder = new Map<number, string>();
+  if (passagePlanned.length > 0) {
+    const { data: parentRows, error: parentErr } = await supabase
       .from("quiz_blocks")
-      .insert(audioPlanned.map((p) => p.audioInsert))
+      .insert(passagePlanned.map((p) => p.parentInsert))
       .select("id, order");
 
-    if (audioErr || !audioRows) {
+    if (parentErr || !parentRows) {
       await supabase.from("quizzes").delete().eq("id", quiz.id);
       return NextResponse.json(
-        { error: audioErr?.message ?? "Échec d'insertion des blocs audio" },
+        { error: parentErr?.message ?? "Échec d'insertion des blocs de passage" },
         { status: 500 },
       );
     }
-    for (const row of audioRows) {
-      audioIdsByOrder.set(row.order, row.id);
+    for (const row of parentRows) {
+      parentIdsByOrder.set(row.order, row.id);
     }
   }
 
-  // ── Pass 2: direct blocks + comprehension MCQs (with audio_block_id) ─
+  // ── Pass 2: direct blocks + passage comprehension MCQs ──────────────
   const remainingInserts: QuizBlockInsert[] = [];
   for (const p of plannedBlocks) {
     if (p.kind === "direct") {
       remainingInserts.push(p.insert);
     } else {
-      const audioId = audioIdsByOrder.get(p.audioInsert.order);
+      const parentId = parentIdsByOrder.get(p.parentInsert.order);
       p.questions.forEach((q, qIdx) => {
         remainingInserts.push({
           quiz_id: quiz.id,
@@ -409,11 +452,11 @@ export async function POST(req: Request): Promise<Response> {
             prompt: q.question,
             allow_multiple: false,
             options: toUiOptions(q.options, q.correct_index),
-            audio_block_id: audioId,
+            [p.childKey]: parentId,
           },
           weight: 1,
           grading_notes: q.explanation ?? null,
-          order: p.audioInsert.order + 1 + qIdx,
+          order: p.parentInsert.order + 1 + qIdx,
         });
       });
     }
@@ -432,7 +475,7 @@ export async function POST(req: Request): Promise<Response> {
 
   // ── Telemetry ───────────────────────────────────────────────────────
   const allInserts: QuizBlockInsert[] = [
-    ...audioPlanned.map((p) => p.audioInsert),
+    ...passagePlanned.map((p) => p.parentInsert),
     ...remainingInserts,
   ];
   const blocksSnapshot = allInserts

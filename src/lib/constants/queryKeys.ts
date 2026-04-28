@@ -91,3 +91,16 @@ export const adminKeys = {
   instructors: () => [...adminKeys.all, "instructors"] as const,
   students: () => [...adminKeys.all, "students"] as const,
 };
+
+export const aiAdminKeys = {
+  all: ["ai-admin"] as const,
+  generations: (filters: {
+    feature?: string;
+    model?: string;
+    onlyUnrated?: boolean;
+    onlyErrors?: boolean;
+  }) => [...aiAdminKeys.all, "generations", filters] as const,
+  generation: (id: string) => [...aiAdminKeys.all, "generation", id] as const,
+  evaluation: (generationId: string) =>
+    [...aiAdminKeys.all, "evaluation", generationId] as const,
+};

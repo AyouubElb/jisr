@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -129,6 +130,70 @@
     scroll-behavior: smooth;
     scroll-padding-top: 5rem;
   }
+}
+
+/* Prose (rich text editor/viewer) — match app color tokens */
+.prose {
+  --tw-prose-body: var(--foreground);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-links: var(--primary);
+  --tw-prose-counters: var(--muted-foreground);
+  --tw-prose-bullets: var(--muted-foreground);
+  --tw-prose-hr: var(--border);
+  --tw-prose-quotes: var(--muted-foreground);
+  --tw-prose-quote-borders: var(--border);
+  --tw-prose-code: var(--foreground);
+  --tw-prose-pre-bg: var(--muted);
+}
+.prose h1 {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 20px;
+  margin-bottom: 12px;
+}
+.prose h2 {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 18px;
+  margin-bottom: 10px;
+}
+.prose h3 {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.prose h4 {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+.prose ul {
+  list-style-type: disc;
+  padding-left: 24px;
+}
+.prose ol {
+  list-style-type: decimal;
+  padding-left: 24px;
+}
+.dark .prose {
+  --tw-prose-body: var(--foreground);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-links: var(--primary);
+  --tw-prose-counters: var(--muted-foreground);
+  --tw-prose-bullets: var(--muted-foreground);
+  --tw-prose-hr: var(--border);
+  --tw-prose-quotes: var(--muted-foreground);
+  --tw-prose-quote-borders: var(--border);
+  --tw-prose-code: var(--foreground);
+  --tw-prose-pre-bg: var(--muted);
 }
 
 @media print {

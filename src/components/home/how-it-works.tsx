@@ -1,21 +1,21 @@
 const steps = [
   {
     number: "01",
-    title: "Créez votre cours",
+    title: "Une discussion (15 min)",
     description:
-      "Définissez le niveau, le titre, la description. En moins de 2 minutes.",
+      "Sur WhatsApp ou par téléphone, on comprend votre contexte et on vous montre Jisr en direct.",
   },
   {
     number: "02",
-    title: "Ajoutez vos élèves",
+    title: "Votre invitation arrive",
     description:
-      "Vous gardez le contrôle : ajoutez manuellement vos élèves existants, pas d'inscriptions parasites.",
+      "Si Jisr vous correspond, vous recevez votre lien d'accès personnel sous 48h.",
   },
   {
     number: "03",
-    title: "Enseignez et suivez",
+    title: "Vous prenez la main",
     description:
-      "Planifiez des sessions, partagez des leçons, et mesurez la progression de chacun.",
+      "Ajoutez vos élèves, créez votre premier cours, planifiez vos sessions — depuis votre tableau de bord, sans intermédiaire.",
   },
 ];
 
@@ -28,7 +28,7 @@ export function HowItWorks(): React.JSX.Element {
             Comment ça marche
           </h2>
           <p className="mt-4 text-muted-foreground">
-            Trois étapes pour passer de WhatsApp à une classe organisée.
+            Du premier message à votre première classe — trois étapes.
           </p>
         </div>
 

@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { Check } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { CONTACT_WHATSAPP_URL } from "@/lib/constants/contact";
 
 const plans = [
   {
@@ -15,7 +15,7 @@ const plans = [
       "Quiz de base",
       "Sessions en direct",
     ],
-    cta: "Commencer gratuitement",
+    cta: "Demander un accès",
     variant: "outline" as const,
     highlighted: false,
   },
@@ -31,7 +31,7 @@ const plans = [
       "Exports sans watermark",
       "Support prioritaire",
     ],
-    cta: "Essayer 14 jours",
+    cta: "Réserver un appel",
     variant: "default" as const,
     highlighted: true,
   },
@@ -41,12 +41,12 @@ const plans = [
     period: "/ mois",
     description: "Pour les freelances qui gèrent plusieurs cohortes.",
     features: [
-      "Élèves illimités",
+      "Jusqu'à 150 élèves",
       "Analytics avancés",
       "Accès prioritaire aux nouveautés IA",
       "Support dédié",
     ],
-    cta: "Choisir Studio",
+    cta: "Réserver un appel",
     variant: "outline" as const,
     highlighted: false,
   },
@@ -61,8 +61,8 @@ export function PricingSection(): React.JSX.Element {
             Des tarifs simples, en dirhams
           </h2>
           <p className="mt-4 text-muted-foreground">
-            Commencez gratuitement. Passez à un plan payant quand vos élèves se
-            multiplient.
+            Programme fondateur : 99 DH/mois à vie pour les 10 premiers profs
+            (au lieu de 149 DH).
           </p>
         </div>
 
@@ -109,21 +109,23 @@ export function PricingSection(): React.JSX.Element {
                 ))}
               </ul>
 
-              <Link
-                href="/register"
+              <a
+                href={CONTACT_WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={cn(
                   buttonVariants({ variant: plan.variant, size: "lg" }),
                   "mt-6 w-full",
                 )}
               >
                 {plan.cta}
-              </Link>
+              </a>
             </div>
           ))}
         </div>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          Annulez à tout moment · Paiement par virement bancaire disponible
+          Accès sur invitation après une discussion · Paiement par virement bancaire
         </p>
       </div>
     </section>

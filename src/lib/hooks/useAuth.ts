@@ -57,10 +57,10 @@ export function useUpdateProfile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: profileKeys.me() });
-      toast.success("Profil mis a jour");
+      toast.success("Profil mis à jour");
     },
-    onError: (error: Error) => {
-      toast.error(error.message);
+    onError: () => {
+      toast.error("Impossible de mettre à jour le profil. Veuillez réessayer.");
     },
   });
 }
@@ -73,10 +73,10 @@ export function useUpdatePassword() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Mot de passe mis a jour");
+      toast.success("Mot de passe mis à jour");
     },
-    onError: (error: Error) => {
-      toast.error(error.message);
+    onError: () => {
+      toast.error("Le mot de passe n'a pas pu être mis à jour. Veuillez réessayer.");
     },
   });
 }

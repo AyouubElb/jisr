@@ -135,6 +135,41 @@ export type Database = {
           }
         ];
       };
+      section_items: {
+        Row: {
+          id: string;
+          section_id: string;
+          item_type: "lesson" | "quiz";
+          item_id: string;
+          position: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          section_id: string;
+          item_type: "lesson" | "quiz";
+          item_id: string;
+          position: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          section_id?: string;
+          item_type?: "lesson" | "quiz";
+          item_id?: string;
+          position?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "section_items_section_id_fkey";
+            columns: ["section_id"];
+            isOneToOne: false;
+            referencedRelation: "sections";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
       sections: {
         Row: {
           id: string;
@@ -390,7 +425,7 @@ export type Database = {
         Update: {
           id?: string;
           quiz_id?: string;
-          type?: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text" | "voice";
+          type?: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text" | "voice" | "section";
           content?: Record<string, unknown>;
           weight?: number | null;
           model_answer?: string | null;
@@ -706,13 +741,6 @@ export type Database = {
           instructor_rejected: boolean | null;
           instructor_rating: number | null;
           error: string | null;
-          eval_cefr_alignment: number | null;
-          eval_instruction_following: number | null;
-          eval_pedagogical_quality: number | null;
-          eval_language_correctness: boolean | null;
-          eval_notes: string | null;
-          evaluated_at: string | null;
-          evaluated_by: string | null;
         };
         Insert: {
           id?: string;
@@ -738,13 +766,6 @@ export type Database = {
           instructor_rejected?: boolean | null;
           instructor_rating?: number | null;
           error?: string | null;
-          eval_cefr_alignment?: number | null;
-          eval_instruction_following?: number | null;
-          eval_pedagogical_quality?: number | null;
-          eval_language_correctness?: boolean | null;
-          eval_notes?: string | null;
-          evaluated_at?: string | null;
-          evaluated_by?: string | null;
         };
         Update: {
           id?: string;
@@ -770,13 +791,6 @@ export type Database = {
           instructor_rejected?: boolean | null;
           instructor_rating?: number | null;
           error?: string | null;
-          eval_cefr_alignment?: number | null;
-          eval_instruction_following?: number | null;
-          eval_pedagogical_quality?: number | null;
-          eval_language_correctness?: boolean | null;
-          eval_notes?: string | null;
-          evaluated_at?: string | null;
-          evaluated_by?: string | null;
         };
         Relationships: [
           {
@@ -792,10 +806,54 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "quizzes";
             referencedColumns: ["id"];
+          }
+        ];
+      };
+      ai_evaluations: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          generation_id: string;
+          evaluator_id: string | null;
+          evaluator_type: "human" | "llm_judge";
+          rubric_key: string;
+          scores: Record<string, unknown>;
+          notes: string | null;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          generation_id: string;
+          evaluator_id?: string | null;
+          evaluator_type?: "human" | "llm_judge";
+          rubric_key: string;
+          scores: Record<string, unknown>;
+          notes?: string | null;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          generation_id?: string;
+          evaluator_id?: string | null;
+          evaluator_type?: "human" | "llm_judge";
+          rubric_key?: string;
+          scores?: Record<string, unknown>;
+          notes?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_evaluations_generation_id_fkey";
+            columns: ["generation_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_generations";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "ai_generations_evaluated_by_fkey";
-            columns: ["evaluated_by"];
+            foreignKeyName: "ai_evaluations_evaluator_id_fkey";
+            columns: ["evaluator_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -877,6 +935,26 @@ export type Database = {
           p_instructor_id: string;
           p_course_id: string | null;
         };
+        Returns: void;
+      };
+      start_quiz_attempt: {
+        Args: { p_quiz_id: string };
+        Returns: {
+          id: string;
+          quiz_id: string;
+          student_id: string;
+          started_at: string;
+          submitted_at: string | null;
+          auto_score: number | null;
+          final_score: number | null;
+          status: "in_progress" | "submitted" | "pending_review" | "graded";
+          graded_at: string | null;
+          graded_by: string | null;
+          created_at: string;
+        };
+      };
+      reorder_section_item: {
+        Args: { p_section_item_id: string; p_new_position: number };
         Returns: void;
       };
     };

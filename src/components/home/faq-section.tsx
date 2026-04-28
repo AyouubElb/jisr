@@ -6,6 +6,16 @@ import { cn } from "@/lib/utils";
 
 const faqs = [
   {
+    question: "Pourquoi je ne peux pas créer un compte directement ?",
+    answer:
+      "Jisr est en programme fondateur — on lance avec 10 profs choisis pour bien démarrer. On prend 15 minutes (sur WhatsApp ou par téléphone, comme vous préférez) pour comprendre votre contexte, puis on vous envoie une invitation si Jisr vous correspond. Pas de chichi, pas de vente forcée.",
+  },
+  {
+    question: "Combien de temps avant d'avoir mon accès ?",
+    answer:
+      "Discussion sous 48h, invitation envoyée le jour même si vous êtes retenu·e, compte actif en 5 minutes après.",
+  },
+  {
     question: "Mes élèves actuels doivent-ils s'inscrire eux-mêmes ?",
     answer:
       "Non. Vous ajoutez manuellement vos élèves depuis votre tableau de bord. Ils reçoivent un accès sans avoir à chercher votre profil.",
@@ -13,7 +23,7 @@ const faqs = [
   {
     question: "Comment ça fonctionne avec WhatsApp ?",
     answer:
-      "TeachSpace complète WhatsApp, il ne le remplace pas. Gardez WhatsApp pour la communication rapide, utilisez TeachSpace pour les cours, quiz et suivi.",
+      "Jisr complète WhatsApp, il ne le remplace pas. Gardez WhatsApp pour la communication rapide, utilisez Jisr pour les cours, quiz et suivi.",
   },
   {
     question: "Puis-je exporter mes données si je change d'avis ?",

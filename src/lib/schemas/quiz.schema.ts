@@ -184,9 +184,10 @@ export const createQuizSchema = z.object({
     .min(0, "Minimum 0%")
     .max(100, "Maximum 100%")
     .default(60),
-  // null = unlimited retakes; 1+ caps the number of attempts per student.
+  // null = unlimited retakes; 1-5 caps the number of attempts per student.
+  // Cap chosen at 5 because anything higher should be unlimited (leave empty).
   max_attempts: z.union([
-    z.number().int().min(1, "Minimum 1").max(20, "Maximum 20"),
+    z.number().int().min(1, "Minimum 1").max(5, "Maximum 5. Pour plus de tentatives, laissez le champ vide (illimité)."),
     z.null(),
   ]).optional(),
 });

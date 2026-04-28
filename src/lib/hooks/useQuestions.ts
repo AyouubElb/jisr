@@ -40,10 +40,10 @@ export function useCreateQuestion(courseId: string) {
       queryClient.invalidateQueries({
         queryKey: questionKeys.byCourse(courseId),
       });
-      toast.success("Question envoyee");
+      toast.success("Question envoyée");
     },
-    onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+    onError: () => {
+      toast.error("Impossible d'envoyer la question. Veuillez réessayer.");
     },
   });
 }
@@ -62,8 +62,8 @@ export function useReplyToQuestion(courseId: string) {
         queryKey: questionKeys.byCourse(courseId),
       });
     },
-    onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+    onError: () => {
+      toast.error("Impossible d'envoyer la réponse. Veuillez réessayer.");
     },
   });
 }

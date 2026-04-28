@@ -20,6 +20,7 @@ import {
   Pencil,
   Plus,
   Save,
+  Sparkles,
   ToggleLeft,
   Trash2,
 } from "lucide-react";
@@ -31,6 +32,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useSidebar } from "@/components/ui/sidebar";
+import { QuizAIEditChat } from "@/components/course/quiz-ai-edit-chat";
 import {
   BlockWrapper,
   SectionBlockEditor,
@@ -147,6 +150,7 @@ export default function QuizEditPage(): React.JSX.Element {
   const courseId = params.id as string;
   const quizId = params.quizId as string;
 
+  const { setOpen: setSidebarOpen, setOpenMobile: setSidebarOpenMobile, isMobile } = useSidebar();
   const { data: quiz, isLoading } = useQuiz(quizId);
   const { mutate: updateQuiz, isPending: isUpdatingQuiz } = useUpdateQuiz(courseId);
   const { mutate: saveBlocks, isPending: isSavingBlocks } = useSaveQuizBlocks(courseId);
@@ -156,6 +160,7 @@ export default function QuizEditPage(): React.JSX.Element {
   const [blocks, setBlocks] = useState<LocalBlock[]>([]);
   const [blockErrors, setBlockErrors] = useState<Record<string, string>>({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
   const [openPanel, setOpenPanel] = useState<"add-block" | "settings">("add-block");
 
   const form = useForm({
@@ -516,6 +521,20 @@ export default function QuizEditPage(): React.JSX.Element {
         <Button
           type="button"
           variant="outline"
+          onClick={() => {
+            if (isMobile) setSidebarOpenMobile(false);
+            else setSidebarOpen(false);
+            setAiChatOpen(true);
+          }}
+          disabled={isSaving || isDeleting}
+          className="gap-1.5"
+        >
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span className="hidden sm:inline">Assistant IA</span>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
           onClick={() => setDeleteConfirmOpen(true)}
           disabled={isSaving || isDeleting}
           className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -538,6 +557,9 @@ export default function QuizEditPage(): React.JSX.Element {
         onConfirm={onDeleteConfirmed}
         isPending={isDeleting}
       />
+
+      {/* ── Content area: bento grid + chat panel ─────────────── */}
+      <div className="flex min-h-0 flex-1 gap-3 sm:gap-4">
 
       {/* ── Bento grid ────────────────────────────────────────── */}
       <div className="grid min-h-0 flex-1 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -730,7 +752,7 @@ export default function QuizEditPage(): React.JSX.Element {
                   <Input
                     type="number"
                     min={1}
-                    max={20}
+                    max={5}
                     placeholder="Illimitées"
                     {...form.register("max_attempts", {
                       setValueAs: (v) =>
@@ -738,7 +760,7 @@ export default function QuizEditPage(): React.JSX.Element {
                     })}
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Laissez vide pour des tentatives illimitées
+                    Maximum 5. Laissez vide pour des tentatives illimitées. Une tentative non terminée (étudiant qui ferme le navigateur) compte aussi.
                   </p>
                 </div>
               </div>
@@ -801,6 +823,17 @@ export default function QuizEditPage(): React.JSX.Element {
           </div>
         </div>
       </div>
+
+      {/* ── AI chat panel (inline, desktop only) ─────────────── */}
+      {aiChatOpen && (
+        <div className="hidden w-[380px] shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:flex">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
+            <QuizAIEditChat quizId={quizId} onClose={() => setAiChatOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      </div>{/* end content area */}
     </form>
   );
 }

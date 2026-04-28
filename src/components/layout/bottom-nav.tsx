@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Mail,
   Settings,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,7 @@ const adminItems: NavItem[] = [
   { label: "Invites", href: "/admin/invites", icon: Mail },
   { label: "Instructeurs", href: "/admin/instructors", icon: GraduationCap },
   { label: "Etudiants", href: "/admin/students", icon: Users },
+  { label: "IA", href: "/admin/ai/generations", icon: Sparkles },
 ];
 
 export function BottomNav({ role }: { role: UserRole }): React.JSX.Element {

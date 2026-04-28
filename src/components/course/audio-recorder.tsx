@@ -126,8 +126,8 @@ export function AudioRecorder({
           localUrlRef.current = localUrl;
           setPlaybackUrl(localUrl);
           onRecorded(path, duration);
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Erreur d'upload");
+        } catch {
+          toast.error("Erreur lors de l'envoi de l'audio. Veuillez réessayer.");
         } finally {
           setStatus("idle");
         }
@@ -147,8 +147,8 @@ export function AudioRecorder({
     } catch (err) {
       toast.error(
         err instanceof DOMException && err.name === "NotAllowedError"
-          ? "Autorisation du microphone refusee"
-          : "Impossible d'acceder au microphone",
+          ? "Autorisation du microphone refusée"
+          : "Impossible d'accéder au microphone",
       );
     }
   };

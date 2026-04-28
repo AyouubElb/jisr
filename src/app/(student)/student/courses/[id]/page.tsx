@@ -240,22 +240,21 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
                                 }
                               | { kind: "quiz"; order: number; quiz: Quiz };
 
-                            const items: TimelineItem[] = [
-                              ...(section.lessons ?? []).map<TimelineItem>(
-                                (l) => ({
-                                  kind: "lesson",
-                                  order: l.order,
-                                  lesson: l,
-                                }),
-                              ),
-                              ...(section.quizzes ?? []).map<TimelineItem>(
-                                (q) => ({
-                                  kind: "quiz",
-                                  order: q.order,
-                                  quiz: q,
-                                }),
-                              ),
-                            ].sort((a, b) => a.order - b.order);
+                            const items: TimelineItem[] = (
+                              section.items ?? []
+                            ).map<TimelineItem>((entry) =>
+                              entry.item_type === "lesson"
+                                ? {
+                                    kind: "lesson",
+                                    order: entry.position,
+                                    lesson: entry.data,
+                                  }
+                                : {
+                                    kind: "quiz",
+                                    order: entry.position,
+                                    quiz: entry.data,
+                                  },
+                            );
 
                             if (items.length === 0) {
                               return (

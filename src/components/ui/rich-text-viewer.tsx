@@ -18,8 +18,9 @@ export function RichTextViewer({
       "h1", "h2", "h3", "h4", "h5", "h6",
       "ul", "ol", "li",
       "blockquote", "hr", "code", "pre",
+      "a",
     ],
-    ALLOWED_ATTR: [],
+    ALLOWED_ATTR: ["href", "target", "rel"],
   });
 
   return (

@@ -946,18 +946,13 @@ function SectionCard({
               | { kind: "lesson"; order: number; lesson: Lesson }
               | { kind: "quiz"; order: number; quiz: QuizWithBlocks };
 
-            const items: TimelineItem[] = [
-              ...(section.lessons ?? []).map<TimelineItem>((l) => ({
-                kind: "lesson",
-                order: l.order,
-                lesson: l,
-              })),
-              ...(section.quizzes ?? []).map<TimelineItem>((q) => ({
-                kind: "quiz",
-                order: q.order,
-                quiz: q,
-              })),
-            ].sort((a, b) => a.order - b.order);
+            // Use the shared section_items timeline so lessons and quizzes
+            // appear in the order the instructor arranged them.
+            const items: TimelineItem[] = (section.items ?? []).map<TimelineItem>((entry) =>
+              entry.item_type === "lesson"
+                ? { kind: "lesson", order: entry.position, lesson: entry.data }
+                : { kind: "quiz", order: entry.position, quiz: entry.data },
+            );
 
             if (items.length === 0) return null;
 

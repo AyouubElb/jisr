@@ -17,6 +17,7 @@ export type SessionAttendance = Database["public"]["Tables"]["session_attendance
 export type CourseQuestion = Database["public"]["Tables"]["course_questions"]["Row"];
 export type CourseQuestionReply = Database["public"]["Tables"]["course_question_replies"]["Row"];
 export type AIGeneration = Database["public"]["Tables"]["ai_generations"]["Row"];
+export type SectionItem = Database["public"]["Tables"]["section_items"]["Row"];
 
 // Insert types (what you send to INSERT)
 export type CourseInsert = Database["public"]["Tables"]["courses"]["Insert"];
@@ -72,10 +73,21 @@ export interface QuizWithBlocks extends Quiz {
   quiz_blocks: QuizBlock[];
 }
 
-// Section with nested lessons and quizzes
+// One entry in a section's shared ordered timeline.
+// `data` carries the underlying lesson or quiz row inline so consumers don't
+// need to re-join client-side. Discriminated by `item_type`.
+export type SectionTimelineItem =
+  | { id: string; item_type: "lesson"; position: number; data: Lesson }
+  | { id: string; item_type: "quiz"; position: number; data: QuizWithBlocks };
+
+// Section with nested lessons and quizzes.
+// `lessons[]` and `quizzes[]` are kept for backward compatibility with
+// existing consumers; `items[]` is the new source of truth for ordering
+// (lessons + quizzes interleaved, sorted by position ascending).
 export interface SectionWithContent extends Section {
   lessons: Lesson[];
   quizzes: QuizWithBlocks[];
+  items: SectionTimelineItem[];
 }
 
 // Course with joined relations

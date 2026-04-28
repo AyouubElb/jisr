@@ -1,4 +1,4 @@
-import { MessageCircle, ClipboardCheck, UserX } from "lucide-react";
+import { MessageCircle, ClipboardCheck, Coins } from "lucide-react";
 
 const pains = [
   {
@@ -10,8 +10,8 @@ const pains = [
     label: "Corrections interminables",
   },
   {
-    icon: UserX,
-    label: "Élèves qui décrochent",
+    icon: Coins,
+    label: "30 % qui partent à l'institut",
   },
 ];
 

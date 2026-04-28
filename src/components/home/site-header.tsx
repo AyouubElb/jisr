@@ -2,6 +2,7 @@ import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { SmoothScrollLink } from "@/components/home/smooth-scroll-link";
+import { CONTACT_WHATSAPP_URL } from "@/lib/constants/contact";
 
 export function SiteHeader(): React.JSX.Element {
   return (
@@ -12,7 +13,7 @@ export function SiteHeader(): React.JSX.Element {
             <GraduationCap className="h-5 w-5 text-primary-foreground" />
           </span>
           <span className="text-lg font-semibold tracking-tight text-amber-950">
-            TeachSpace
+            Jisr
           </span>
         </Link>
 
@@ -38,9 +39,14 @@ export function SiteHeader(): React.JSX.Element {
           >
             Se connecter
           </Link>
-          <Link href="/register" className={buttonVariants({ size: "sm" })}>
-            Commencer
-          </Link>
+          <a
+            href={CONTACT_WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonVariants({ size: "sm" })}
+          >
+            Demander un accès
+          </a>
         </div>
       </div>
     </header>

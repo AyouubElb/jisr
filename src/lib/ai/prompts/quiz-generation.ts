@@ -14,9 +14,11 @@ export interface QuizGenPromptContext {
     mcq: number;
     fill_blank: number;
     free_text: number;
+    voice_response: number;
     audio_passage: number;
+    text_passage: number;
   };
-  questionsPerAudioPassage: number;
+  questionsPerPassage: number;
   studentMistakes?: Array<{ wrong: string; correct: string }>;
 }
 
@@ -28,10 +30,13 @@ export const QUIZ_GEN_SYSTEM_PROMPT = `You are a CEFR-aligned English quiz gener
 
 Rules:
 - Questions MUST match the requested CEFR level (see rubric).
-- MCQ distractors must be plausible but unambiguous — exactly ONE option is correct unless allow_multiple is true.
+- MCQ distractors must be plausible but unambiguous — exactly ONE option is correct.
+- For TRUE/FALSE questions, use type "mcq" with EXACTLY two options: ["True", "False"]. Do NOT invent a separate true_false type.
 - Fill-blank is a sentence with a single blank marked "___". Provide 2–4 options; exactly one is correct.
 - Free-text questions must include a concrete grading rubric AND a model answer.
+- Voice-response questions are speaking prompts. Same shape as free_text (rubric + model_answer); the student's answer will be recorded audio. Phrase the question for SPEAKING (e.g. "Talk about…", "Describe out loud…"), not writing.
 - Audio passages: write a natural-sounding spoken script (60-180 words at the requested CEFR level), then write the comprehension MCQs whose answers are explicitly verifiable from the script. Do NOT reference details that aren't in the script.
+- Text passages: write a short reading passage (80-220 words at the requested CEFR level) followed by comprehension MCQs whose answers are explicitly verifiable from the passage. Same "stay grounded in the passage" rule as audio.
 - Avoid culturally foreign examples; prefer contexts Moroccan learners relate to (daily life, travel in Morocco, local school scenarios) — do not force it.
 - All question/answer text MUST be in English. Optional grading notes can be bilingual French–English.
 - Output MUST conform exactly to the provided JSON schema. Never invent extra fields.
@@ -80,6 +85,36 @@ Use this EXACT output shape. One small example showing each block type:
           "correct_index": 1
         }
       ]
+    },
+    {
+      "type": "text_passage",
+      "passage": "The medina of Fes is one of the largest car-free urban areas in the world. Narrow streets wind between old houses, small shops, and traditional workshops. Visitors can buy leather goods, spices, and handmade pottery. The famous tanneries are still in use today, just as they were hundreds of years ago.",
+      "caption": "A short text about the medina of Fes.",
+      "questions": [
+        {
+          "question": "Why is the medina of Fes special?",
+          "options": ["It has many cars", "It is car-free", "It is very modern"],
+          "correct_index": 1
+        },
+        {
+          "question": "What can visitors buy in the medina?",
+          "options": ["Phones and computers", "Leather, spices and pottery", "Cars and bicycles"],
+          "correct_index": 1
+        }
+      ]
+    },
+    {
+      "type": "voice_response",
+      "question": "Talk about your last weekend in 4 to 6 sentences. Use the past simple.",
+      "rubric": "1. Uses past simple correctly for at least 4 verbs. 2. Sentences are connected (then, after that, finally). 3. Pronunciation is clear enough to understand.",
+      "model_answer": "Last Saturday I went to the beach with my friends. We swam in the sea and played football on the sand. After that we ate sandwiches. In the evening I watched a movie at home. Sunday I studied for my English test."
+    },
+    {
+      "type": "mcq",
+      "question": "True or False: The verb 'to go' is regular in the past simple.",
+      "options": ["True", "False"],
+      "correct_index": 1,
+      "explanation": "'go' is irregular — past simple is 'went', not 'goed'."
     }
   ]
 }
@@ -123,7 +158,17 @@ export const buildQuizGenUserPrompt = (ctx: QuizGenPromptContext): string => {
 
   const audioLine =
     ctx.mix.audio_passage > 0
-      ? `\n- ${ctx.mix.audio_passage} audio_passage block(s), each with a 60-180 word spoken script in English plus ${ctx.questionsPerAudioPassage} comprehension MCQs whose answers are explicitly stated in the script`
+      ? `\n- ${ctx.mix.audio_passage} audio_passage block(s), each with a 60-180 word spoken script in English plus ${ctx.questionsPerPassage} comprehension MCQs whose answers are explicitly stated in the script`
+      : "";
+
+  const textPassageLine =
+    ctx.mix.text_passage > 0
+      ? `\n- ${ctx.mix.text_passage} text_passage block(s), each with an 80-220 word reading passage in English plus ${ctx.questionsPerPassage} comprehension MCQs whose answers are explicitly stated in the passage`
+      : "";
+
+  const voiceLine =
+    ctx.mix.voice_response > 0
+      ? `\n- ${ctx.mix.voice_response} voice_response (speaking prompt with rubric + model spoken answer; phrase for SPEAKING)`
       : "";
 
   return `Course: ${ctx.courseTitle} (Level: ${ctx.courseLevel})
@@ -132,9 +177,9 @@ Lesson(s) provided:
 ${lessonsBlock}
 ${mistakesBlock}
 Task — generate a draft quiz with ${ctx.numQuestions} gradable questions:
-- ${ctx.mix.mcq} MCQ (single correct answer unless obvious)
+- ${ctx.mix.mcq} MCQ (single correct answer; use ["True","False"] options for true/false)
 - ${ctx.mix.fill_blank} fill-blank (sentence with one "___" and answer options)
-- ${ctx.mix.free_text} free-text (open response with a clear rubric)${audioLine}
+- ${ctx.mix.free_text} free-text (open written response with a clear rubric)${voiceLine}${audioLine}${textPassageLine}
 
 ${focusLine}
 

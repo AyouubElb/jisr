@@ -4,11 +4,12 @@
  * orchestration stay uniform as we add more agents.
  */
 
-export const AI_PROVIDERS = ["google", "anthropic"] as const;
+export const AI_PROVIDERS = ["google", "anthropic", "vercel-gateway"] as const;
 export type AIProvider = (typeof AI_PROVIDERS)[number];
 
 export const AI_FEATURES = [
   "quiz_gen",
+  "quiz_edit",
   "free_text_grade",
   "voice_grade",
   "intervention_suggest",

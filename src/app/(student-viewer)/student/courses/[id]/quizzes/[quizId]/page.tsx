@@ -10,6 +10,7 @@ import {
   Circle,
   Clock,
   History,
+  RotateCcw,
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -119,6 +120,7 @@ export default function StudentQuizPage(): React.JSX.Element {
 
   const [answers, setAnswers] = useState<Record<string, AnswerState>>({});
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [confirmStart, setConfirmStart] = useState(false);
   const [resultAttempt, setResultAttempt] = useState<StudentAttempt | null>(null);
   const [activeAttempt, setActiveAttempt] = useState<StudentAttempt | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
@@ -169,27 +171,29 @@ export default function StudentQuizPage(): React.JSX.Element {
     if (!course?.sections) return [];
     const out: FlatItem[] = [];
     course.sections.forEach((section, sIdx) => {
-      const lessonItems: FlatItem[] = (section.lessons ?? []).map((l) => ({
-        kind: "lesson",
-        id: l.id,
-        title: l.title,
-        sectionTitle: section.title,
-        sectionIndex: sIdx,
-        order: l.order,
-        lesson: l,
-      }));
-      const quizItems: FlatItem[] = (section.quizzes ?? []).map((q) => ({
-        kind: "quiz",
-        id: q.id,
-        title: q.title,
-        sectionTitle: section.title,
-        sectionIndex: sIdx,
-        order: q.order,
-        quiz: q,
-      }));
-      [...lessonItems, ...quizItems]
-        .sort((a, b) => a.order - b.order)
-        .forEach((item) => out.push(item));
+      (section.items ?? []).forEach((entry) => {
+        if (entry.item_type === "lesson") {
+          out.push({
+            kind: "lesson",
+            id: entry.data.id,
+            title: entry.data.title,
+            sectionTitle: section.title,
+            sectionIndex: sIdx,
+            order: entry.position,
+            lesson: entry.data,
+          });
+        } else {
+          out.push({
+            kind: "quiz",
+            id: entry.data.id,
+            title: entry.data.title,
+            sectionTitle: section.title,
+            sectionIndex: sIdx,
+            order: entry.position,
+            quiz: entry.data,
+          });
+        }
+      });
     });
     return out;
   }, [course]);
@@ -501,7 +505,7 @@ export default function StudentQuizPage(): React.JSX.Element {
                 etre termine avant la fin du temps imparti.
               </p>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-md border border-border bg-background px-3 py-2">
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
                     Questions
@@ -529,6 +533,17 @@ export default function StudentQuizPage(): React.JSX.Element {
                     sur 100
                   </div>
                 </div>
+                <div className="rounded-md border border-border bg-background px-3 py-2">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Tentatives
+                  </div>
+                  <div className="mt-1 flex items-center gap-1 text-lg font-semibold text-amber-950">
+                    <RotateCcw className="h-4 w-4" />
+                    {quiz.max_attempts == null
+                      ? "Illimitees"
+                      : `${Math.max(quiz.max_attempts - (attempts?.length ?? 0), 0)} / ${quiz.max_attempts}`}
+                  </div>
+                </div>
               </div>
 
               {quiz.time_limit_minutes && (
@@ -550,13 +565,21 @@ export default function StudentQuizPage(): React.JSX.Element {
                       <p className="text-xs text-muted-foreground">
                         {exhausted
                           ? `Tentatives epuisees (${used} / ${cap}).`
-                          : `Tentative ${used + 1} sur ${cap} (${remaining} restante${remaining === 1 ? "" : "s"}).`}
+                          : cap === 1
+                            ? "Une seule tentative autorisee."
+                            : `Tentative ${used + 1} sur ${cap} (${remaining} restante${remaining === 1 ? "" : "s"}).`}
                       </p>
                     )}
                     <Button
                       size="lg"
                       disabled={isStarting || exhausted}
-                      onClick={handleStart}
+                      onClick={() => {
+                        if (cap != null) {
+                          setConfirmStart(true);
+                        } else {
+                          handleStart();
+                        }
+                      }}
                       className="w-full sm:w-auto"
                     >
                       {exhausted
@@ -614,6 +637,28 @@ export default function StudentQuizPage(): React.JSX.Element {
         isPending={isSubmitting}
         onConfirm={handleSubmit}
       />
+
+      {quiz && quiz.max_attempts != null && (() => {
+        const used = attempts?.length ?? 0;
+        const cap = quiz.max_attempts;
+        const remaining = Math.max(cap - used, 0);
+        return (
+          <ConfirmDialog
+            open={confirmStart}
+            onOpenChange={setConfirmStart}
+            title={cap === 1 ? "Une seule tentative" : "Commencer le quiz ?"}
+            description={
+              cap === 1
+                ? "Vous n'avez qu'une seule tentative. Une fois commencé, fermer le navigateur sans soumettre comptera comme votre tentative. Êtes-vous prêt(e) ?"
+                : `Ceci utilisera 1 de vos ${remaining} tentative${remaining !== 1 ? "s" : ""} restante${remaining !== 1 ? "s" : ""}. Une tentative non terminée compte aussi. Continuer ?`
+            }
+            confirmLabel="Commencer"
+            cancelLabel="Annuler"
+            isPending={isStarting}
+            onConfirm={handleStart}
+          />
+        );
+      })()}
     </ViewerShell>
   );
 }
