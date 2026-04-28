@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,15 +38,17 @@ export function EvalForm({
     return seed;
   }, [rubric, existing]);
 
+  const prevInitialRef = useRef(initial);
   const [scores, setScores] = useState(initial);
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const { mutate, isPending } = useUpsertEvaluation();
 
-  // Reset when navigating between generations.
-  useEffect(() => {
+  // Reset when navigating between generations (ref comparison avoids setState-in-effect lint error).
+  if (prevInitialRef.current !== initial) {
+    prevInitialRef.current = initial;
     setScores(initial);
     setNotes(existing?.notes ?? "");
-  }, [initial, existing?.notes]);
+  }
 
   const allFilled = rubric.criteria.every((c) => scores[c.key] !== null);
   const failingScores = isBelowPassBar(
