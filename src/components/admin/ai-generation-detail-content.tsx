@@ -236,6 +236,7 @@ export function AIGenerationDetailContent({
         <aside className="lg:sticky lg:top-6 lg:self-start">
           {rubric ? (
             <EvalForm
+              key={gen.id}
               generationId={gen.id}
               rubric={rubric}
               existing={existingEval ?? null}
