@@ -3,10 +3,7 @@
  * fetch directly; they go through here so error handling and shapes stay
  * consistent across every AI feature.
  */
-import type {
-  AIQuizChange,
-  AIQuizEditOutput,
-} from "@/lib/ai/schemas/quiz-edit.schema";
+import type { AIQuizChange } from "@/lib/ai/schemas/quiz-edit.schema";
 
 export interface GenerateQuizInput {
   sectionId: string;
@@ -40,12 +37,15 @@ export interface ResolveGenerationInput {
 export interface ProposeQuizEditInput {
   quizId: string;
   instruction: string;
+  /** Pre-formatted in-session history. Empty string = first turn. */
+  chatHistory?: string;
 }
 
 export interface ProposeQuizEditResponse {
   generationId: string;
-  summary: AIQuizEditOutput["summary"];
-  changes: AIQuizEditOutput["changes"];
+  summary: string;
+  // Server narrows the LLM's flat output to the wire shape before returning.
+  changes: AIQuizChange[];
 }
 
 export interface ApplyQuizEditInput {

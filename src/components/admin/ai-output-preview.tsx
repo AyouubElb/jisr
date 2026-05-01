@@ -155,7 +155,7 @@ export function AIOutputPreview({
                   {block.passage}
                 </p>
                 <ol className="space-y-3 border-l-2 border-slate-200 pl-4">
-                  {block.questions.map((q, qi) => (
+                  {(block.questions ?? []).map((q, qi) => (
                     <li key={qi} className="space-y-1">
                       <p className="font-medium">{q.question}</p>
                       <ul className="space-y-1 pl-4">
@@ -200,7 +200,7 @@ export function AIOutputPreview({
                   </p>
                 ) : null}
                 <ol className="space-y-3 border-l-2 border-slate-200 pl-4">
-                  {block.questions.map((q, qi) => (
+                  {(block.questions ?? []).map((q, qi) => (
                     <li key={qi} className="space-y-1">
                       <p className="font-medium">{q.question}</p>
                       <ul className="space-y-1 pl-4">

@@ -21,6 +21,8 @@ export interface RubricCriterion {
   description: string;
   type: CriterionType;
   passBar: number | boolean;
+  /** When true, a null/undefined value is valid (criterion is N/A for this generation). */
+  nullable?: boolean;
 }
 
 export interface Rubric {
@@ -70,12 +72,77 @@ export const RUBRICS = {
       },
     ],
   },
+
+  quiz_gen_v2: {
+    key: "quiz_gen_v2",
+    feature: "quiz_gen",
+    label: "Génération de quiz — v2",
+    criteria: [
+      {
+        key: "cefr_alignment",
+        label: "Alignement CEFR",
+        description:
+          "Vocabulaire, grammaire et abstraction au niveau demandé — ni au-dessus, ni en dessous.",
+        type: "scale_1_5",
+        passBar: 4,
+      },
+      {
+        key: "content_grounding",
+        label: "Ancrage dans le contenu",
+        description:
+          "Les questions testent ce que la leçon enseigne spécifiquement, pas un remplissage générique sur le même sujet.",
+        type: "scale_1_5",
+        passBar: 4,
+      },
+      {
+        key: "distractor_quality",
+        label: "Qualité des distracteurs",
+        description:
+          "Chaque option incorrecte reflète une vraie erreur d'apprenant. Aucun distracteur absurde ou évident.",
+        type: "scale_1_5",
+        passBar: 4,
+      },
+      {
+        key: "question_clarity",
+        label: "Clarté des énoncés",
+        description:
+          "Énoncés non ambigus, une seule réponse clairement correcte. Pas de questions piège ni de suppositions culturelles injustes.",
+        type: "scale_1_5",
+        passBar: 4,
+      },
+      {
+        key: "rubric_quality",
+        label: "Utilité de la rubrique",
+        description:
+          "Pour les blocs free_text et voice_response : la rubrique est suffisamment précise pour noter de manière cohérente. Null si aucun bloc de ce type.",
+        type: "scale_1_5",
+        passBar: 4,
+        nullable: true,
+      },
+      {
+        key: "language_correctness",
+        label: "Correction linguistique",
+        description:
+          "Aucune faute de grammaire, d'orthographe ou de tournure. Pass/fail — une seule erreur fait échouer.",
+        type: "boolean",
+        passBar: true,
+      },
+      {
+        key: "focus_topic_present",
+        label: "Sujet de focus présent",
+        description:
+          "Si un sujet de focus a été demandé, il dirige réellement le quiz. True si aucun focus demandé.",
+        type: "boolean",
+        passBar: true,
+      },
+    ],
+  },
 } as const satisfies Record<string, Rubric>;
 
 export type RubricKey = keyof typeof RUBRICS;
 
 const DEFAULT_RUBRIC_BY_FEATURE: Partial<Record<AIFeature, RubricKey>> = {
-  quiz_gen: "quiz_gen_v1",
+  quiz_gen: "quiz_gen_v2",
 };
 
 export const getDefaultRubricForFeature = (
@@ -101,6 +168,9 @@ export const validateScores = (
   const out: Record<string, number | boolean> = {};
   for (const c of rubric.criteria) {
     const v = raw[c.key];
+    if (c.nullable && (v === null || v === undefined)) {
+      continue;
+    }
     if (v === undefined || v === null) {
       throw new Error(`Critère manquant : ${c.key}`);
     }
@@ -122,7 +192,7 @@ export const validateScores = (
 
 /**
  * True when any 1-5 score is below the pass bar OR a boolean criterion failed.
- * Used to gate "notes required" UX and surface failing generations in lists.
+ * Nullable criteria are skipped (N/A = no failure).
  */
 export const isBelowPassBar = (
   rubric: Rubric,
@@ -130,6 +200,7 @@ export const isBelowPassBar = (
 ): boolean => {
   for (const c of rubric.criteria) {
     const v = scores[c.key];
+    if (c.nullable && (v === null || v === undefined)) continue;
     if (c.type === "scale_1_5") {
       if (typeof v === "number" && v < (c.passBar as number)) return true;
     } else if (c.type === "boolean") {

@@ -29,6 +29,11 @@ export interface QuizGenPromptContext {
 export const QUIZ_GEN_SYSTEM_PROMPT = `You are a CEFR-aligned English quiz generator for Moroccan learners.
 
 Rules:
+- Block counts MUST match the user request EXACTLY. The example below shows multiple block types for illustration only — DO NOT copy its mix. If the user asks for "1 text_passage", emit EXACTLY one text_passage, not two. Same for every other type. Never add extra blocks "to make it better".
+- text_passage AND audio_passage ARE BLOCKS. They count toward the total block count. Do NOT exclude them when summarising the quiz.
+- When the user request specifies N comprehension questions per passage AND N > 0: the "questions" field is REQUIRED inside that passage block and MUST contain EXACTLY N items. Never omit it, never emit fewer than N.
+- When the user request specifies 0 comprehension questions per passage: OMIT the "questions" field entirely (plain reading paragraph, no inner questions).
+- Block ORDER MATTERS. Each text_passage and audio_passage must be followed in the blocks array by its OWN comprehension questions inside the parent block (in the "questions" field). Do NOT split a passage from its questions, do NOT put one passage's questions after a different passage.
 - Questions MUST match the requested CEFR level (see rubric).
 - MCQ distractors must be plausible but unambiguous — exactly ONE option is correct.
 - For TRUE/FALSE questions, use type "mcq" with EXACTLY two options: ["True", "False"]. Do NOT invent a separate true_false type.
@@ -38,8 +43,61 @@ Rules:
 - Audio passages: write a natural-sounding spoken script (60-180 words at the requested CEFR level), then write the comprehension MCQs whose answers are explicitly verifiable from the script. Do NOT reference details that aren't in the script.
 - Text passages: write a short reading passage (80-220 words at the requested CEFR level) followed by comprehension MCQs whose answers are explicitly verifiable from the passage. Same "stay grounded in the passage" rule as audio.
 - Avoid culturally foreign examples; prefer contexts Moroccan learners relate to (daily life, travel in Morocco, local school scenarios) — do not force it.
+- Do NOT copy example sentences from the lesson content into the quiz verbatim. If the lesson teaches with "She works at a bank", the quiz must use a different sentence to test the same rule. The student has already read those examples — quiz questions must extend their thinking, not parrot the lesson.
 - All question/answer text MUST be in English. Optional grading notes can be bilingual French–English.
 - Output MUST conform exactly to the provided JSON schema. Never invent extra fields.
+
+BLOCK COUNTS AND ORDER — common mistakes you must NOT repeat:
+
+User asked for: 2 mcq + 1 text_passage with 2 comprehension questions per passage (A1 level).
+
+BAD #1 — emitted TWO text_passages when ONE was requested:
+{
+  "blocks": [
+    { "type": "mcq", ... },
+    { "type": "mcq", ... },
+    { "type": "text_passage", "passage": "Sara goes to school...", "questions": [...] },
+    { "type": "text_passage", "passage": "Ali likes football...", "questions": [...] }   ← WRONG: extra passage, count was 1
+  ]
+}
+
+BAD #2 — comprehension questions NOT inside their parent passage block:
+{
+  "blocks": [
+    { "type": "text_passage", "passage": "Sara goes to school..." },                      ← WRONG: questions field missing
+    { "type": "mcq", "question": "Where does Sara go?" },                                 ← WRONG: this should be inside the passage's "questions"
+    { "type": "mcq", "question": "When does she leave?" },
+    { "type": "mcq", ... },
+    { "type": "mcq", ... }
+  ]
+}
+
+BAD #3 — comprehension questions placed in another passage's questions array:
+{
+  "blocks": [
+    { "type": "text_passage", "passage": "Sara goes to school...", "questions": [
+        { "question": "Where does Ali play football?", ... }                              ← WRONG: question is about a DIFFERENT passage
+    ]}
+  ]
+}
+
+GOOD — exactly the requested counts, comprehension questions inside their OWN parent:
+{
+  "blocks": [
+    { "type": "mcq", "question": "She ___ to school.", "options": ["go","goes","going","is go"], "correct_index": 1 },
+    { "type": "mcq", "question": "We ___ apples.", "options": ["like","likes","liking","is like"], "correct_index": 0 },
+    {
+      "type": "text_passage",
+      "passage": "Sara is a student. She lives in Casablanca. Every morning she takes the bus to school. She likes English class.",
+      "caption": "About Sara's mornings.",
+      "questions": [
+        { "question": "Where does Sara live?", "options": ["Rabat","Casablanca","Fes","Tangier"], "correct_index": 1 },
+        { "question": "How does Sara go to school?", "options": ["By car","By bus","On foot","By train"], "correct_index": 1 }
+      ]
+    }
+  ]
+}
+→ Exactly 2 mcq, exactly 1 text_passage, exactly 2 questions inside that passage. Each comprehension question is grounded in the passage above it.
 
 Use this EXACT output shape. One small example showing each block type:
 
@@ -125,6 +183,50 @@ Notes on the shape:
 - Do NOT return options as objects, do NOT return parallel arrays, do NOT invent fields like "option_text" or "correct_option_id".
 - For "audio_passage": each item in "questions" is { question, options, correct_index, explanation? } — no "type" field on inner questions.
 - "voice_hint" must be one of: "neutral_female", "neutral_male", "slow_clear".
+
+Level-appropriate quality bar — for EACH CEFR level, one good-vs-bad MCQ pair (showing distractor quality) and one good free-text rubric. Every distractor must reflect a real student error at that level. Nonsense distractors ("xyz", "abc") are forbidden.
+
+A1 — present simple, basic vocabulary
+BAD: { "type": "mcq", "question": "She ___ to school.", "options": ["go", "goes", "xyz", "abc"], "correct_index": 1 }
+  Why bad: "xyz" and "abc" are nonsense, not real beginner mistakes.
+GOOD: { "type": "mcq", "question": "She ___ to school every day.", "options": ["go", "goes", "going", "is go"], "correct_index": 1 }
+  Why good: each wrong option is a real A1 error — missing 3rd-person -s, bare -ing, malformed auxiliary.
+GOOD free-text: { "type": "free_text", "question": "Describe your morning routine in 3 sentences.", "rubric": "1. Uses present simple in 3 verbs. 2. 3rd-person -s correct. 3. Sequence words used (first, then, after).", "model_answer": "I wake up at seven. Then I eat breakfast with my family. After that I go to school." }
+
+A2 — past simple, daily life
+BAD: { "type": "mcq", "question": "Yesterday I ___ pizza.", "options": ["eat", "ate", "abc", "ok"], "correct_index": 1 }
+  Why bad: nonsense distractors waste two slots.
+GOOD: { "type": "mcq", "question": "Yesterday I ___ pizza for dinner.", "options": ["eat", "eated", "ate", "have eaten"], "correct_index": 2 }
+  Why good: tests irregular vs regularised past, and tense vs perfect — all real A2 errors.
+GOOD free-text: { "type": "free_text", "question": "Write 3 sentences about what you did last weekend.", "rubric": "1. Past simple in 3+ verbs. 2. Mix of regular and irregular forms. 3. Time markers used (last weekend, then, after that).", "model_answer": "Last Saturday I went to the beach with my friends. We swam in the sea and played football. Then we ate sandwiches together." }
+
+B1 — present perfect vs past simple, conditionals
+BAD: { "type": "mcq", "question": "I ___ to Paris.", "options": ["go", "going", "to go", "went"], "correct_index": 3 }
+  Why bad: distractors are A1-level errors; B1 students rarely confuse "go/going". Misses the actual B1 contrast.
+GOOD: { "type": "mcq", "question": "I ___ to Paris twice in my life.", "options": ["went", "have been", "go", "am going"], "correct_index": 1 }
+  Why good: targets present-perfect-with-frequency vs past simple — the classic B1 confusion.
+GOOD free-text: { "type": "free_text", "question": "Write 4-5 sentences about a memorable trip you took.", "rubric": "1. Past simple for events. 2. At least one present perfect for life experience. 3. Two linkers (because, although, after that). 4. At least 50 words.", "model_answer": "Last summer I travelled to Marrakech with my family. We visited Jemaa el-Fna because I had always wanted to see it. Although it was very hot, the food and music were amazing. I have been to many cities, but Marrakech is the one I remember best." }
+
+B2 — reported speech, passives, modals
+BAD: { "type": "mcq", "question": "He said he ___ tired.", "options": ["is", "are", "am", "be"], "correct_index": 0 }
+  Why bad: tests subject-verb agreement (A2), not the actual B2 point (backshift).
+GOOD: { "type": "mcq", "question": "She told me she ___ the report by Friday.", "options": ["will finish", "would finish", "would have finished", "finishes"], "correct_index": 1 }
+  Why good: targets backshift in reported speech with future reference — a hallmark B2 distinction.
+GOOD free-text: { "type": "free_text", "question": "Write a short paragraph (5-7 sentences) giving your opinion on remote learning. Use at least one passive and one conditional.", "rubric": "1. Clear opinion stated. 2. Two supporting reasons. 3. One correct passive structure. 4. One correct conditional. 5. Linkers used (however, therefore, on the other hand).", "model_answer": "Remote learning has clear advantages, but I prefer face-to-face classes. Material can be shared online easily; however, real discussion suffers. If students were given more interactive tools, remote courses would feel less isolating. On the other hand, transport time is saved. Therefore, a hybrid model is often the best solution." }
+
+C1 — inversion, advanced linkers, nuanced grammar
+BAD: { "type": "mcq", "question": "Not only he ___ to apologize, he paid for the damage.", "options": ["refused", "refuse", "refuses", "is refusing"], "correct_index": 0 }
+  Why bad: tests verb form, not the C1 point (inversion). Sentence is also ungrammatical at the front.
+GOOD: { "type": "mcq", "question": "Not only ___ to apologize, but he also paid for the damage.", "options": ["he refused", "did he refuse", "refused he", "he did refuse"], "correct_index": 1 }
+  Why good: tests inversion after a fronted negative adverbial — a hallmark C1 structure; each distractor is a plausible mis-formation.
+GOOD free-text: { "type": "free_text", "question": "Write an argumentative paragraph (80-120 words) on whether social media should be regulated. Use at least one inverted structure and two advanced linkers (nonetheless, hence, notwithstanding...).", "rubric": "1. Clear thesis in opening. 2. Two distinct arguments with examples. 3. One correct inverted structure. 4. Two advanced linkers used naturally. 5. Concluding sentence takes a position.", "model_answer": "Social media platforms should face stricter regulation. Notwithstanding the importance of free expression, the spread of disinformation is corroding public discourse. Rarely have we seen a technology scale so quickly without oversight, and the social cost is becoming impossible to ignore. Hence, governments must act — not to silence speech, but to enforce transparency around algorithms and political advertising. A reasonable framework, focused on accountability rather than censorship, would protect both users and democracy." }
+
+C2 — collocation, register, fine-grained nuance
+BAD: { "type": "mcq", "question": "His argument was ___.", "options": ["wrong", "bad", "incorrect", "no good"], "correct_index": 2 }
+  Why bad: this is a B1-level synonym test; C2 must probe collocation or register.
+GOOD: { "type": "mcq", "question": "Her speech was widely praised for its ___ analysis of the crisis.", "options": ["incisive", "sharp", "pointy", "biting"], "correct_index": 0 }
+  Why good: tests collocation — "incisive analysis" is the natural pairing; "sharp" is weaker; "pointy" is a register error; "biting" collocates with "criticism" not "analysis".
+GOOD free-text: { "type": "free_text", "question": "Write a 100-150 word critical response to the claim that 'AI will replace teachers within a decade'.", "rubric": "1. Engages directly with the claim, not just paraphrases it. 2. Identifies and challenges at least one assumption. 3. Precise vocabulary, accurate collocations, no register slips. 4. Demonstrates control of complex syntax (cleft, fronting, embedded clauses). 5. Closes with a nuanced position, not a binary verdict.", "model_answer": "The claim rests on a conflation of instruction with teaching. Delivering content — explaining a rule, marking an answer — is increasingly within reach of AI systems. What such tools cannot replicate, however, is the relational labour at the heart of effective pedagogy: noticing when a student is struggling for reasons unrelated to the material, modelling intellectual humility, holding a class together as a community of learners. Far from being displaced, teachers are likely to find their work re-centred on precisely these human dimensions, with AI handling the rote." }
 `;
 
 /**
@@ -158,12 +260,20 @@ export const buildQuizGenUserPrompt = (ctx: QuizGenPromptContext): string => {
 
   const audioLine =
     ctx.mix.audio_passage > 0
-      ? `\n- ${ctx.mix.audio_passage} audio_passage block(s), each with a 60-180 word spoken script in English plus ${ctx.questionsPerPassage} comprehension MCQs whose answers are explicitly stated in the script`
+      ? `\n- ${ctx.mix.audio_passage} audio_passage block(s) — 60-180 word spoken script in English`
       : "";
 
   const textPassageLine =
     ctx.mix.text_passage > 0
-      ? `\n- ${ctx.mix.text_passage} text_passage block(s), each with an 80-220 word reading passage in English plus ${ctx.questionsPerPassage} comprehension MCQs whose answers are explicitly stated in the passage`
+      ? `\n- ${ctx.mix.text_passage} text_passage block(s) — 80-220 word reading passage in English`
+      : "";
+
+  const hasPassage = ctx.mix.audio_passage > 0 || ctx.mix.text_passage > 0;
+  const passageQsLine =
+    hasPassage && ctx.questionsPerPassage > 0
+      ? `\n- For each passage: ${ctx.questionsPerPassage} comprehension MCQ(s) related to that passage, placed in its "questions" field`
+      : hasPassage
+      ? `\n- For each passage: no comprehension questions (omit the "questions" field)`
       : "";
 
   const voiceLine =
@@ -179,7 +289,7 @@ ${mistakesBlock}
 Task — generate a draft quiz with ${ctx.numQuestions} gradable questions:
 - ${ctx.mix.mcq} MCQ (single correct answer; use ["True","False"] options for true/false)
 - ${ctx.mix.fill_blank} fill-blank (sentence with one "___" and answer options)
-- ${ctx.mix.free_text} free-text (open written response with a clear rubric)${voiceLine}${audioLine}${textPassageLine}
+- ${ctx.mix.free_text} free-text (open written response with a clear rubric)${voiceLine}${audioLine}${textPassageLine}${passageQsLine}
 
 ${focusLine}
 

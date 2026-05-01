@@ -114,13 +114,16 @@ function QuizAIGenerateDialogBody({
   const derivedMCQs = (mix.audio_passage + mix.text_passage) * questionsPerPassage;
   const grandTotal = directQs + derivedMCQs;
 
-  const directInRange = directQs >= 3 && directQs <= 15;
+  const directInRange = directQs >= 0 && directQs <= 15;
   const passageQsValid =
-    !usesAnyPassage || (questionsPerPassage >= 1 && questionsPerPassage <= 5);
+    !usesAnyPassage || (questionsPerPassage >= 0 && questionsPerPassage <= 5);
+  // Quiz must have at least one block of any kind.
+  const hasAtLeastOneBlock = grandTotal >= 1;
   const canSubmit =
     selectedLessonIds.length > 0 &&
     directInRange &&
     passageQsValid &&
+    hasAtLeastOneBlock &&
     mix.audio_passage <= 3 &&
     mix.text_passage <= 3 &&
     !isPending;
@@ -245,7 +248,12 @@ function QuizAIGenerateDialogBody({
             </div>
             {!directInRange ? (
               <p className="text-xs text-destructive">
-                Le total direct doit être entre 3 et 15 (actuel : {directQs}).
+                Le total direct doit être entre 0 et 15 (actuel : {directQs}).
+              </p>
+            ) : null}
+            {!hasAtLeastOneBlock ? (
+              <p className="text-xs text-destructive">
+                Le quiz doit contenir au moins un bloc.
               </p>
             ) : null}
           </CardContent>
@@ -301,15 +309,15 @@ function QuizAIGenerateDialogBody({
               />
               <div>
                 <Label className="text-xs">QCM / passage</Label>
-                <p className="text-[10px] text-muted-foreground">1–5</p>
+                <p className="text-[10px] text-muted-foreground">0–5</p>
                 <Input
                   type="number"
-                  min={1}
+                  min={0}
                   max={5}
                   disabled={!usesAnyPassage}
                   value={questionsPerPassage}
                   onChange={(e) =>
-                    setQuestionsPerPassage(clamp(Number(e.target.value) || 1, 1, 5))
+                    setQuestionsPerPassage(clamp(Number(e.target.value) || 0, 0, 5))
                   }
                   className="mt-1"
                 />

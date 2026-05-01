@@ -21,7 +21,7 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "149 DH",
+    price: "199 DH",
     period: "/ mois",
     description: "Pour les instructeurs actifs avec une vraie classe.",
     features: [
@@ -125,7 +125,8 @@ export function PricingSection(): React.JSX.Element {
         </div>
 
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          Accès sur invitation après une discussion · Paiement par virement bancaire
+          Accès sur invitation après une discussion · Paiement par virement
+          bancaire
         </p>
       </div>
     </section>

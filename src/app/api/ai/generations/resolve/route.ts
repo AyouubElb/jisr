@@ -53,6 +53,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "Requête invalide" }, { status: 400 });
   }
 
+  // Only the original quiz_gen turn — quiz_edit has its own accept tracking.
   const { data: gen, error: genError } = await supabase
     .from("ai_generations")
     .select(
@@ -60,6 +61,9 @@ export async function POST(req: Request): Promise<Response> {
     )
     .eq("output_quiz_id", body.quizId)
     .eq("user_id", user.id)
+    .eq("feature", "quiz_gen")
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (genError) {

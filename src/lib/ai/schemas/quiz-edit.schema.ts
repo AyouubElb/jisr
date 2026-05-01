@@ -2,53 +2,43 @@ import { z } from "zod";
 import { aiQuizBlockSchema } from "./quiz-output.schema";
 
 /**
- * LLM-facing schema for quiz EDIT operations. The model receives the current
- * blocks (with their UUIDs) and returns a flat list of block-level changes
- * the instructor will accept or reject before they hit the database.
+ * Wire schema for quiz-edit changes.
  *
- * Same flat-types philosophy as quiz-output.schema.ts — no refinements, no
- * nested objects beyond what the block schema already requires.
+ * The change list is built server-side by the propose route — each tool
+ * (add / update / delete) returns its own clean schema, and the route wraps
+ * each result into one of the three change kinds below before sending to the
+ * client. The same schema validates the apply body (client → server).
+ *
+ * No LLM ever sees this discriminated union directly, so we get the strong
+ * type narrowing without hitting Gemini's nested-union limitations.
  */
-
-const updateBlockChangeSchema = z.object({
+const updateBlockChangeWireSchema = z.object({
   kind: z.literal("update_block"),
-  // Must reference an id present in the input. Validated server-side.
   block_id: z.string(),
-  // Full replacement block (not a partial diff — the model emits the
-  // complete new shape, easier to reason about and to render).
   new_block: aiQuizBlockSchema,
-  // 1-line French justification shown in the diff card.
   reason: z.string(),
 });
 
-const addBlockChangeSchema = z.object({
+const addBlockChangeWireSchema = z.object({
   kind: z.literal("add_block"),
-  // null = insert at the very start of the quiz.
   after_block_id: z.string().nullable(),
   block: aiQuizBlockSchema,
   reason: z.string(),
 });
 
-const deleteBlockChangeSchema = z.object({
+const deleteBlockChangeWireSchema = z.object({
   kind: z.literal("delete_block"),
   block_id: z.string(),
   reason: z.string(),
 });
 
-export const quizChangeSchema = z.discriminatedUnion("kind", [
-  updateBlockChangeSchema,
-  addBlockChangeSchema,
-  deleteBlockChangeSchema,
+export const aiQuizChangeWireSchema = z.discriminatedUnion("kind", [
+  updateBlockChangeWireSchema,
+  addBlockChangeWireSchema,
+  deleteBlockChangeWireSchema,
 ]);
 
-export const aiQuizEditOutputSchema = z.object({
-  // 1-2 sentence overview shown above the change list.
-  summary: z.string(),
-  changes: z.array(quizChangeSchema),
-});
-
-export type AIQuizChange = z.infer<typeof quizChangeSchema>;
-export type AIQuizUpdateBlockChange = z.infer<typeof updateBlockChangeSchema>;
-export type AIQuizAddBlockChange = z.infer<typeof addBlockChangeSchema>;
-export type AIQuizDeleteBlockChange = z.infer<typeof deleteBlockChangeSchema>;
-export type AIQuizEditOutput = z.infer<typeof aiQuizEditOutputSchema>;
+export type AIQuizUpdateBlockChange = z.infer<typeof updateBlockChangeWireSchema>;
+export type AIQuizAddBlockChange = z.infer<typeof addBlockChangeWireSchema>;
+export type AIQuizDeleteBlockChange = z.infer<typeof deleteBlockChangeWireSchema>;
+export type AIQuizChange = z.infer<typeof aiQuizChangeWireSchema>;

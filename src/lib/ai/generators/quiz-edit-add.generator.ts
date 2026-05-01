@@ -6,45 +6,34 @@ import { cheapRepair } from "../repair";
 import { AIGenerationError } from "../types";
 import type { AICallResult } from "../types";
 import {
-  QUIZ_GEN_SYSTEM_PROMPT,
-  QUIZ_GEN_RUBRIC_PROMPT,
-  buildQuizGenUserPrompt,
-  type QuizGenPromptContext,
-} from "../prompts/quiz-generation";
+  QUIZ_EDIT_ADD_SYSTEM_PROMPT,
+  QUIZ_EDIT_ADD_RUBRIC_PROMPT,
+  buildQuizEditAddUserPrompt,
+  type QuizEditAddContext,
+} from "../prompts/quiz-edit-add";
 import {
-  aiQuizOutputSchema,
-  type AIQuizOutput,
-} from "../schemas/quiz-output.schema";
+  aiQuizEditAddOutputSchema,
+  type AIQuizEditAddOutput,
+} from "../schemas/quiz-edit-add.schema";
 
-export interface GenerateQuizArgs {
-  context: QuizGenPromptContext;
+export interface AddQuizBlocksArgs {
+  context: QuizEditAddContext;
   modelKey?: ModelKey;
 }
 
-/**
- * Single-call quiz generator. Pre-assembled context → one LLM → Zod-
- * validated structured output. One repair retry on schema failure: we
- * hand the broken JSON + validation error back to the model so it can
- * patch the shape without regenerating the quiz from scratch.
- *
- * Upgrade path (tools, critic) is documented in docs/AI-AGENT-QUIZ-GEN.md §10.
- */
-export const generateQuiz = async (
-  args: GenerateQuizArgs,
-): Promise<AICallResult<AIQuizOutput>> => {
-  const modelKey = args.modelKey ?? DEFAULT_MODEL.quiz_gen;
+export const addQuizBlocks = async (
+  args: AddQuizBlocksArgs,
+): Promise<AICallResult<AIQuizEditAddOutput>> => {
+  const modelKey = args.modelKey ?? DEFAULT_MODEL.quiz_edit;
   const model = getModel(modelKey);
   const provider = getProvider(modelKey);
-  const promptVersion = PROMPT_VERSIONS.quiz_gen;
+  const promptVersion = PROMPT_VERSIONS.quiz_edit;
 
-  const systemPrompt = `${QUIZ_GEN_SYSTEM_PROMPT}\n\n${QUIZ_GEN_RUBRIC_PROMPT}`;
-  const userPrompt = buildQuizGenUserPrompt(args.context);
-  const inputHash = hashPromptInput(`${promptVersion}\n${systemPrompt}\n${userPrompt}`);
-
-  // Debug: log what we send to the model.
-  console.log("[quiz-gen] === MODEL INPUT ===");
-  console.log("[quiz-gen] model:", modelKey, "/ promptVersion:", promptVersion);
-  console.log("[quiz-gen] user prompt:\n" + userPrompt);
+  const systemPrompt = `${QUIZ_EDIT_ADD_SYSTEM_PROMPT}\n\n${QUIZ_EDIT_ADD_RUBRIC_PROMPT}`;
+  const userPrompt = buildQuizEditAddUserPrompt(args.context);
+  const inputHash = hashPromptInput(
+    `add\n${promptVersion}\n${systemPrompt}\n${userPrompt}`,
+  );
 
   const startedAt = Date.now();
   let repairAttempts = 0;
@@ -52,7 +41,7 @@ export const generateQuiz = async (
   try {
     const { object, usage } = await generateObject({
       model,
-      schema: aiQuizOutputSchema,
+      schema: aiQuizEditAddOutputSchema,
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0.4,
@@ -62,7 +51,6 @@ export const generateQuiz = async (
         // Cheap fix first; LLM repair only if it didn't help.
         const cheap = cheapRepair(text);
         if (repairAttempts === 1 && cheap !== text) return cheap;
-
         const { text: repaired } = await generateText({
           model,
           system:
@@ -75,17 +63,12 @@ ${error.message}
 Original JSON:
 ${text}
 
-Return the corrected JSON only. Keep as much of the original content as possible — fix only what the error requires. Do not invent new fields.`,
+Return the corrected JSON only. Keep as much of the original content as possible — fix only what the error requires.`,
           temperature: 0,
         });
-
         return cheapRepair(repaired.trim());
       },
     });
-
-    console.log("[quiz-gen] === MODEL OUTPUT (parsed) ===");
-    console.log("[quiz-gen] block count:", object.blocks.length);
-    console.log("[quiz-gen] full object:\n" + JSON.stringify(object, null, 2));
 
     return {
       output: object,
@@ -106,12 +89,9 @@ Return the corrected JSON only. Keep as much of the original content as possible
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     const rawText = NoObjectGeneratedError.isInstance(err) ? err.text : undefined;
-    console.log("[quiz-gen] === MODEL OUTPUT (raw, schema FAILED) ===");
-    console.log("[quiz-gen] error:", message);
-    if (rawText) console.log("[quiz-gen] raw text:\n" + rawText);
     throw new AIGenerationError(
-      `Quiz generation failed: ${message}`,
-      "quiz_gen",
+      `Quiz edit (add) failed: ${message}`,
+      "quiz_edit",
       err,
       rawText,
     );

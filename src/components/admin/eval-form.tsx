@@ -17,18 +17,25 @@ type AIEvaluationRow = Database["public"]["Tables"]["ai_evaluations"]["Row"];
 interface EvalFormProps {
   generationId: string;
   rubric: Rubric;
-  existing: AIEvaluationRow | null;
+  humanEval: AIEvaluationRow | null;
+  llmEval: AIEvaluationRow | null;
 }
 
 export function EvalForm({
   generationId,
   rubric,
-  existing,
+  humanEval,
+  llmEval,
 }: EvalFormProps): React.JSX.Element {
+  // Prefill from human if it exists, else fall back to LLM judge.
+  const seedSource = humanEval ?? llmEval;
+
   const initial = useMemo(() => {
     const seed: Record<string, number | boolean | null> = {};
     for (const c of rubric.criteria) {
-      const v = (existing?.scores as Record<string, unknown> | undefined)?.[c.key];
+      const v = (seedSource?.scores as Record<string, unknown> | undefined)?.[
+        c.key
+      ];
       if (c.type === "scale_1_5") {
         seed[c.key] = typeof v === "number" ? v : null;
       } else {
@@ -36,10 +43,10 @@ export function EvalForm({
       }
     }
     return seed;
-  }, [rubric, existing]);
+  }, [rubric, seedSource]);
 
   const [scores, setScores] = useState(initial);
-  const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [notes, setNotes] = useState(seedSource?.notes ?? "");
   const { mutate, isPending } = useUpsertEvaluation();
 
   const allFilled = rubric.criteria.every((c) => scores[c.key] !== null);
@@ -78,14 +85,25 @@ export function EvalForm({
       onSubmit={onSubmit}
       className="space-y-5 rounded-lg border border-slate-200 bg-white p-4"
     >
-      <div>
+      <div className="space-y-2">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
           {rubric.label}
         </h3>
-        {existing ? (
-          <p className="mt-1 text-xs text-slate-500">
-            Évaluation existante — vos modifications l&apos;écrasent.
-          </p>
+        {humanEval ? (
+          <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            <p className="font-medium">Validée par admin</p>
+            <p className="text-emerald-700/80">
+              Vos modifications mettent à jour cette évaluation.
+            </p>
+          </div>
+        ) : llmEval ? (
+          <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <p className="font-medium">Évaluation LLM — non validée</p>
+            <p className="text-amber-700/80">
+              Scores pré-remplis par le juge IA. Validez tel quel ou modifiez,
+              puis enregistrez.
+            </p>
+          </div>
         ) : null}
       </div>
 

@@ -95,7 +95,14 @@ const aiTextPassageBlockSchema = z.object({
       correct_index: z.number().int(),
       explanation: z.string().optional(),
     }),
-  ),
+  ).optional(),
+});
+
+/** Section header — purely structural, no scoring. */
+const aiSectionBlockSchema = z.object({
+  type: z.literal("section"),
+  title: z.string(),
+  description: z.string().optional(),
 });
 
 export const aiQuizBlockSchema = z.discriminatedUnion("type", [
@@ -105,6 +112,7 @@ export const aiQuizBlockSchema = z.discriminatedUnion("type", [
   aiVoiceResponseBlockSchema,
   aiAudioPassageBlockSchema,
   aiTextPassageBlockSchema,
+  aiSectionBlockSchema,
 ]);
 
 export const aiQuizOutputSchema = z.object({
@@ -122,4 +130,5 @@ export type AIFreeTextBlock = z.infer<typeof aiFreeTextBlockSchema>;
 export type AIVoiceResponseBlock = z.infer<typeof aiVoiceResponseBlockSchema>;
 export type AIAudioPassageBlock = z.infer<typeof aiAudioPassageBlockSchema>;
 export type AITextPassageBlock = z.infer<typeof aiTextPassageBlockSchema>;
+export type AISectionBlock = z.infer<typeof aiSectionBlockSchema>;
 export type AIQuizOutput = z.infer<typeof aiQuizOutputSchema>;

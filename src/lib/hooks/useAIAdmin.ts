@@ -32,10 +32,13 @@ export const useAIGeneration = (id: string) => {
   });
 };
 
-export const useAIEvaluation = (generationId: string, rubricKey: string) => {
-  return useQuery<AIEvaluationRow | null>({
+export const useAIEvaluations = (generationId: string, rubricKey: string) => {
+  return useQuery<{
+    human: AIEvaluationRow | null;
+    llm: AIEvaluationRow | null;
+  }>({
     queryKey: aiAdminKeys.evaluation(generationId),
-    queryFn: () => aiAdminApi.getEvaluation(generationId, rubricKey),
+    queryFn: () => aiAdminApi.getEvaluations(generationId, rubricKey),
     enabled: !!generationId && !!rubricKey,
   });
 };

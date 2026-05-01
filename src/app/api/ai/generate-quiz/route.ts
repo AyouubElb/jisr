@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { generateQuiz } from "@/lib/ai/generators/quiz.generator";
+import { generatePassageQuestions } from "@/lib/ai/generators/passage-questions.generator";
+import { judgeAndStoreQuizEval } from "@/lib/ai/generators/quiz-judge.generator";
 import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
@@ -25,7 +27,7 @@ const DEFAULT_VOICE = VOICE_BY_HINT.neutral_female;
 const BodySchema = z.object({
   sectionId: z.uuid(),
   lessonIds: z.array(z.uuid()).min(1).max(5),
-  numQuestions: z.number().int().min(3).max(15),
+  numQuestions: z.number().int().min(0).max(15),
   mix: z.object({
     mcq: z.number().int().min(0),
     fill_blank: z.number().int().min(0),
@@ -34,7 +36,7 @@ const BodySchema = z.object({
     audio_passage: z.number().int().min(0).max(3),
     text_passage: z.number().int().min(0).max(3),
   }),
-  questionsPerPassage: z.number().int().min(1).max(5),
+  questionsPerPassage: z.number().int().min(0).max(5),
   focusTopic: z.string().max(500).optional(),
 });
 
@@ -71,6 +73,15 @@ export async function POST(req: Request): Promise<Response> {
   if (totalMix !== body.numQuestions) {
     return NextResponse.json(
       { error: "La répartition des types ne correspond pas au nombre de questions" },
+      { status: 400 },
+    );
+  }
+
+  // A quiz must have at least one block (direct question OR passage).
+  const totalBlocks = totalMix + body.mix.audio_passage + body.mix.text_passage;
+  if (totalBlocks < 1) {
+    return NextResponse.json(
+      { error: "Le quiz doit contenir au moins un bloc" },
       { status: 400 },
     );
   }
@@ -278,10 +289,68 @@ export async function POST(req: Request): Promise<Response> {
         questions: PassageQuestion[];
       };
 
+  // Defensive: enforce per-type caps from the user's mix. The model sometimes
+  // emits an extra passage even when told to emit one. Drop the surplus.
+  const caps = {
+    mcq: body.mix.mcq,
+    fill_blank: body.mix.fill_blank,
+    free_text: body.mix.free_text,
+    voice_response: body.mix.voice_response,
+    audio_passage: body.mix.audio_passage,
+    text_passage: body.mix.text_passage,
+  };
+  const seen = {
+    mcq: 0,
+    fill_blank: 0,
+    free_text: 0,
+    voice_response: 0,
+    audio_passage: 0,
+    text_passage: 0,
+  };
+  const trimmedBlocks = result.output.blocks.filter((b) => {
+    const t = b.type as keyof typeof caps;
+    if (caps[t] === undefined) return true;
+    if (seen[t] >= caps[t]) {
+      console.warn(
+        `[ai/generate-quiz] dropping extra ${t} block (model emitted ${seen[t] + 1}, cap is ${caps[t]})`,
+      );
+      return false;
+    }
+    seen[t] += 1;
+    return true;
+  });
+
+  // Critic + repair: passages missing comprehension MCQs get a focused
+  // second LLM call. Most generations skip this entirely.
+  if (body.questionsPerPassage > 0) {
+    for (const b of trimmedBlocks) {
+      if (b.type !== "text_passage" && b.type !== "audio_passage") continue;
+      const have = b.questions?.length ?? 0;
+      if (have >= body.questionsPerPassage) continue;
+      const sourceText = b.type === "text_passage" ? b.passage : b.script;
+      try {
+        console.warn(
+          `[ai/generate-quiz] ${b.type} missing ${body.questionsPerPassage - have} comprehension question(s) — repairing`,
+        );
+        const repair = await generatePassageQuestions({
+          context: {
+            cefrLevel: course.level,
+            sourceLabel: b.type === "text_passage" ? "passage" : "script",
+            sourceText,
+            count: body.questionsPerPassage,
+          },
+        });
+        b.questions = repair.output.questions.slice(0, body.questionsPerPassage);
+      } catch (err) {
+        console.error("[ai/generate-quiz] passage-questions repair failed:", err);
+      }
+    }
+  }
+
   const plannedBlocks: PlannedBlock[] = [];
   let cursor = 0;
 
-  for (const b of result.output.blocks) {
+  for (const b of trimmedBlocks) {
     if (b.type === "mcq") {
       plannedBlocks.push({
         kind: "direct",
@@ -393,22 +462,20 @@ export async function POST(req: Request): Promise<Response> {
       cursor += b.questions.length;
     } else if (b.type === "text_passage") {
       const passageOrder = cursor++;
+      const questions = b.questions ?? [];
       plannedBlocks.push({
         kind: "passage",
         childKey: "passage_block_id",
         parentInsert: {
           quiz_id: quiz.id,
           type: "text",
-          content: {
-            passage: b.passage,
-            caption: b.caption,
-          },
+          content: { html: b.passage },
           weight: null,
           order: passageOrder,
         },
-        questions: b.questions,
+        questions,
       });
-      cursor += b.questions.length;
+      cursor += questions.length;
     }
   }
 
@@ -489,7 +556,7 @@ export async function POST(req: Request): Promise<Response> {
     }));
 
   const costCents = computeCostCents(DEFAULT_MODEL.quiz_gen, result.usage);
-  await logGeneration({
+  const generationId = await logGeneration({
     supabase,
     userId: user.id,
     feature: "quiz_gen",
@@ -499,6 +566,26 @@ export async function POST(req: Request): Promise<Response> {
     costCents,
     blocksSnapshot,
   });
+
+  // Fire LLM judge after telemetry — never awaited so it never delays the response.
+  if (generationId) {
+    void judgeAndStoreQuizEval({
+      supabase,
+      generationId,
+      context: {
+        courseTitle: promptContext.courseTitle,
+        courseLevel: promptContext.courseLevel,
+        lessons: promptContext.lessons,
+        focusTopic: body.focusTopic,
+        quizOutput: {
+          title: result.output.title,
+          description: result.output.description ?? null,
+          cefr_targeted: result.output.cefr_targeted,
+          blocks: result.output.blocks,
+        },
+      },
+    }).catch((err) => console.error("[quiz-judge] unexpected:", err));
+  }
 
   return NextResponse.json({
     quizId: quiz.id,

@@ -16,7 +16,7 @@ import { fr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAIEvaluation, useAIGeneration } from "@/lib/hooks/useAIAdmin";
+import { useAIEvaluations, useAIGeneration } from "@/lib/hooks/useAIAdmin";
 import { useQuiz } from "@/lib/hooks/useQuizzes";
 import { getDefaultRubricForFeature } from "@/lib/ai/eval/rubrics";
 import { aiQuizOutputSchema } from "@/lib/ai/schemas/quiz-output.schema";
@@ -34,7 +34,7 @@ export function AIGenerationDetailContent({
 }: AIGenerationDetailContentProps): React.JSX.Element {
   const { data: gen, isLoading, error } = useAIGeneration(id);
   const rubric = gen ? getDefaultRubricForFeature(gen.feature) : null;
-  const { data: existingEval } = useAIEvaluation(id, rubric?.key ?? "");
+  const { data: evals } = useAIEvaluations(id, rubric?.key ?? "");
   // Always call this hook (rules-of-hooks); it no-ops with empty id.
   const { data: liveQuiz } = useQuiz(gen?.output_quiz_id ?? "");
 
@@ -236,10 +236,11 @@ export function AIGenerationDetailContent({
         <aside className="lg:sticky lg:top-6 lg:self-start">
           {rubric ? (
             <EvalForm
-              key={gen.id}
+              key={`${gen.id}-${evals?.human?.id ?? evals?.llm?.id ?? "pending"}`}
               generationId={gen.id}
               rubric={rubric}
-              existing={existingEval ?? null}
+              humanEval={evals?.human ?? null}
+              llmEval={evals?.llm ?? null}
             />
           ) : (
             <Card>

@@ -114,20 +114,25 @@ export const aiAdminApi = {
     return data;
   },
 
-  getEvaluation: async (
+  // Returns both human and LLM rows; UI shows `human ?? llm`.
+  getEvaluations: async (
     generationId: string,
     rubricKey: string,
-  ): Promise<AIEvaluationRow | null> => {
+  ): Promise<{ human: AIEvaluationRow | null; llm: AIEvaluationRow | null }> => {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("ai_evaluations")
       .select("*")
       .eq("generation_id", generationId)
       .eq("rubric_key", rubricKey)
-      .eq("evaluator_type", "human")
-      .maybeSingle();
+      .in("evaluator_type", ["human", "llm_judge"]);
     if (error) throw error;
-    return data;
+
+    const rows = data ?? [];
+    return {
+      human: rows.find((r) => r.evaluator_type === "human") ?? null,
+      llm: rows.find((r) => r.evaluator_type === "llm_judge") ?? null,
+    };
   },
 
   upsertEvaluation: async (

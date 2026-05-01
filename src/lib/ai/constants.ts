@@ -5,8 +5,8 @@ import type { AIModelConfig, AIFeature } from "./types";
  * Never edit an existing version in place — add a new one.
  */
 export const PROMPT_VERSIONS = {
-  quiz_gen: "quiz_gen_v4",
-  quiz_edit: "quiz_edit_v1",
+  quiz_gen: "quiz_gen_v7",
+  quiz_edit: "quiz_edit_v2",
 } as const;
 
 /**
@@ -15,19 +15,11 @@ export const PROMPT_VERSIONS = {
  * when re-read; 0 for providers that give caching for free.
  */
 export const MODELS = {
-  "gemini-2.5-flash": {
-    provider: "google",
-    modelId: "gemini-2.5-flash",
-    inputCostPerMTokens: 0.075,
-    outputCostPerMTokens: 0.3,
-    cacheReadCostPerMTokens: 0.01875,
-    supportsCaching: true,
-  },
   "gemini-2.5-flash-lite": {
-    provider: "google",
-    modelId: "gemini-2.5-flash-lite",
-    inputCostPerMTokens: 0.0375,
-    outputCostPerMTokens: 0.15,
+    provider: "vercel-gateway",
+    modelId: "google/gemini-2.5-flash-lite",
+    inputCostPerMTokens: 0.1,
+    outputCostPerMTokens: 0.4,
     cacheReadCostPerMTokens: 0.01,
     supportsCaching: true,
   },
@@ -39,9 +31,33 @@ export const MODELS = {
     cacheReadCostPerMTokens: 0.3125,
     supportsCaching: true,
   },
+  "claude-haiku-4-5": {
+    provider: "vercel-gateway",
+    modelId: "anthropic/claude-haiku-4-5-20251001",
+    inputCostPerMTokens: 1.0,
+    outputCostPerMTokens: 5.0,
+    cacheReadCostPerMTokens: 0.1,
+    supportsCaching: true,
+  },
+  "gpt-5.4-nano": {
+    provider: "vercel-gateway",
+    modelId: "openai/gpt-5.4-nano",
+    inputCostPerMTokens: 0.2,
+    outputCostPerMTokens: 1.25,
+    cacheReadCostPerMTokens: 0.02,
+    supportsCaching: true,
+  },
+  "gpt-5.4-mini": {
+    provider: "vercel-gateway",
+    modelId: "openai/gpt-5.4-mini",
+    inputCostPerMTokens: 0.75,
+    outputCostPerMTokens: 4.5,
+    cacheReadCostPerMTokens: 0.07,
+    supportsCaching: true,
+  },
   "claude-sonnet-4-6": {
-    provider: "anthropic",
-    modelId: "claude-sonnet-4-6",
+    provider: "vercel-gateway",
+    modelId: "anthropic/claude-sonnet-4-6",
     inputCostPerMTokens: 3.0,
     outputCostPerMTokens: 15.0,
     cacheReadCostPerMTokens: 0.3,
@@ -80,12 +96,12 @@ const envQuizEditModel = process.env.AI_QUIZ_EDIT_MODEL;
  * Stage 1 runs on Gemini Flash free tier.
  */
 export const DEFAULT_MODEL: Record<AIFeature, ModelKey> = {
-  quiz_gen: isModelKey(envQuizModel) ? envQuizModel : "gemini-2.5-flash",
-  quiz_edit: isModelKey(envQuizEditModel) ? envQuizEditModel : "gemini-2.5-flash",
-  free_text_grade: "gemini-2.5-flash",
-  voice_grade: "gemini-2.5-flash",
-  intervention_suggest: "gemini-2.5-flash",
-  lesson_outline: "gemini-2.5-flash",
+  quiz_gen: isModelKey(envQuizModel) ? envQuizModel : "gemini-2.5-flash-lite",
+  quiz_edit: isModelKey(envQuizEditModel) ? envQuizEditModel : "gemini-2.5-flash-lite",
+  free_text_grade: "gemini-2.5-flash-lite",
+  voice_grade: "gemini-2.5-flash-lite",
+  intervention_suggest: "gemini-2.5-flash-lite",
+  lesson_outline: "gemini-2.5-flash-lite",
 };
 
 /**

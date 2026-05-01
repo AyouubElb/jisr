@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { editQuiz } from "@/lib/ai/generators/quiz-edit.generator";
+import { routeQuizEdit } from "@/lib/ai/generators/quiz-edit-router.generator";
+import { addQuizBlocks } from "@/lib/ai/generators/quiz-edit-add.generator";
+import { updateQuizBlocks } from "@/lib/ai/generators/quiz-edit-update.generator";
+import { deleteQuizBlocks } from "@/lib/ai/generators/quiz-edit-delete.generator";
 import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
 import { AIQuotaExceededError, AIGenerationError } from "@/lib/ai/types";
-import { DEFAULT_MODEL, MODELS, PROMPT_VERSIONS } from "@/lib/ai/constants";
+import { DEFAULT_MODEL } from "@/lib/ai/constants";
 import {
-  aiQuizEditOutputSchema,
+  aiQuizChangeWireSchema,
   type AIQuizChange,
 } from "@/lib/ai/schemas/quiz-edit.schema";
-import type { QuizEditPromptContext } from "@/lib/ai/prompts/quiz-editing";
 import type { AIQuizBlock } from "@/lib/ai/schemas/quiz-output.schema";
+import type { QuizEditRouterStep } from "@/lib/ai/schemas/quiz-edit-router.schema";
+import type { AICallResult } from "@/lib/ai/types";
 import type { QuizBlockInsert } from "@/lib/types";
 
 // ── Body schemas ───────────────────────────────────────────────────────
@@ -20,6 +24,8 @@ const ProposeBody = z.object({
   action: z.literal("propose"),
   quizId: z.uuid(),
   instruction: z.string().min(3).max(1000),
+  // Pre-formatted in-session history. Empty/missing = first turn.
+  chatHistory: z.string().max(4000).optional(),
 });
 
 const ApplyBody = z.object({
@@ -27,7 +33,8 @@ const ApplyBody = z.object({
   quizId: z.uuid(),
   generationId: z.uuid(),
   // Already filtered client-side to the changes the instructor accepted.
-  changes: z.array(aiQuizEditOutputSchema.shape.changes.element).min(1),
+  // Wire schema uses a discriminated union (no LLM involved here).
+  changes: z.array(aiQuizChangeWireSchema).min(1),
 });
 
 const Body = z.discriminatedUnion("action", [ProposeBody, ApplyBody]);
@@ -103,21 +110,22 @@ const aiBlockToDbShape = (b: AIQuizBlock): QuizBlockShape => {
     };
   }
   if (b.type === "text_passage") {
-    // Stage 1: passage parents emitted from the editor become a single text
-    // block; the LLM-supplied questions are dropped (no auto-MCQ expansion
-    // here — that lives in quiz_gen). Instructor can re-run quiz_gen if they
-    // need comprehension MCQs from this passage.
+    // LLM emits {passage, caption}; the editor/viewer reads {html}.
     return {
       type: "text",
-      content: {
-        passage: b.passage,
-        caption: b.caption,
-      },
+      content: { html: b.passage },
       weight: null,
     };
   }
-  // audio_passage — same restriction; emitting one from the editor would
-  // require a TTS pipeline call here. Out of Stage 1 scope; reject upstream.
+  if (b.type === "section") {
+    return {
+      type: "section",
+      content: { title: b.title, description: b.description },
+      weight: null,
+    };
+  }
+  // audio_passage — emitting one from the editor would require a TTS
+  // pipeline call here. Out of Stage 1 scope; reject upstream.
   throw new Error(`Block type "${b.type}" not yet supported by quiz_edit`);
 };
 
@@ -173,6 +181,7 @@ export async function POST(req: Request): Promise<Response> {
       courseTitle: course.title,
       courseLevel: course.level,
       instruction: body.instruction,
+      chatHistory: body.chatHistory ?? "",
     });
   }
 
@@ -186,6 +195,11 @@ export async function POST(req: Request): Promise<Response> {
 }
 
 // ── PROPOSE ────────────────────────────────────────────────────────────
+//
+// Orchestration: router LLM picks tool(s) → run each tool in parallel →
+// merge results into a single change list. Each LLM call uses a flat or
+// single-union schema (no nested discriminated unions), which is the only
+// shape Gemini's structured-output translator handles reliably.
 async function propose({
   supabase,
   userId,
@@ -195,6 +209,7 @@ async function propose({
   courseTitle,
   courseLevel,
   instruction,
+  chatHistory,
 }: {
   supabase: Awaited<ReturnType<typeof createServerSupabase>>;
   userId: string;
@@ -204,8 +219,9 @@ async function propose({
   courseTitle: string;
   courseLevel: "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
   instruction: string;
+  chatHistory: string;
 }): Promise<Response> {
-  // Quota
+  // Quota — one charge per propose, regardless of how many sub-tools run.
   try {
     await assertQuota(supabase, userId, "quiz_edit");
   } catch (err) {
@@ -215,7 +231,7 @@ async function propose({
     throw err;
   }
 
-  // Snapshot current blocks → fed to model AND logged for eval context
+  // Snapshot current blocks → fed to router AND logged for eval context.
   const { data: blocks, error: blocksError } = await supabase
     .from("quiz_blocks")
     .select("id, type, content, weight, order")
@@ -225,93 +241,268 @@ async function propose({
     return NextResponse.json({ error: blocksError.message }, { status: 500 });
   }
 
-  const promptContext: QuizEditPromptContext = {
-    courseTitle,
-    courseLevel,
-    quizTitle,
-    quizDescription,
-    blocks: (blocks ?? []).map((b) => ({
-      id: b.id,
-      type: b.type,
-      weight: b.weight,
-      order: b.order,
-      content: b.content as Record<string, unknown> | null,
-    })),
-    instruction,
-  };
+  const allBlocks = blocks ?? [];
+  const validIds = new Set(allBlocks.map((b) => b.id));
+  const blockById = new Map(
+    allBlocks.map((b) => [
+      b.id,
+      {
+        id: b.id,
+        type: b.type,
+        order: b.order,
+        content: b.content as Record<string, unknown> | null,
+      },
+    ]),
+  );
 
-  let result;
+  // ── Step 1: router ─────────────────────────────────────────────────
+  let routerResult;
   try {
-    result = await editQuiz({ context: promptContext });
+    routerResult = await routeQuizEdit({
+      context: {
+        courseTitle,
+        courseLevel,
+        quizTitle,
+        quizDescription,
+        instruction,
+        chatHistory,
+        blocks: allBlocks.map((b) => ({
+          id: b.id,
+          type: b.type,
+          order: b.order,
+          content: b.content as Record<string, unknown> | null,
+        })),
+      },
+    });
   } catch (err) {
     const message =
       err instanceof AIGenerationError
         ? err.message
-        : "L'édition IA a échoué, réessayez";
+        : "Le routeur IA a échoué, réessayez";
     const rawText =
       err instanceof AIGenerationError ? err.rawText : undefined;
-    console.error("[ai/edit-quiz] propose failed:", message);
-
-    const modelKey = DEFAULT_MODEL.quiz_edit;
-    await logGeneration({
-      supabase,
-      userId,
-      feature: "quiz_edit",
-      inputContext: { quizId, instruction, blockCount: blocks?.length ?? 0 },
-      result: {
-        output: null as unknown as never,
-        usage: { inputTokens: null, outputTokens: null, cacheReadTokens: null },
-        latencyMs: 0,
-        model: modelKey,
-        provider: MODELS[modelKey].provider,
-        promptVersion: PROMPT_VERSIONS.quiz_edit,
-        retryCount: 0,
-        schemaValid: false,
-        inputHash: "",
-        error: message,
-      },
-      costCents: 0,
-      outputQuizId: quizId,
-    });
+    console.error("[ai/edit-quiz] router failed:", message);
     return NextResponse.json(
       { error: message, rawText: rawText ?? null },
       { status: 502 },
     );
   }
 
-  // Validate every referenced block_id exists (defence against the model
-  // hallucinating ids despite the prompt rule).
-  const validIds = new Set((blocks ?? []).map((b) => b.id));
-  const invalid = result.output.changes.filter((c) => {
-    if (c.kind === "update_block" || c.kind === "delete_block") {
-      return !validIds.has(c.block_id);
+  // Filter steps to those whose target ids are valid (drop hallucinations).
+  const steps: QuizEditRouterStep[] = routerResult.output.steps
+    .map((s) => ({
+      ...s,
+      target_block_ids: s.target_block_ids.filter((id) => validIds.has(id)),
+    }))
+    .filter(
+      (s) => s.tool === "add" || s.target_block_ids.length > 0,
+    );
+
+  // Empty steps = router chose to reply conversationally (greeting, info,
+  // suggestion, clarification). Return summary as a text-only response.
+  if (steps.length === 0) {
+    const generationId = await logGeneration({
+      supabase,
+      userId,
+      feature: "quiz_edit",
+      inputContext: {
+        quizId,
+        instruction,
+        blockCount: allBlocks.length,
+        replyOnly: true,
+      },
+      result: {
+        output: { summary: routerResult.output.summary, changes: [] },
+        usage: routerResult.usage,
+        latencyMs: routerResult.latencyMs,
+        model: routerResult.model,
+        provider: routerResult.provider,
+        promptVersion: routerResult.promptVersion,
+        retryCount: routerResult.retryCount,
+        schemaValid: true,
+        inputHash: routerResult.inputHash,
+        error: null,
+      },
+      outputQuizId: quizId,
+      costCents: computeCostCents(DEFAULT_MODEL.quiz_edit, routerResult.usage),
+    });
+    return NextResponse.json({
+      generationId,
+      summary: routerResult.output.summary,
+      changes: [],
+    });
+  }
+
+  // ── Step 2: run tools in parallel ──────────────────────────────────
+  type ToolResultUnknown = AICallResult<unknown>;
+  const toolPromises: Promise<{
+    step: QuizEditRouterStep;
+    changes: AIQuizChange[];
+    result: ToolResultUnknown;
+  }>[] = steps.map(async (step) => {
+    if (step.tool === "add") {
+      const out = await addQuizBlocks({
+        context: {
+          courseTitle,
+          courseLevel,
+          quizTitle,
+          quizDescription,
+          existingBlocks: allBlocks.map((b) => ({
+            id: b.id,
+            type: b.type,
+            order: b.order,
+            contentPreview: previewContent(b.content, b.type),
+          })),
+          subInstruction: step.sub_instruction,
+        },
+      });
+      const len = Math.min(
+        out.output.blocks.length,
+        out.output.reasons.length,
+      );
+      // Stage 1: always append at the end (apply path ignores after_block_id
+      // anyway). Reordering is a Stage 2 concern.
+      const changes: AIQuizChange[] = out.output.blocks.slice(0, len).map(
+        (block, i) => ({
+          kind: "add_block" as const,
+          after_block_id: null,
+          block,
+          reason: out.output.reasons[i] ?? "Bloc ajouté.",
+        }),
+      );
+      return { step, changes, result: out };
     }
-    if (c.kind === "add_block" && c.after_block_id !== null) {
-      return !validIds.has(c.after_block_id);
+
+    if (step.tool === "update") {
+      // Transform DB shape → LLM-flat shape so the model sees the SAME shape
+      // it must emit. Otherwise it tends to mirror the DB field names back.
+      const blocksToUpdate = step.target_block_ids
+        .map((id) => blockById.get(id))
+        .filter((b): b is NonNullable<typeof b> => b !== undefined)
+        .map((b) => ({
+          id: b.id,
+          type: b.type,
+          order: b.order,
+          content: dbContentToFlatShape(b.type, b.content),
+        }));
+      const out = await updateQuizBlocks({
+        context: {
+          courseTitle,
+          courseLevel,
+          quizTitle,
+          quizDescription,
+          blocksToUpdate,
+          subInstruction: step.sub_instruction,
+        },
+      });
+      const changes: AIQuizChange[] = out.output.updates
+        .filter((u) => validIds.has(u.block_id))
+        .map((u) => ({
+          kind: "update_block" as const,
+          block_id: u.block_id,
+          new_block: u.new_block,
+          reason: u.reason,
+        }));
+      return { step, changes, result: out };
     }
-    return false;
+
+    // delete
+    const candidateBlocks = step.target_block_ids
+      .map((id) => blockById.get(id))
+      .filter((b): b is NonNullable<typeof b> => b !== undefined)
+      .map((b) => ({
+        id: b.id,
+        type: b.type,
+        order: b.order,
+        contentPreview: previewContent(b.content, b.type),
+      }));
+    const out = await deleteQuizBlocks({
+      context: {
+        courseTitle,
+        courseLevel,
+        quizTitle,
+        candidateBlocks,
+        subInstruction: step.sub_instruction,
+      },
+    });
+    const changes: AIQuizChange[] = out.output.deletions
+      .filter((d) => validIds.has(d.block_id))
+      .map((d) => ({
+        kind: "delete_block" as const,
+        block_id: d.block_id,
+        reason: d.reason,
+      }));
+    return { step, changes, result: out };
   });
 
-  if (invalid.length > 0) {
+  let toolResults: Awaited<(typeof toolPromises)[number]>[];
+  try {
+    toolResults = await Promise.all(toolPromises);
+  } catch (err) {
+    const message =
+      err instanceof AIGenerationError
+        ? err.message
+        : "Un outil IA a échoué, réessayez";
+    const rawText =
+      err instanceof AIGenerationError ? err.rawText : undefined;
+    console.error("[ai/edit-quiz] tool failed:", message);
     return NextResponse.json(
-      {
-        error:
-          "L'IA a référencé des blocs inexistants. Réessayez ou reformulez.",
-      },
+      { error: message, rawText: rawText ?? null },
       { status: 502 },
     );
   }
 
-  const costCents = computeCostCents(DEFAULT_MODEL.quiz_edit, result.usage);
+  const mergedChanges: AIQuizChange[] = toolResults.flatMap(
+    (t) => t.changes,
+  );
+
+  // ── Step 3: telemetry — sum usage + cost across router + tools ──────
+  const allCalls: AICallResult<unknown>[] = [
+    routerResult,
+    ...toolResults.map((t) => t.result),
+  ];
+  const totalUsage = {
+    inputTokens: sumNullable(allCalls.map((c) => c.usage.inputTokens)),
+    outputTokens: sumNullable(allCalls.map((c) => c.usage.outputTokens)),
+    cacheReadTokens: sumNullable(
+      allCalls.map((c) => c.usage.cacheReadTokens),
+    ),
+  };
+  const totalLatency = allCalls.reduce((s, c) => s + c.latencyMs, 0);
+  const costCents = computeCostCents(DEFAULT_MODEL.quiz_edit, totalUsage);
+
   const generationId = await logGeneration({
     supabase,
     userId,
     feature: "quiz_edit",
-    inputContext: { quizId, instruction, blockCount: blocks?.length ?? 0 },
-    result,
+    inputContext: {
+      quizId,
+      instruction,
+      blockCount: allBlocks.length,
+      routerSteps: steps.map((s) => ({
+        tool: s.tool,
+        target_block_ids: s.target_block_ids,
+        sub_instruction: s.sub_instruction,
+      })),
+    },
+    result: {
+      output: {
+        summary: routerResult.output.summary,
+        changes: mergedChanges,
+      },
+      usage: totalUsage,
+      latencyMs: totalLatency,
+      model: routerResult.model,
+      provider: routerResult.provider,
+      promptVersion: routerResult.promptVersion,
+      retryCount: allCalls.reduce((s, c) => s + c.retryCount, 0),
+      schemaValid: true,
+      inputHash: routerResult.inputHash,
+      error: null,
+    },
     outputQuizId: quizId,
     costCents,
-    blocksSnapshot: (blocks ?? []).map((b) => ({
+    blocksSnapshot: allBlocks.map((b) => ({
       id: b.id,
       type: b.type,
       content: b.content,
@@ -322,9 +513,121 @@ async function propose({
 
   return NextResponse.json({
     generationId,
-    summary: result.output.summary,
-    changes: result.output.changes,
+    summary: routerResult.output.summary,
+    changes: mergedChanges,
   });
+}
+
+// Compact one-line preview of a block's content blob, for prompts that only
+// need to recognise/route blocks without seeing the full JSON.
+function previewContent(content: unknown, type?: string): string {
+  if (!content || typeof content !== "object") return "";
+  const c = content as Record<string, unknown>;
+  // Send full stripped text for passages so the model can ground MCQs on it.
+  if (type === "text" && typeof c.html === "string") {
+    return stripHtml(c.html).slice(0, 1500);
+  }
+  if (type === "section" && typeof c.title === "string") {
+    return c.title;
+  }
+  return JSON.stringify(content).slice(0, 200);
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function sumNullable(values: Array<number | null>): number | null {
+  const present = values.filter((v): v is number => typeof v === "number");
+  if (present.length === 0) return null;
+  return present.reduce((a, b) => a + b, 0);
+}
+
+/**
+ * Convert a DB-shape block content blob to the LLM-flat shape, so the update
+ * tool sees the SAME field names it must emit. Reverse of `aiBlockToDbShape`
+ * (which maps LLM-flat → DB on the way in).
+ *
+ * Best-effort: we keep going on missing/oddly shaped fields rather than
+ * throwing. If the block type isn't recognised, we return the raw content.
+ */
+function dbContentToFlatShape(
+  type: string,
+  content: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!content) return null;
+  const c = content as Record<string, unknown>;
+
+  const flatOptions = (): { options: string[]; correct_index: number } => {
+    const raw = Array.isArray(c.options) ? c.options : [];
+    const labels: string[] = [];
+    let correctIndex = 0;
+    raw.forEach((opt, i) => {
+      if (opt && typeof opt === "object") {
+        const o = opt as { label?: unknown; is_correct?: unknown };
+        if (typeof o.label === "string") labels.push(o.label);
+        else labels.push(String(o.label ?? ""));
+        if (o.is_correct === true) correctIndex = i;
+      } else if (typeof opt === "string") {
+        labels.push(opt);
+      }
+    });
+    return { options: labels, correct_index: correctIndex };
+  };
+
+  if (type === "mcq") {
+    const { options, correct_index } = flatOptions();
+    return {
+      type: "mcq",
+      question: typeof c.prompt === "string" ? c.prompt : "",
+      options,
+      correct_index,
+      ...(typeof c.explanation === "string" ? { explanation: c.explanation } : {}),
+    };
+  }
+  if (type === "fill_blank") {
+    const { options, correct_index } = flatOptions();
+    return {
+      type: "fill_blank",
+      sentence: typeof c.sentence === "string" ? c.sentence : "",
+      options,
+      correct_index,
+      ...(typeof c.explanation === "string" ? { explanation: c.explanation } : {}),
+    };
+  }
+  if (type === "free_text") {
+    return {
+      type: "free_text",
+      question: typeof c.prompt === "string" ? c.prompt : "",
+      rubric: typeof c.rubric === "string" ? c.rubric : "",
+      model_answer: typeof c.model_answer === "string" ? c.model_answer : "",
+      ...(typeof c.min_words === "number" ? { min_words: c.min_words } : {}),
+      ...(typeof c.max_words === "number" ? { max_words: c.max_words } : {}),
+    };
+  }
+  if (type === "voice") {
+    return {
+      type: "voice_response",
+      question: typeof c.prompt === "string" ? c.prompt : "",
+      rubric: typeof c.rubric === "string" ? c.rubric : "",
+      model_answer: typeof c.model_answer === "string" ? c.model_answer : "",
+      ...(typeof c.max_seconds === "number" ? { max_seconds: c.max_seconds } : {}),
+    };
+  }
+  if (type === "text") {
+    return {
+      type: "text_passage",
+      passage: typeof c.html === "string" ? c.html : "",
+    };
+  }
+  if (type === "section") {
+    return {
+      type: "section",
+      title: typeof c.title === "string" ? c.title : "",
+      ...(typeof c.description === "string" ? { description: c.description } : {}),
+    };
+  }
+  return content;
 }
 
 // ── APPLY ──────────────────────────────────────────────────────────────

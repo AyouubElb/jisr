@@ -162,13 +162,16 @@ export default function QuizEditPage(): React.JSX.Element {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [openPanel, setOpenPanel] = useState<"add-block" | "settings">("add-block");
+  // Set true when the AI chat applies changes; useEffect below resyncs
+  // local blocks from the freshly-refetched quiz on the next render.
+  const [pendingRehydrate, setPendingRehydrate] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(createQuizSchema),
     defaultValues: EMPTY_VALUES,
   });
 
-  // Hydrate form + blocks once quiz loads
+  // Hydrate on mount + after AI apply (pendingRehydrate flips true).
   useEffect(() => {
     if (!quiz) return;
     form.reset({
@@ -190,8 +193,9 @@ export default function QuizEditPage(): React.JSX.Element {
           order: b.order,
         })),
     );
+    if (pendingRehydrate) setPendingRehydrate(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quiz?.id]);
+  }, [quiz?.id, pendingRehydrate, quiz?.quiz_blocks]);
 
   // ── Block ops ────────────────────────────────────────────────────
   const addBlock = (type: BlockType): void => {
@@ -828,7 +832,11 @@ export default function QuizEditPage(): React.JSX.Element {
       {aiChatOpen && (
         <div className="hidden w-[380px] shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:flex">
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
-            <QuizAIEditChat quizId={quizId} onClose={() => setAiChatOpen(false)} />
+            <QuizAIEditChat
+              quizId={quizId}
+              onClose={() => setAiChatOpen(false)}
+              onApplied={() => setPendingRehydrate(true)}
+            />
           </div>
         </div>
       )}

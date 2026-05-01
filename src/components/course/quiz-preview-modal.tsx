@@ -263,7 +263,11 @@ function McqBlockViewer({ content }: { content: Record<string, unknown> }): Reac
         {options.map((opt) => (
           <label
             key={opt.id}
-            className="flex cursor-default items-center gap-3 rounded-lg border border-border px-4 py-3 transition-colors hover:bg-muted/30"
+            className={`flex cursor-default items-center gap-3 rounded-lg border px-4 py-3 transition-colors ${
+              opt.is_correct
+                ? "border-orange-400 bg-orange-50"
+                : "border-border hover:bg-muted/30"
+            }`}
           >
             <Circle className="h-4 w-4 shrink-0 text-muted-foreground/50" />
             <span className="text-sm">{opt.label || "..."}</span>
@@ -276,6 +280,7 @@ function McqBlockViewer({ content }: { content: Record<string, unknown> }): Reac
 
 function FillBlankBlockViewer({ content }: { content: Record<string, unknown> }): React.JSX.Element {
   const sentence = (content.sentence as string) || "";
+  const options = (content.options as { id: string; label: string; is_correct: boolean }[]) || [];
   const parts = sentence.split("___");
 
   return (
@@ -294,6 +299,25 @@ function FillBlankBlockViewer({ content }: { content: Record<string, unknown> })
           </span>
         ))}
       </div>
+      {options.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Choix :</p>
+          <div className="flex flex-wrap gap-2">
+            {options.map((opt) => (
+              <span
+                key={opt.id}
+                className={`rounded-md border px-3 py-1.5 text-sm ${
+                  opt.is_correct
+                    ? "border-orange-400 bg-orange-50"
+                    : "border-border bg-muted/30"
+                }`}
+              >
+                {opt.label || "..."}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

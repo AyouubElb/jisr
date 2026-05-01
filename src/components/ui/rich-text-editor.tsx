@@ -5,6 +5,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Link from "@tiptap/extension-link";
+import { Highlight } from "@tiptap/extension-highlight";
 import { FontSize } from "@/lib/extensions/font-size";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,9 @@ import {
   Minus,
   Link2,
   X,
+  Quote,
+  Code,
+  Highlighter,
 } from "lucide-react";
 
 const FONT_SIZES = [
@@ -78,6 +82,7 @@ export function RichTextEditor({
       }),
       TextStyle,
       FontSize,
+      Highlight,
       Link.configure({
         openOnClick: false,
         autolink: true,
@@ -247,6 +252,30 @@ export function RichTextEditor({
             title="Liste numérotée"
           >
             <ListOrdered className="h-4 w-4" />
+          </ToolbarButton>
+
+          <div className="mx-1 h-5 w-px bg-border" />
+
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            active={editor.isActive("blockquote")}
+            title="Citation"
+          >
+            <Quote className="h-4 w-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+            active={editor.isActive("codeBlock")}
+            title="Bloc de code"
+          >
+            <Code className="h-4 w-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleHighlight().run()}
+            active={editor.isActive("highlight")}
+            title="Surligner"
+          >
+            <Highlighter className="h-4 w-4" />
           </ToolbarButton>
 
           <div className="mx-1 h-5 w-px bg-border" />
