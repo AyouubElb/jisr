@@ -14,6 +14,9 @@ import { DEFAULT_MODEL, MODELS, PROMPT_VERSIONS } from "@/lib/ai/constants";
 import type { QuizGenPromptContext } from "@/lib/ai/prompts/quiz-generation";
 import type { QuizBlockInsert } from "@/lib/types";
 
+// Vercel Hobby caps function execution at 60s.
+export const maxDuration = 60;
+
 // Map the model's free-form voice hint to a concrete Google Chirp 3 HD
 // voice. Keeping the mapping in one place lets us swap providers later
 // without touching the prompt or schema.
@@ -24,17 +27,50 @@ const VOICE_BY_HINT: Record<string, { voiceId: string; speed: number }> = {
 };
 const DEFAULT_VOICE = VOICE_BY_HINT.neutral_female;
 
+// Stage 1 caps to keep generation under Vercel Hobby's 60s limit.
+const MAX_LESSONS = 1;
+const MAX_DIRECT_QUESTIONS = 8;
+const MAX_PASSAGES_PER_TYPE = 1;
+const MAX_LESSON_CONTENT_CHARS = 12000;
+
+// Bound the worst-case LLM hang. Two attempts at 30s = 60s, fits Hobby.
+const MAIN_LLM_TIMEOUT_MS = 30000;
+const MAX_MAIN_LLM_ATTEMPTS = 2;
+
+class LLMTimeoutError extends Error {
+  constructor(public ms: number) {
+    super(`LLM call exceeded ${ms}ms`);
+    this.name = "LLMTimeoutError";
+  }
+}
+
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new LLMTimeoutError(ms)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+};
+
 const BodySchema = z.object({
   sectionId: z.uuid(),
-  lessonIds: z.array(z.uuid()).min(1).max(5),
-  numQuestions: z.number().int().min(0).max(15),
+  lessonIds: z.array(z.uuid()).min(1).max(MAX_LESSONS),
+  numQuestions: z.number().int().min(0).max(MAX_DIRECT_QUESTIONS),
   mix: z.object({
     mcq: z.number().int().min(0),
     fill_blank: z.number().int().min(0),
     free_text: z.number().int().min(0),
     voice_response: z.number().int().min(0),
-    audio_passage: z.number().int().min(0).max(3),
-    text_passage: z.number().int().min(0).max(3),
+    audio_passage: z.number().int().min(0).max(MAX_PASSAGES_PER_TYPE),
+    text_passage: z.number().int().min(0).max(MAX_PASSAGES_PER_TYPE),
   }),
   questionsPerPassage: z.number().int().min(0).max(5),
   focusTopic: z.string().max(500).optional(),
@@ -125,6 +161,19 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  // Reject lessons whose content would balloon the prompt and risk a timeout.
+  const oversizedLesson = lessons.find(
+    (l) => (l.content?.length ?? 0) > MAX_LESSON_CONTENT_CHARS,
+  );
+  if (oversizedLesson) {
+    return NextResponse.json(
+      {
+        error: `La leçon « ${oversizedLesson.title} » est trop longue (max ${MAX_LESSON_CONTENT_CHARS} caractères). Raccourcissez-la ou divisez-la avant de générer un quiz.`,
+      },
+      { status: 400 },
+    );
+  }
+
   // ── Quota check (MVP is permissive; still wired end-to-end) ────────
   try {
     await assertQuota(supabase, user.id, "quiz_gen");
@@ -151,9 +200,37 @@ export async function POST(req: Request): Promise<Response> {
   };
 
   let result;
-  try {
-    result = await generateQuiz({ context: promptContext });
-  } catch (err) {
+  let attempts = 0;
+  let lastErr: unknown;
+  while (attempts < MAX_MAIN_LLM_ATTEMPTS) {
+    attempts++;
+    const attemptStart = Date.now();
+    try {
+      result = await withTimeout(
+        generateQuiz({ context: promptContext }),
+        MAIN_LLM_TIMEOUT_MS,
+      );
+      console.log(
+        `[ai/generate-quiz] main LLM call latency: ${result.latencyMs}ms (attempt ${attempts}/${MAX_MAIN_LLM_ATTEMPTS})`,
+      );
+      lastErr = undefined;
+      break;
+    } catch (err) {
+      lastErr = err;
+      const elapsed = Date.now() - attemptStart;
+      const isTimeout = err instanceof LLMTimeoutError;
+      console.warn(
+        `[ai/generate-quiz] attempt ${attempts}/${MAX_MAIN_LLM_ATTEMPTS} failed after ${elapsed}ms` +
+          (isTimeout ? " [timeout]" : ""),
+      );
+      if (attempts < MAX_MAIN_LLM_ATTEMPTS) {
+        console.warn("[ai/generate-quiz] retrying...");
+      }
+    }
+  }
+
+  if (!result) {
+    const err = lastErr;
     const message =
       err instanceof AIGenerationError
         ? err.message
@@ -172,9 +249,15 @@ export async function POST(req: Request): Promise<Response> {
         : undefined;
 
     // Classify so we can tell overload vs schema vs auth vs unknown at a glance.
-    let kind: "overload" | "schema" | "rate_limit" | "auth" | "unknown" =
-      "unknown";
-    if (rawText) kind = "schema";
+    let kind:
+      | "timeout"
+      | "overload"
+      | "schema"
+      | "rate_limit"
+      | "auth"
+      | "unknown" = "unknown";
+    if (err instanceof LLMTimeoutError) kind = "timeout";
+    else if (rawText) kind = "schema";
     else if (
       statusCode === 429 ||
       /quota|rate limit|exceeded your current quota/i.test(causeMessage)
@@ -183,6 +266,12 @@ export async function POST(req: Request): Promise<Response> {
     else if (statusCode === 401 || statusCode === 403) kind = "auth";
     else if (statusCode === 503 || /high demand|overload/i.test(causeMessage))
       kind = "overload";
+
+    // User-facing message — friendlier when we know it timed out.
+    const userMessage =
+      kind === "timeout"
+        ? "La génération a pris trop de temps. Réessayez dans un instant ou réduisez le nombre de blocs."
+        : message;
 
     // Server-side log — visible in the `next dev` terminal
     console.error(
@@ -214,17 +303,17 @@ export async function POST(req: Request): Promise<Response> {
         model: modelKey,
         provider: MODELS[modelKey].provider,
         promptVersion: PROMPT_VERSIONS.quiz_gen,
-        retryCount: 0,
+        retryCount: attempts - 1,
         schemaValid: false,
         inputHash: "",
-        error: message,
+        error: `[${kind}] ${message}`,
       },
       costCents: 0,
     });
 
     return NextResponse.json(
-      { error: message, rawText: rawText ?? null },
-      { status: 502 },
+      { error: userMessage, rawText: rawText ?? null },
+      { status: kind === "timeout" ? 504 : 502 },
     );
   }
 
@@ -321,29 +410,51 @@ export async function POST(req: Request): Promise<Response> {
   });
 
   // Critic + repair: passages missing comprehension MCQs get a focused
-  // second LLM call. Most generations skip this entirely.
+  // second LLM call. Repairs run in parallel — they're independent.
   if (body.questionsPerPassage > 0) {
-    for (const b of trimmedBlocks) {
-      if (b.type !== "text_passage" && b.type !== "audio_passage") continue;
-      const have = b.questions?.length ?? 0;
-      if (have >= body.questionsPerPassage) continue;
-      const sourceText = b.type === "text_passage" ? b.passage : b.script;
-      try {
-        console.warn(
-          `[ai/generate-quiz] ${b.type} missing ${body.questionsPerPassage - have} comprehension question(s) — repairing`,
-        );
-        const repair = await generatePassageQuestions({
-          context: {
-            cefrLevel: course.level,
-            sourceLabel: b.type === "text_passage" ? "passage" : "script",
-            sourceText,
-            count: body.questionsPerPassage,
-          },
-        });
-        b.questions = repair.output.questions.slice(0, body.questionsPerPassage);
-      } catch (err) {
-        console.error("[ai/generate-quiz] passage-questions repair failed:", err);
-      }
+    const passagesNeedingRepair = trimmedBlocks.filter(
+      (b) =>
+        (b.type === "text_passage" || b.type === "audio_passage") &&
+        (b.questions?.length ?? 0) < body.questionsPerPassage,
+    );
+
+    if (passagesNeedingRepair.length > 0) {
+      const repairBatchStart = Date.now();
+      await Promise.all(
+        passagesNeedingRepair.map(async (b) => {
+          if (b.type !== "text_passage" && b.type !== "audio_passage") return;
+          const have = b.questions?.length ?? 0;
+          const sourceText = b.type === "text_passage" ? b.passage : b.script;
+          try {
+            console.warn(
+              `[ai/generate-quiz] ${b.type} missing ${body.questionsPerPassage - have} comprehension question(s) — repairing`,
+            );
+            const repair = await generatePassageQuestions({
+              context: {
+                cefrLevel: course.level,
+                sourceLabel: b.type === "text_passage" ? "passage" : "script",
+                sourceText,
+                count: body.questionsPerPassage,
+              },
+            });
+            console.log(
+              `[ai/generate-quiz] repair (${b.type}) latency: ${repair.latencyMs}ms`,
+            );
+            b.questions = repair.output.questions.slice(
+              0,
+              body.questionsPerPassage,
+            );
+          } catch (err) {
+            console.error(
+              "[ai/generate-quiz] passage-questions repair failed:",
+              err,
+            );
+          }
+        }),
+      );
+      console.log(
+        `[ai/generate-quiz] repair batch (${passagesNeedingRepair.length} passage(s)) total: ${Date.now() - repairBatchStart}ms`,
+      );
     }
   }
 
@@ -572,6 +683,7 @@ export async function POST(req: Request): Promise<Response> {
     void judgeAndStoreQuizEval({
       supabase,
       generationId,
+      userId: user.id,
       context: {
         courseTitle: promptContext.courseTitle,
         courseLevel: promptContext.courseLevel,

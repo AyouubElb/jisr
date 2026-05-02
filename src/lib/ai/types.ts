@@ -10,6 +10,7 @@ export type AIProvider = (typeof AI_PROVIDERS)[number];
 export const AI_FEATURES = [
   "quiz_gen",
   "quiz_edit",
+  "quiz_judge",
   "free_text_grade",
   "voice_grade",
   "intervention_suggest",

@@ -7,6 +7,7 @@ import type { AIModelConfig, AIFeature } from "./types";
 export const PROMPT_VERSIONS = {
   quiz_gen: "quiz_gen_v7",
   quiz_edit: "quiz_edit_v2",
+  quiz_judge: "quiz_judge_v1",
 } as const;
 
 /**
@@ -98,6 +99,7 @@ const envQuizEditModel = process.env.AI_QUIZ_EDIT_MODEL;
 export const DEFAULT_MODEL: Record<AIFeature, ModelKey> = {
   quiz_gen: isModelKey(envQuizModel) ? envQuizModel : "gemini-2.5-flash-lite",
   quiz_edit: isModelKey(envQuizEditModel) ? envQuizEditModel : "gemini-2.5-flash-lite",
+  quiz_judge: "claude-haiku-4-5",
   free_text_grade: "gemini-2.5-flash-lite",
   voice_grade: "gemini-2.5-flash-lite",
   intervention_suggest: "gemini-2.5-flash-lite",
@@ -111,10 +113,12 @@ export const DEFAULT_MODEL: Record<AIFeature, ModelKey> = {
  */
 export type Tier = "free" | "pro" | "studio";
 
+// quiz_judge is system-internal — not user-quota-bound.
 export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
   free: {
     quiz_gen: 10,
     quiz_edit: 30,
+    quiz_judge: 100000,
     free_text_grade: 20,
     voice_grade: 5,
     intervention_suggest: 5,
@@ -123,6 +127,7 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
   pro: {
     quiz_gen: 200,
     quiz_edit: 600,
+    quiz_judge: 100000,
     free_text_grade: 500,
     voice_grade: 100,
     intervention_suggest: 100,
@@ -131,6 +136,7 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
   studio: {
     quiz_gen: 1000,
     quiz_edit: 3000,
+    quiz_judge: 100000,
     free_text_grade: 5000,
     voice_grade: 500,
     intervention_suggest: 500,

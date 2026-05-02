@@ -42,6 +42,12 @@ interface Mix {
   text_passage: number;
 }
 
+// Stage 1 caps — keep generation under Vercel Hobby's 60s limit.
+const MAX_LESSONS = 1;
+const MAX_DIRECT_QUESTIONS = 8;
+const MAX_PASSAGES_PER_TYPE = 1;
+const HEAVY_CONFIG_THRESHOLD = 8;
+
 const DEFAULT_MIX: Mix = {
   mcq: 4,
   fill_blank: 2,
@@ -102,9 +108,13 @@ function QuizAIGenerateDialogBody({
   const [focusTopic, setFocusTopic] = useState<string>("");
 
   const toggleLesson = (id: string): void => {
-    setSelectedLessonIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setSelectedLessonIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      // Stage 1: only one lesson allowed — replace any prior selection.
+      if (MAX_LESSONS === 1) return [id];
+      if (prev.length >= MAX_LESSONS) return prev;
+      return [...prev, id];
+    });
   };
 
   // Direct gradable count = the 4 question types. Passage parents are
@@ -114,18 +124,19 @@ function QuizAIGenerateDialogBody({
   const derivedMCQs = (mix.audio_passage + mix.text_passage) * questionsPerPassage;
   const grandTotal = directQs + derivedMCQs;
 
-  const directInRange = directQs >= 0 && directQs <= 15;
+  const directInRange = directQs >= 0 && directQs <= MAX_DIRECT_QUESTIONS;
   const passageQsValid =
     !usesAnyPassage || (questionsPerPassage >= 0 && questionsPerPassage <= 5);
   // Quiz must have at least one block of any kind.
   const hasAtLeastOneBlock = grandTotal >= 1;
+  const isHeavyConfig = grandTotal >= HEAVY_CONFIG_THRESHOLD || usesAnyPassage;
   const canSubmit =
     selectedLessonIds.length > 0 &&
     directInRange &&
     passageQsValid &&
     hasAtLeastOneBlock &&
-    mix.audio_passage <= 3 &&
-    mix.text_passage <= 3 &&
+    mix.audio_passage <= MAX_PASSAGES_PER_TYPE &&
+    mix.text_passage <= MAX_PASSAGES_PER_TYPE &&
     !isPending;
 
   const onSubmit = (): void => {
@@ -209,7 +220,7 @@ function QuizAIGenerateDialogBody({
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {selectedLessonIds.length} sélectionnée
-                  {selectedLessonIds.length > 1 ? "s" : ""} — max 5
+                  {selectedLessonIds.length > 1 ? "s" : ""} — max {MAX_LESSONS}
                 </p>
               </>
             )}
@@ -248,7 +259,7 @@ function QuizAIGenerateDialogBody({
             </div>
             {!directInRange ? (
               <p className="text-xs text-destructive">
-                Le total direct doit être entre 0 et 15 (actuel : {directQs}).
+                Le total direct doit être entre 0 et {MAX_DIRECT_QUESTIONS} (actuel : {directQs}).
               </p>
             ) : null}
             {!hasAtLeastOneBlock ? (
@@ -293,18 +304,24 @@ function QuizAIGenerateDialogBody({
             <div className="grid grid-cols-3 gap-3">
               <PassageField
                 label="Audio"
-                max={3}
+                max={MAX_PASSAGES_PER_TYPE}
                 value={mix.audio_passage}
                 onChange={(v) =>
-                  setMix((m) => ({ ...m, audio_passage: clamp(v, 0, 3) }))
+                  setMix((m) => ({
+                    ...m,
+                    audio_passage: clamp(v, 0, MAX_PASSAGES_PER_TYPE),
+                  }))
                 }
               />
               <PassageField
                 label="Texte"
-                max={3}
+                max={MAX_PASSAGES_PER_TYPE}
                 value={mix.text_passage}
                 onChange={(v) =>
-                  setMix((m) => ({ ...m, text_passage: clamp(v, 0, 3) }))
+                  setMix((m) => ({
+                    ...m,
+                    text_passage: clamp(v, 0, MAX_PASSAGES_PER_TYPE),
+                  }))
                 }
               />
               <div>
@@ -355,6 +372,13 @@ function QuizAIGenerateDialogBody({
           </p>
         </div>
       </div>
+
+      {isHeavyConfig ? (
+        <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          Cette configuration peut être lente (jusqu&apos;à une minute). Si la
+          génération échoue, réduisez le nombre de blocs ou retirez les passages.
+        </p>
+      ) : null}
 
       <DialogFooter>
         <Button
