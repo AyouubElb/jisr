@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
-import { synthesizeWithGoogle } from "./google";
+import { synthesizeWithOpenAI } from "./openai";
 import { TTSError } from "./types";
 
 /**
@@ -30,7 +30,7 @@ export interface SynthesizeResult {
 }
 
 const STORAGE_BUCKET = "quiz-audio";
-const DEFAULT_VOICE = "en-US-Chirp3-HD-Aoede"; // clear, neutral, female
+const DEFAULT_VOICE = "nova";
 const DEFAULT_SPEED = 1.0;
 const DEFAULT_LANGUAGE = "en-US";
 
@@ -46,6 +46,7 @@ export const synthesizeSpeech = async (
   const speed = args.speed ?? DEFAULT_SPEED;
   const languageCode = args.languageCode ?? DEFAULT_LANGUAGE;
   const scriptHash = cacheKey(args.script, voiceId, speed);
+  const startedAt = Date.now();
 
   // ── 1. Cache lookup ──────────────────────────────────────────────────
   const { data: cached } = await args.supabase
@@ -57,6 +58,9 @@ export const synthesizeSpeech = async (
     .maybeSingle();
 
   if (cached) {
+    console.log(
+      `[ai.tts] cache HIT | voice: ${voiceId} | speed: ${speed} | chars: ${cached.char_count} | duration: ${cached.duration_seconds}s | latency: ${Date.now() - startedAt}ms`,
+    );
     return {
       audioUrl: cached.audio_url,
       storagePath: cached.storage_path,
@@ -69,12 +73,14 @@ export const synthesizeSpeech = async (
   }
 
   // ── 2. TTS provider call ─────────────────────────────────────────────
-  const tts = await synthesizeWithGoogle({
+  const providerStart = Date.now();
+  const tts = await synthesizeWithOpenAI({
     script: args.script,
     voiceId,
     speed,
     languageCode,
   });
+  const providerLatency = Date.now() - providerStart;
 
   // ── 3. Upload to Supabase Storage ────────────────────────────────────
   const buffer = Buffer.from(tts.audioBase64, "base64");
@@ -117,6 +123,10 @@ export const synthesizeSpeech = async (
   if (cacheError && !/duplicate key/i.test(cacheError.message)) {
     console.error("[ai.tts] cache insert failed:", cacheError.message);
   }
+
+  console.log(
+    `[ai.tts] cache MISS | provider: ${tts.provider} | model: ${tts.model} | voice: ${voiceId} | speed: ${speed} | chars: ${tts.charCount} | duration: ${tts.durationSeconds}s | provider latency: ${providerLatency}ms | total: ${Date.now() - startedAt}ms`,
+  );
 
   return {
     audioUrl: publicUrl,

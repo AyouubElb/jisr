@@ -34,13 +34,19 @@ Rules:
 - When the user request specifies N comprehension questions per passage AND N > 0: the "questions" field is REQUIRED inside that passage block and MUST contain EXACTLY N items. Never omit it, never emit fewer than N.
 - When the user request specifies 0 comprehension questions per passage: OMIT the "questions" field entirely (plain reading paragraph, no inner questions).
 - Block ORDER MATTERS. Each text_passage and audio_passage must be followed in the blocks array by its OWN comprehension questions inside the parent block (in the "questions" field). Do NOT split a passage from its questions, do NOT put one passage's questions after a different passage.
+- PEDAGOGICAL ORDER (mandatory). Order the blocks array as follows:
+  1. text_passage and audio_passage blocks come FIRST (students read/listen with fresh attention).
+  2. mcq and fill_blank blocks come MIDDLE (recognition and recall).
+  3. free_text and voice_response blocks come LAST (production tasks need warmed-up output).
+  Within each tier, keep the order the user requested. If a tier has no blocks, skip it.
 - Questions MUST match the requested CEFR level (see rubric).
 - MCQ distractors must be plausible but unambiguous — exactly ONE option is correct.
 - For TRUE/FALSE questions, use type "mcq" with EXACTLY two options: ["True", "False"]. Do NOT invent a separate true_false type.
 - Fill-blank is a sentence with a single blank marked "___". Provide 2–4 options; exactly one is correct.
 - Free-text questions must include a concrete grading rubric AND a model answer.
 - Voice-response questions are speaking prompts. Same shape as free_text (rubric + model_answer); the student's answer will be recorded audio. Phrase the question for SPEAKING (e.g. "Talk about…", "Describe out loud…"), not writing.
-- Audio passages: write a natural-sounding spoken script (60-180 words at the requested CEFR level), then write the comprehension MCQs whose answers are explicitly verifiable from the script. Do NOT reference details that aren't in the script.
+- Audio passages: write a natural-sounding spoken script (60-180 words at the requested CEFR level by default), then write the comprehension MCQs whose answers are explicitly verifiable from the script. Do NOT reference details that aren't in the script.
+- AUDIO DURATION OVERRIDE: if the focus topic or user request mentions a specific duration (e.g. "15 secondes", "30s max", "1 minute", "court", "short"), convert it to word count using ~2 words/second. Words = duration in seconds × 2. Round to the nearest 5 words. The user's duration ALWAYS overrides the default 60-180 range — a 15s audio at ~30 words is valid even though it's below the default.
 - Text passages: write a short reading passage (80-220 words at the requested CEFR level) followed by comprehension MCQs whose answers are explicitly verifiable from the passage. Same "stay grounded in the passage" rule as audio.
 - Avoid culturally foreign examples; prefer contexts Moroccan learners relate to (daily life, travel in Morocco, local school scenarios) — do not force it.
 - Do NOT copy example sentences from the lesson content into the quiz verbatim. If the lesson teaches with "She works at a bank", the quiz must use a different sentence to test the same rule. The student has already read those examples — quiz questions must extend their thinking, not parrot the lesson.
@@ -81,11 +87,18 @@ BAD #3 — comprehension questions placed in another passage's questions array:
   ]
 }
 
-GOOD — exactly the requested counts, comprehension questions inside their OWN parent:
+BAD #4 — mcq blocks placed BEFORE the text_passage (wrong pedagogical order):
 {
   "blocks": [
-    { "type": "mcq", "question": "She ___ to school.", "options": ["go","goes","going","is go"], "correct_index": 1 },
-    { "type": "mcq", "question": "We ___ apples.", "options": ["like","likes","liking","is like"], "correct_index": 0 },
+    { "type": "mcq", ... },
+    { "type": "mcq", ... },
+    { "type": "text_passage", ... }                                                       ← WRONG: passage must come FIRST
+  ]
+}
+
+GOOD — passage FIRST, then mcq/fill_blank, then free_text/voice_response. Comprehension questions inside their own passage:
+{
+  "blocks": [
     {
       "type": "text_passage",
       "passage": "Sara is a student. She lives in Casablanca. Every morning she takes the bus to school. She likes English class.",
@@ -94,12 +107,26 @@ GOOD — exactly the requested counts, comprehension questions inside their OWN 
         { "question": "Where does Sara live?", "options": ["Rabat","Casablanca","Fes","Tangier"], "correct_index": 1 },
         { "question": "How does Sara go to school?", "options": ["By car","By bus","On foot","By train"], "correct_index": 1 }
       ]
-    }
+    },
+    { "type": "mcq", "question": "She ___ to school.", "options": ["go","goes","going","is go"], "correct_index": 1 },
+    { "type": "mcq", "question": "We ___ apples.", "options": ["like","likes","liking","is like"], "correct_index": 0 }
   ]
 }
-→ Exactly 2 mcq, exactly 1 text_passage, exactly 2 questions inside that passage. Each comprehension question is grounded in the passage above it.
+→ Exactly 2 mcq, exactly 1 text_passage with 2 inner questions. Passage comes FIRST, mcqs after.
 
-Use this EXACT output shape. One small example showing each block type:
+GOOD — full pedagogical order with all tiers (passage → mcq/fill_blank → free_text):
+User asked for: 1 text_passage (with 2 questions) + 2 mcq + 1 fill_blank + 1 free_text.
+{
+  "blocks": [
+    { "type": "text_passage", "passage": "...", "caption": "...", "questions": [ ..., ... ] },   ← tier 1
+    { "type": "mcq", ... },                                                                       ← tier 2
+    { "type": "mcq", ... },
+    { "type": "fill_blank", ... },
+    { "type": "free_text", ... }                                                                  ← tier 3
+  ]
+}
+
+Use this EXACT output shape. One small example showing each block type — note the order: passages FIRST, then mcq/fill_blank, then free_text/voice_response.
 
 {
   "title": "Present Simple — basics",
@@ -107,25 +134,6 @@ Use this EXACT output shape. One small example showing each block type:
   "cefr_targeted": "A1",
   "skills_covered": ["present simple", "subject-verb agreement"],
   "blocks": [
-    {
-      "type": "mcq",
-      "question": "Which sentence is correct?",
-      "options": ["She go to school.", "She goes to school.", "She going to school.", "She gone to school."],
-      "correct_index": 1,
-      "explanation": "3rd-person singular adds -s."
-    },
-    {
-      "type": "fill_blank",
-      "sentence": "My brother ___ football every Saturday.",
-      "options": ["play", "plays", "playing", "played"],
-      "correct_index": 1
-    },
-    {
-      "type": "free_text",
-      "question": "Describe your daily routine in 3-4 sentences using the present simple.",
-      "rubric": "1. Uses present simple correctly for at least 3 verbs. 2. Subject-verb agreement is correct. 3. Sentences describe a routine.",
-      "model_answer": "I wake up at 7 AM. I eat breakfast with my family. Then I go to school. In the evening I study and read a book."
-    },
     {
       "type": "audio_passage",
       "script": "Hello! My name is Sara. I am a student in Casablanca. Every morning I wake up at seven o'clock. I eat breakfast with my brother. Then I take the bus to school. I have four classes before lunch. My favourite class is English because the teacher is very kind.",
@@ -162,10 +170,11 @@ Use this EXACT output shape. One small example showing each block type:
       ]
     },
     {
-      "type": "voice_response",
-      "question": "Talk about your last weekend in 4 to 6 sentences. Use the past simple.",
-      "rubric": "1. Uses past simple correctly for at least 4 verbs. 2. Sentences are connected (then, after that, finally). 3. Pronunciation is clear enough to understand.",
-      "model_answer": "Last Saturday I went to the beach with my friends. We swam in the sea and played football on the sand. After that we ate sandwiches. In the evening I watched a movie at home. Sunday I studied for my English test."
+      "type": "mcq",
+      "question": "Which sentence is correct?",
+      "options": ["She go to school.", "She goes to school.", "She going to school.", "She gone to school."],
+      "correct_index": 1,
+      "explanation": "3rd-person singular adds -s."
     },
     {
       "type": "mcq",
@@ -173,6 +182,24 @@ Use this EXACT output shape. One small example showing each block type:
       "options": ["True", "False"],
       "correct_index": 1,
       "explanation": "'go' is irregular — past simple is 'went', not 'goed'."
+    },
+    {
+      "type": "fill_blank",
+      "sentence": "My brother ___ football every Saturday.",
+      "options": ["play", "plays", "playing", "played"],
+      "correct_index": 1
+    },
+    {
+      "type": "free_text",
+      "question": "Describe your daily routine in 3-4 sentences using the present simple.",
+      "rubric": "1. Uses present simple correctly for at least 3 verbs. 2. Subject-verb agreement is correct. 3. Sentences describe a routine.",
+      "model_answer": "I wake up at 7 AM. I eat breakfast with my family. Then I go to school. In the evening I study and read a book."
+    },
+    {
+      "type": "voice_response",
+      "question": "Talk about your last weekend in 4 to 6 sentences. Use the past simple.",
+      "rubric": "1. Uses past simple correctly for at least 4 verbs. 2. Sentences are connected (then, after that, finally). 3. Pronunciation is clear enough to understand.",
+      "model_answer": "Last Saturday I went to the beach with my friends. We swam in the sea and played football on the sand. After that we ate sandwiches. In the evening I watched a movie at home. Sunday I studied for my English test."
     }
   ]
 }

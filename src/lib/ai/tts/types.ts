@@ -15,8 +15,8 @@ export interface TTSResult {
   mimeType: string;          // 'audio/mpeg'
   charCount: number;         // billed unit
   durationSeconds: number | null;
-  provider: "google";        // widen union when adding providers
-  model: string;             // 'chirp3-hd'
+  provider: "google" | "openai";
+  model: string;             // 'chirp3-hd' | 'gpt-4o-mini-tts'
 }
 
 export class TTSError extends Error {

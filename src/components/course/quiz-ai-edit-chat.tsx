@@ -858,8 +858,9 @@ function aiBlockToPreview(block: AIQuizBlock): BlockPreview {
   }
   if (block.type === "audio_passage") {
     return {
-      prompt: block.caption ?? "Audio",
+      prompt: block.caption ?? "Passage audio",
       passage: block.script,
+      description: "🔊 Audio sera généré à l'acceptation",
     };
   }
   // section
@@ -869,15 +870,33 @@ function aiBlockToPreview(block: AIQuizBlock): BlockPreview {
   };
 }
 
+function ExpandablePassage({ text }: { text: string }): React.JSX.Element {
+  const [expanded, setExpanded] = useState(false);
+  const COLLAPSED = 280;
+  const isLong = text.length > COLLAPSED;
+  const display = !isLong || expanded ? text : text.slice(0, COLLAPSED) + "…";
+
+  return (
+    <div className="rounded bg-muted/60 p-2 text-xs leading-relaxed text-muted-foreground">
+      <p className="whitespace-pre-wrap">{display}</p>
+      {isLong ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs font-medium text-primary hover:underline"
+        >
+          {expanded ? "Réduire" : "Lire plus"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 function BlockPreviewBody({ p }: { p: BlockPreview }): React.JSX.Element {
   return (
     <>
       <p className="text-sm font-medium leading-snug">{truncate(p.prompt, 200)}</p>
-      {p.passage ? (
-        <p className="rounded bg-muted/60 p-2 text-xs leading-relaxed text-muted-foreground">
-          {truncate(p.passage, 280)}
-        </p>
-      ) : null}
+      {p.passage ? <ExpandablePassage text={p.passage} /> : null}
       {p.description ? (
         <p className="text-xs text-muted-foreground">{truncate(p.description, 160)}</p>
       ) : null}

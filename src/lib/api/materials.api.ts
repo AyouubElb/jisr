@@ -47,8 +47,11 @@ export const materialsApi = {
     return data;
   },
 
-  /** Get a signed download URL */
+  /** Get a signed download URL — passthrough if already a full http(s) URL
+   * (e.g. TTS audio in the public quiz-audio bucket). */
   getSignedUrl: async (path: string): Promise<string> => {
+    if (/^https?:\/\//i.test(path)) return path;
+
     const supabase = createClient();
     const { data, error } = await supabase.storage
       .from(BUCKET)

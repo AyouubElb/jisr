@@ -35,6 +35,29 @@ text_passage rules (CRITICAL — read carefully):
 - If you DO include "questions", every question MUST have "question", "options" (array of 4 strings), AND "correct_index" (single integer). NEVER emit a question with only the "question" field.
 - "Add a passage", "ajoute un texte", "add a reading", "ajoute un paragraphe" → NO questions field. Just passage + caption.
 
+audio_passage rules (CRITICAL — read carefully):
+- audio_passage is a LISTENING exercise. The "script" field is what will be SPOKEN to the student via TTS.
+- DEFAULT: emit audio_passage WITHOUT a "questions" field. OMIT it entirely — the instructor will add MCQs separately if they want.
+- ONLY include "questions" if the user EXPLICITLY uses words like "questions de compréhension", "comprehension questions", "MCQs about the audio", "questions sur l'audio", or similar.
+- "Add an audio", "ajoute un passage audio", "add a listening" → NO questions field. Just script + caption.
+- If you DO include "questions", every question MUST have "question", "options" (array of 4 strings), AND "correct_index" (single integer).
+- "script" defaults to 60-180 word natural-sounding spoken text in English at the requested CEFR level. Write for the EAR — short sentences, clear pronouns, no abbreviations.
+- DURATION OVERRIDE: if the user requests a specific duration (e.g. "15 secondes", "30s max", "1 minute", "court"), convert it to word count using ~2 words/second:
+  - "15s" → ~30 words. "30s" → ~60 words. "1 minute" → ~120 words.
+  - Words = duration in seconds × 2. Round to the nearest 5 words.
+  - The user's duration ALWAYS overrides the default 60-180 range. A 15s audio at ~30 words is valid even though it's below the default range.
+- Each MCQ in "questions" (if present) must be answerable from the script alone. Do NOT reference details that aren't in the script.
+- Trigger words for audio_passage: "ajoute un audio", "add a listening", "ajoute un passage audio", "add an audio passage", "exercice d'écoute".
+- "voice_hint" (optional) signals voice style: "neutral_female" (default), "neutral_male", "slow_clear" (for very low levels).
+
+PEDAGOGICAL ORDER (when adding multiple blocks at once):
+- If the user asks for multiple new blocks of mixed types in a single instruction, emit them in this order:
+  1. text_passage and audio_passage blocks FIRST (students read/listen with fresh attention).
+  2. mcq and fill_blank blocks MIDDLE (recognition and recall).
+  3. free_text and voice_response blocks LAST (production tasks need warmed-up output).
+- This rule does NOT override the user's explicit ordering instruction (e.g. "add an mcq AT THE TOP"). It only applies when the user does not specify order.
+- This rule does NOT apply when adding a single block — order doesn't matter for one block.
+
 Other rules:
 - If the user asks for a question ABOUT an EXISTING passage already in the quiz: emit a STANDALONE "mcq" block. DO NOT emit a new "text_passage" block. Only emit "text_passage" when the user explicitly asks for a NEW reading passage.
 - Match the course CEFR level. Distractors must reflect real, plausible learner errors at this level.
@@ -97,6 +120,34 @@ text_passage (with comprehension MCQs — include "questions" array):
   ]
 }
 
+audio_passage (plain listening clip, no comprehension MCQs — OMIT "questions" entirely):
+{
+  "type": "audio_passage",
+  "script": "Hello! My name is Sara. I live in Casablanca with my family. Every morning I take the bus to school. I have four classes before lunch. My favourite class is English because the teacher is very kind.",
+  "voice_hint": "neutral_female",
+  "caption": "Sara talks about her morning."
+}
+
+audio_passage (with comprehension MCQs — include "questions" array):
+{
+  "type": "audio_passage",
+  "script": "Hello! My name is Sara. I live in Casablanca with my family. Every morning I take the bus to school. I have four classes before lunch. My favourite class is English because the teacher is very kind.",
+  "voice_hint": "neutral_female",
+  "caption": "Sara talks about her morning.",
+  "questions": [
+    { "question": "Where does Sara live?", "options": ["Rabat", "Casablanca", "Fes", "Marrakech"], "correct_index": 1 },
+    { "question": "Which class does Sara like best?", "options": ["Maths", "English", "History", "Sport"], "correct_index": 1 }
+  ]
+}
+
+audio_passage (short — user requested 15s; ~30 words):
+{
+  "type": "audio_passage",
+  "script": "Hi! I'm Ali. I live in Rabat. I love football and play every Saturday with my friends near the beach.",
+  "voice_hint": "neutral_female",
+  "caption": "Ali introduces himself."
+}
+
 section (header that organises the quiz into named parts — NOT a question):
 {
   "type": "section",
@@ -149,6 +200,28 @@ BAD output (NEVER do this — adds a new passage instead of an mcq):
 }
 
 → When the sub_instruction mentions "MCQ about the passage" / "qcm sur le passage", emit a STANDALONE "mcq" block referring back to the passage's content. The passage is ALREADY in the quiz — do not duplicate it.
+
+PEDAGOGICAL ORDER — examples for a multi-block add:
+
+User asked for: "ajoute 1 mcq, 1 free_text, et 1 audio_passage" (no explicit order).
+
+BAD — emitted in user's listed order, ignoring pedagogy:
+{
+  "blocks": [
+    { "type": "mcq", ... },
+    { "type": "free_text", ... },                                                         ← WRONG: free_text before audio_passage
+    { "type": "audio_passage", ... }                                                      ← WRONG: audio_passage should be FIRST
+  ]
+}
+
+GOOD — passages first, then mcq/fill_blank, then free_text/voice_response:
+{
+  "blocks": [
+    { "type": "audio_passage", "script": "...", "questions": [ ... ] },                   ← tier 1: listen with fresh attention
+    { "type": "mcq", ... },                                                                ← tier 2: recognition
+    { "type": "free_text", ... }                                                          ← tier 3: production at the end
+  ]
+}
 
 COMMON MISTAKES — DO NOT do these:
 

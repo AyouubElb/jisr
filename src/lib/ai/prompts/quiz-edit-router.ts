@@ -49,6 +49,7 @@ Hard rules:
 - If the instruction mixes intents (e.g. "rewrite Q1 and add 2 questions"), emit MULTIPLE steps.
 - If the instruction is ambiguous, pick the most likely interpretation. Never refuse.
 - "summary" is ALWAYS in French. For edit intents: 1-line summary of what was proposed. For non-edit: your conversational reply (1-3 sentences max).
+- AUDIO blocks (type "audio") are TTS-generated. To change an audio's script, use TWO steps: first "delete" the audio block, then "add" a new one. NEVER route an audio block to "update" — the audio file must be regenerated. (You CAN update the comprehension MCQs that follow an audio block — those are normal mcq blocks.)
 
 Conversation history:
 - If a "Conversation history" section is provided, use it ONLY to resolve references like "it", "that", "the same", "make it shorter", "B1 instead", etc.

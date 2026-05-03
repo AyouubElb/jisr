@@ -8,6 +8,7 @@ import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
 import { synthesizeSpeech } from "@/lib/ai/tts/synthesize";
+import { stripLessonHtml } from "@/lib/extensions/lesson-html";
 import { AIQuotaExceededError, AIGenerationError } from "@/lib/ai/types";
 import { TTSError } from "@/lib/ai/tts/types";
 import { DEFAULT_MODEL, MODELS, PROMPT_VERSIONS } from "@/lib/ai/constants";
@@ -17,13 +18,13 @@ import type { QuizBlockInsert } from "@/lib/types";
 // Vercel Hobby caps function execution at 60s.
 export const maxDuration = 60;
 
-// Map the model's free-form voice hint to a concrete Google Chirp 3 HD
-// voice. Keeping the mapping in one place lets us swap providers later
-// without touching the prompt or schema.
+// Map the model's free-form voice hint to a concrete OpenAI TTS voice.
+// Keeping the mapping in one place lets us swap providers later without
+// touching the prompt or schema.
 const VOICE_BY_HINT: Record<string, { voiceId: string; speed: number }> = {
-  neutral_female: { voiceId: "en-US-Chirp3-HD-Aoede", speed: 1.0 },
-  neutral_male: { voiceId: "en-US-Chirp3-HD-Charon", speed: 1.0 },
-  slow_clear: { voiceId: "en-US-Chirp3-HD-Aoede", speed: 0.85 },
+  neutral_female: { voiceId: "nova", speed: 1.0 },
+  neutral_male: { voiceId: "onyx", speed: 1.0 },
+  slow_clear: { voiceId: "nova", speed: 0.85 },
 };
 const DEFAULT_VOICE = VOICE_BY_HINT.neutral_female;
 
@@ -191,7 +192,7 @@ export async function POST(req: Request): Promise<Response> {
     lessons: lessons.map((l) => ({
       title: l.title,
       type: l.type,
-      content: l.content ?? "",
+      content: stripLessonHtml(l.content ?? ""),
     })),
     focusTopic: body.focusTopic,
     numQuestions: body.numQuestions,
@@ -550,6 +551,7 @@ export async function POST(req: Request): Promise<Response> {
       }
 
       const audioOrder = cursor++;
+      const audioQuestions = b.questions ?? [];
       plannedBlocks.push({
         kind: "passage",
         childKey: "audio_block_id",
@@ -568,9 +570,9 @@ export async function POST(req: Request): Promise<Response> {
           weight: null, // ungraded parent; child MCQs carry the weight
           order: audioOrder,
         },
-        questions: b.questions,
+        questions: audioQuestions,
       });
-      cursor += b.questions.length;
+      cursor += audioQuestions.length;
     } else if (b.type === "text_passage") {
       const passageOrder = cursor++;
       const questions = b.questions ?? [];
@@ -679,25 +681,26 @@ export async function POST(req: Request): Promise<Response> {
   });
 
   // Fire LLM judge after telemetry — never awaited so it never delays the response.
-  if (generationId) {
-    void judgeAndStoreQuizEval({
-      supabase,
-      generationId,
-      userId: user.id,
-      context: {
-        courseTitle: promptContext.courseTitle,
-        courseLevel: promptContext.courseLevel,
-        lessons: promptContext.lessons,
-        focusTopic: body.focusTopic,
-        quizOutput: {
-          title: result.output.title,
-          description: result.output.description ?? null,
-          cefr_targeted: result.output.cefr_targeted,
-          blocks: result.output.blocks,
-        },
-      },
-    }).catch((err) => console.error("[quiz-judge] unexpected:", err));
-  }
+  // Disabled during model bake-off to save tokens.
+  // if (generationId) {
+  //   void judgeAndStoreQuizEval({
+  //     supabase,
+  //     generationId,
+  //     userId: user.id,
+  //     context: {
+  //       courseTitle: promptContext.courseTitle,
+  //       courseLevel: promptContext.courseLevel,
+  //       lessons: promptContext.lessons,
+  //       focusTopic: body.focusTopic,
+  //       quizOutput: {
+  //         title: result.output.title,
+  //         description: result.output.description ?? null,
+  //         cefr_targeted: result.output.cefr_targeted,
+  //         blocks: result.output.blocks,
+  //       },
+  //     },
+  //   }).catch((err) => console.error("[quiz-judge] unexpected:", err));
+  // }
 
   return NextResponse.json({
     quizId: quiz.id,

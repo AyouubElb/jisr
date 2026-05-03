@@ -5,8 +5,8 @@ import type { AIModelConfig, AIFeature } from "./types";
  * Never edit an existing version in place — add a new one.
  */
 export const PROMPT_VERSIONS = {
-  quiz_gen: "quiz_gen_v7",
-  quiz_edit: "quiz_edit_v2",
+  quiz_gen: "quiz_gen_v9",
+  quiz_edit: "quiz_edit_v4",
   quiz_judge: "quiz_judge_v1",
 } as const;
 
@@ -19,6 +19,14 @@ export const MODELS = {
   "gemini-2.5-flash-lite": {
     provider: "vercel-gateway",
     modelId: "google/gemini-2.5-flash-lite",
+    inputCostPerMTokens: 0.1,
+    outputCostPerMTokens: 0.4,
+    cacheReadCostPerMTokens: 0.01,
+    supportsCaching: true,
+  },
+  "gemini-2.5-flash-lite-direct": {
+    provider: "google",
+    modelId: "gemini-2.5-flash-lite",
     inputCostPerMTokens: 0.1,
     outputCostPerMTokens: 0.4,
     cacheReadCostPerMTokens: 0.01,
@@ -97,8 +105,8 @@ const envQuizEditModel = process.env.AI_QUIZ_EDIT_MODEL;
  * Stage 1 runs on Gemini Flash free tier.
  */
 export const DEFAULT_MODEL: Record<AIFeature, ModelKey> = {
-  quiz_gen: isModelKey(envQuizModel) ? envQuizModel : "gemini-2.5-flash-lite",
-  quiz_edit: isModelKey(envQuizEditModel) ? envQuizEditModel : "gemini-2.5-flash-lite",
+  quiz_gen: isModelKey(envQuizModel) ? envQuizModel : "gemini-2.5-flash-lite-direct",
+  quiz_edit: isModelKey(envQuizEditModel) ? envQuizEditModel : "claude-haiku-4-5",
   quiz_judge: "claude-haiku-4-5",
   free_text_grade: "gemini-2.5-flash-lite",
   voice_grade: "gemini-2.5-flash-lite",

@@ -9,6 +9,8 @@ import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
 import { AIQuotaExceededError, AIGenerationError } from "@/lib/ai/types";
+import { synthesizeSpeech } from "@/lib/ai/tts/synthesize";
+import { TTSError } from "@/lib/ai/tts/types";
 import { DEFAULT_MODEL } from "@/lib/ai/constants";
 import {
   aiQuizChangeWireSchema,
@@ -38,6 +40,14 @@ const ApplyBody = z.object({
 });
 
 const Body = z.discriminatedUnion("action", [ProposeBody, ApplyBody]);
+
+// Voice hint → OpenAI TTS voice. Mirrors VOICE_BY_HINT in generate-quiz/route.
+const VOICE_BY_HINT: Record<string, { voiceId: string; speed: number }> = {
+  neutral_female: { voiceId: "nova", speed: 1.0 },
+  neutral_male: { voiceId: "onyx", speed: 1.0 },
+  slow_clear: { voiceId: "nova", speed: 0.85 },
+};
+const DEFAULT_VOICE = VOICE_BY_HINT.neutral_female;
 
 // ── Shared: flat AI block → rich UI/DB shape ───────────────────────────
 // Duplicated from /api/ai/generate-quiz/route.ts. Will be folded into a
@@ -691,6 +701,83 @@ async function apply({
         // add_block — Stage 1: append at the end. We deliberately ignore
         // after_block_id for now to avoid order-shift complexity. Reordering
         // moves to Stage 2.
+
+        // audio_passage expands to 1 audio parent + N child mcqs (linked via
+        // audio_block_id). TTS runs at apply-time so cost is only paid when
+        // the instructor accepts the change.
+        if (change.block.type === "audio_passage") {
+          const b = change.block;
+          const voice =
+            (b.voice_hint && VOICE_BY_HINT[b.voice_hint]) ?? DEFAULT_VOICE;
+
+          let tts;
+          try {
+            tts = await synthesizeSpeech({
+              supabase,
+              script: b.script,
+              voiceId: voice.voiceId,
+              speed: voice.speed,
+            });
+          } catch (err) {
+            const msg =
+              err instanceof TTSError
+                ? `Synthèse audio échouée : ${err.message}`
+                : "Synthèse audio échouée";
+            console.error("[ai/edit-quiz] TTS failed:", err);
+            return NextResponse.json(
+              { error: msg, applied, total: changes.length },
+              { status: 502 },
+            );
+          }
+
+          const audioOrder = nextOrder;
+          const { data: parentRow, error: parentErr } = await supabase
+            .from("quiz_blocks")
+            .insert({
+              quiz_id: quizId,
+              type: "audio",
+              content: {
+                audio_url: tts.audioUrl,
+                caption: b.caption,
+                script: b.script,
+                voice_id: tts.voiceId,
+                speed: tts.speed,
+                duration_seconds: tts.durationSeconds ?? undefined,
+                transcript_visible: false,
+              },
+              weight: null,
+              order: audioOrder,
+            })
+            .select("id")
+            .single();
+          if (parentErr || !parentRow) throw parentErr ?? new Error("Audio insert failed");
+
+          const questions = b.questions ?? [];
+          const childInserts = questions.map((q, qIdx) => ({
+            quiz_id: quizId,
+            type: "mcq" as const,
+            content: {
+              prompt: q.question,
+              allow_multiple: false,
+              options: toUiOptions(q.options, q.correct_index),
+              audio_block_id: parentRow.id,
+            },
+            weight: 1,
+            grading_notes: q.explanation ?? null,
+            order: audioOrder + 1 + qIdx,
+          }));
+          if (childInserts.length > 0) {
+            const { error: childErr } = await supabase
+              .from("quiz_blocks")
+              .insert(childInserts);
+            if (childErr) throw childErr;
+          }
+
+          nextOrder = audioOrder + 1 + questions.length;
+          applied += 1;
+          continue;
+        }
+
         const shape = aiBlockToDbShape(change.block);
         const { error } = await supabase.from("quiz_blocks").insert({
           quiz_id: quizId,

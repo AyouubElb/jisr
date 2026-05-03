@@ -75,7 +75,7 @@ const aiAudioPassageBlockSchema = z.object({
       correct_index: z.number().int(),
       explanation: z.string().optional(),
     }),
-  ),
+  ).optional(),
 });
 
 /**
