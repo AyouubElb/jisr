@@ -37,13 +37,13 @@ export function useUpdateLesson(courseId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: LessonUpdate }) =>
+    mutationFn: ({ id, updates }: { id: string; updates: LessonUpdate; silent?: boolean }) =>
       lessonsApi.update(id, updates),
-    onSuccess: (_, { id }) => {
+    onSuccess: (_, { id, silent }) => {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
       queryClient.invalidateQueries({ queryKey: lessonKeys.detail(id) });
-      toast.success("Lecon mise a jour");
+      if (!silent) toast.success("Lecon mise a jour");
     },
     onError: (error: Error) => {
       toast.error(`Erreur : ${error.message}`);

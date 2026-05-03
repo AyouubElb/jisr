@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { TextStyle } from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
+import { Underline } from "@tiptap/extension-underline";
+import { TextAlign } from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
 import { Highlight } from "@tiptap/extension-highlight";
 import { FontSize } from "@/lib/extensions/font-size";
@@ -26,6 +29,11 @@ import {
 import {
   Bold,
   Italic,
+  Underline as UnderlineIcon,
+  Type,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
   List,
   ListOrdered,
   Heading1,
@@ -40,7 +48,23 @@ import {
   Quote,
   Code,
   Highlighter,
+  Palette,
 } from "lucide-react";
+
+const TEXT_COLORS = [
+  { label: "Défaut", value: "" },
+  { label: "Noir", value: "#000000" },
+  { label: "Gris foncé", value: "#374151" },
+  { label: "Gris", value: "#6B7280" },
+  { label: "Rouge", value: "#EF4444" },
+  { label: "Orange", value: "#F97316" },
+  { label: "Jaune", value: "#EAB308" },
+  { label: "Vert", value: "#22C55E" },
+  { label: "Bleu", value: "#3B82F6" },
+  { label: "Indigo", value: "#6366F1" },
+  { label: "Violet", value: "#A855F7" },
+  { label: "Rose", value: "#EC4899" },
+] as const;
 
 const FONT_SIZES = [
   { label: "12", value: "12px" },
@@ -73,6 +97,8 @@ export function RichTextEditor({
   const [linkUrl, setLinkUrl] = useState("");
   const [linkText, setLinkText] = useState("");
   const [linkHasSelection, setLinkHasSelection] = useState(false);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -81,7 +107,10 @@ export function RichTextEditor({
         heading: { levels: [1, 2, 3, 4] },
       }),
       TextStyle,
+      Color,
       FontSize,
+      Underline,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
       Highlight,
       Link.configure({
         openOnClick: false,
@@ -152,9 +181,24 @@ export function RichTextEditor({
     editor?.commands.focus();
   }, [editor]);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        colorPickerRef.current &&
+        !colorPickerRef.current.contains(e.target as Node)
+      ) {
+        setColorPickerOpen(false);
+      }
+    };
+    if (colorPickerOpen)
+      document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [colorPickerOpen]);
+
   if (!editor) return null;
 
   const isLinkActive = editor.isActive("link");
+  const currentColor = editor.getAttributes("textStyle").color ?? "";
 
   return (
     <div
@@ -205,36 +249,82 @@ export function RichTextEditor({
           >
             <Italic className="h-4 w-4" />
           </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            active={editor.isActive("underline")}
+            title="Souligné"
+          >
+            <UnderlineIcon className="h-4 w-4" />
+          </ToolbarButton>
 
           <div className="mx-1 h-5 w-px bg-border" />
 
           <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+            onClick={() => editor.chain().focus().setParagraph().run()}
+            active={editor.isActive("paragraph")}
+            title="Texte normal"
+          >
+            <Type className="h-4 w-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 1 }).run()
+            }
             active={editor.isActive("heading", { level: 1 })}
             title="Titre 1"
           >
             <Heading1 className="h-4 w-4" />
           </ToolbarButton>
           <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 2 }).run()
+            }
             active={editor.isActive("heading", { level: 2 })}
             title="Titre 2"
           >
             <Heading2 className="h-4 w-4" />
           </ToolbarButton>
           <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 3 }).run()
+            }
             active={editor.isActive("heading", { level: 3 })}
             title="Titre 3"
           >
             <Heading3 className="h-4 w-4" />
           </ToolbarButton>
           <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
+            onClick={() =>
+              editor.chain().focus().toggleHeading({ level: 4 }).run()
+            }
             active={editor.isActive("heading", { level: 4 })}
             title="Titre 4"
           >
             <Heading4 className="h-4 w-4" />
+          </ToolbarButton>
+
+          <div className="mx-1 h-5 w-px bg-border" />
+
+          <ToolbarButton
+            onClick={() => editor.chain().focus().setTextAlign("left").run()}
+            active={editor.isActive({ textAlign: "left" })}
+            title="Aligner à gauche"
+          >
+            <AlignLeft className="h-4 w-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().setTextAlign("center").run()}
+            active={editor.isActive({ textAlign: "center" })}
+            title="Centrer"
+          >
+            <AlignCenter className="h-4 w-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().setTextAlign("right").run()}
+            active={editor.isActive({ textAlign: "right" })}
+            title="Aligner à droite"
+          >
+            <AlignRight className="h-4 w-4" />
           </ToolbarButton>
 
           <div className="mx-1 h-5 w-px bg-border" />
@@ -277,6 +367,69 @@ export function RichTextEditor({
           >
             <Highlighter className="h-4 w-4" />
           </ToolbarButton>
+
+          {/* Color picker */}
+          <div className="relative" ref={colorPickerRef}>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 flex flex-col items-center justify-center gap-0"
+                    onClick={() => setColorPickerOpen((o) => !o)}
+                  >
+                    <Palette className="h-3.5 w-3.5" />
+                    <span
+                      className="h-1 w-4 rounded-sm"
+                      style={{
+                        backgroundColor: currentColor || "transparent",
+                        border: currentColor
+                          ? "none"
+                          : "1px solid hsl(var(--border))",
+                      }}
+                    />
+                  </Button>
+                }
+              />
+              <TooltipContent>Couleur du texte</TooltipContent>
+            </Tooltip>
+            {colorPickerOpen && (
+              <div className="absolute top-full left-0 z-50 mt-1 rounded-md border border-border bg-popover px-6 py-3 shadow-md w-fit">
+                <div className="grid grid-cols-4 gap-x-8 gap-y-2 place-items-center">
+                  {TEXT_COLORS.map((c) => (
+                    <Tooltip key={c.value || "default"}>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            type="button"
+                            className={cn(
+                              "block h-6 w-6 shrink-0 rounded border border-border transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring",
+                              currentColor === c.value &&
+                                "ring-2 ring-ring ring-offset-1",
+                              !c.value &&
+                                "relative after:absolute after:inset-0 after:m-auto after:h-px after:w-full after:rotate-45 after:bg-destructive after:content-['']",
+                            )}
+                            style={{ backgroundColor: c.value || "white" }}
+                            onClick={() => {
+                              if (c.value) {
+                                editor.chain().focus().setColor(c.value).run();
+                              } else {
+                                editor.chain().focus().unsetColor().run();
+                              }
+                              setColorPickerOpen(false);
+                            }}
+                          />
+                        }
+                      />
+                      <TooltipContent>{c.label}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="mx-1 h-5 w-px bg-border" />
 
@@ -336,7 +489,10 @@ export function RichTextEditor({
               value={linkText}
               onChange={(e) => setLinkText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") { e.preventDefault(); applyLink(); }
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  applyLink();
+                }
                 if (e.key === "Escape") cancelLink();
               }}
             />
@@ -348,7 +504,10 @@ export function RichTextEditor({
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); applyLink(); }
+              if (e.key === "Enter") {
+                e.preventDefault();
+                applyLink();
+              }
               if (e.key === "Escape") cancelLink();
             }}
           />
@@ -364,10 +523,21 @@ export function RichTextEditor({
               Supprimer
             </button>
           )}
-          <Button type="button" size="sm" className="h-7 px-3 text-xs" onClick={applyLink}>
+          <Button
+            type="button"
+            size="sm"
+            className="h-7 px-3 text-xs"
+            onClick={applyLink}
+          >
             OK
           </Button>
-          <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={cancelLink}>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={cancelLink}
+          >
             <X className="h-3 w-3" />
           </Button>
         </div>

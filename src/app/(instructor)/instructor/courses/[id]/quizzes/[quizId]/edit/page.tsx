@@ -25,6 +25,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +60,7 @@ import {
   useDeleteQuiz,
 } from "@/lib/hooks/useQuizzes";
 import { useResolveAIGeneration } from "@/lib/hooks/useAIQuiz";
+import { useAutosave } from "@/lib/hooks/useAutosave";
 
 const AVAILABLE_BLOCK_TYPES: BlockType[] = [
   "section",
@@ -161,7 +163,25 @@ export default function QuizEditPage(): React.JSX.Element {
   const [blockErrors, setBlockErrors] = useState<Record<string, string>>({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
-  const [openPanel, setOpenPanel] = useState<"add-block" | "settings">("add-block");
+  const [openPanels, setOpenPanels] = useState<Set<string>>(
+    new Set(["plan", "add-block"]),
+  );
+  const togglePanel = (panel: string): void =>
+    setOpenPanels((prev) => {
+      const next = new Set(prev);
+      if (next.has(panel)) {
+        next.delete(panel);
+      } else {
+        next.add(panel);
+        // Settings is long — opening it auto-collapses the other two so
+        // their titles stay visible without overflow.
+        if (panel === "settings") {
+          next.delete("plan");
+          next.delete("add-block");
+        }
+      }
+      return next;
+    });
   // Set true when the AI chat applies changes; useEffect below resyncs
   // local blocks from the freshly-refetched quiz on the next render.
   const [pendingRehydrate, setPendingRehydrate] = useState(false);
@@ -337,6 +357,7 @@ export default function QuizEditPage(): React.JSX.Element {
             { quizId, blocks: blockInserts },
             {
               onSuccess: () => {
+                clearDraft();
                 resolveGeneration({ quizId, action: "save" });
               },
             },
@@ -364,6 +385,40 @@ export default function QuizEditPage(): React.JSX.Element {
   };
 
   const isSaving = isUpdatingQuiz || isSavingBlocks;
+
+  // ── Autosave ─────────────────────────────────────────────────────
+  const autosaveData = { meta: form.watch(), blocks };
+
+  const { status: autosaveStatus, pendingRestore, acceptRestore, discardRestore, clearDraft } = useAutosave({
+    key: `quiz-draft-${quizId}`,
+    data: autosaveData,
+    enabled: !!quiz,
+    dbDebounceMs: 15000,
+    onSave: (data) =>
+      new Promise<void>((resolve, reject) => {
+        const blockInserts = data.blocks.map((b) => ({
+          type: b.type,
+          content: b.content,
+          weight: b.points,
+          order: b.order,
+        }));
+        updateQuiz(
+          { id: quizId, updates: data.meta as unknown as Parameters<typeof updateQuiz>[0]["updates"], silent: true },
+          {
+            onSuccess: () =>
+              saveBlocks({ quizId, blocks: blockInserts, silent: true }, { onSuccess: () => resolve(), onError: reject }),
+            onError: reject,
+          },
+        );
+      }),
+  });
+
+  const onAcceptRestore = (): void => {
+    if (!pendingRestore) return;
+    form.reset(pendingRestore.meta);
+    setBlocks(pendingRestore.blocks);
+    acceptRestore();
+  };
 
   // ── Block renderer ───────────────────────────────────────────────
   const renderBlockEditor = (block: LocalBlock): React.JSX.Element | null => {
@@ -546,11 +601,30 @@ export default function QuizEditPage(): React.JSX.Element {
           <Trash2 className="h-4 w-4" />
           <span className="hidden sm:inline">Supprimer</span>
         </Button>
+        {autosaveStatus === "saving-db" && (
+          <span className="hidden text-xs text-muted-foreground sm:inline">Sauvegarde...</span>
+        )}
+        {autosaveStatus === "saved" && (
+          <span className="hidden text-xs text-green-600 sm:inline">Sauvegardé</span>
+        )}
         <Button type="submit" disabled={isSaving || isDeleting} className="gap-1.5">
           <Save className="h-4 w-4" />
           {isSaving ? "Enregistrement..." : "Enregistrer"}
         </Button>
       </div>
+
+      {/* ── Restore banner ───────────────────────────────────────── */}
+      {pendingRestore && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+          <span className="flex-1">Un brouillon non enregistré a été trouvé. Voulez-vous le restaurer ?</span>
+          <button type="button" onClick={onAcceptRestore} className="font-medium underline underline-offset-2 hover:text-amber-700">
+            Restaurer
+          </button>
+          <button type="button" onClick={discardRestore} className="text-amber-600 hover:text-amber-800">
+            Ignorer
+          </button>
+        </div>
+      )}
 
       <ConfirmDialog
         open={deleteConfirmOpen}
@@ -570,22 +644,39 @@ export default function QuizEditPage(): React.JSX.Element {
         {/* ── Left column: plan (TOC) + add-block + settings ── */}
         <div className="flex min-h-0 flex-col gap-3 sm:gap-4 lg:col-span-1">
 
-          {/* Plan / TOC — fills remaining height, scrollable */}
-          <div className="hidden min-h-0 flex-1 flex-col rounded-xl border border-border bg-card shadow-sm lg:flex">
-            <div className="shrink-0 border-b border-border px-4 py-3">
+          {/* Plan / TOC — accordion; flex-1 only when open so it doesn't steal height */}
+          <div
+            className={cn(
+              "hidden min-h-0 flex-col rounded-xl border border-border bg-card shadow-sm lg:flex",
+              openPanels.has("plan") ? "flex-1" : "shrink-0",
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => togglePanel("plan")}
+              className="shrink-0 border-b border-border px-4 py-3 text-left"
+            >
               <div className="flex items-center gap-2">
-                <Map className="h-4 w-4 text-muted-foreground" />
+                <Map className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <h2 className="flex-1 text-sm font-semibold text-amber-950">Plan</h2>
-              </div>
-              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                <span>{blocks.length} bloc{blocks.length !== 1 ? "s" : ""}</span>
-                <span>{questionCount} question{questionCount !== 1 ? "s" : ""}</span>
-                <span>Poids: {totalWeight}</span>
-                {form.watch("time_limit_minutes") && (
-                  <span>{form.watch("time_limit_minutes")} min</span>
+                {openPanels.has("plan") ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 )}
               </div>
-            </div>
+              {openPanels.has("plan") && (
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                  <span>{blocks.length} bloc{blocks.length !== 1 ? "s" : ""}</span>
+                  <span>{questionCount} question{questionCount !== 1 ? "s" : ""}</span>
+                  <span>Poids: {totalWeight}</span>
+                  {form.watch("time_limit_minutes") && (
+                    <span>{form.watch("time_limit_minutes")} min</span>
+                  )}
+                </div>
+              )}
+            </button>
+            {openPanels.has("plan") && (
             <div className="min-h-0 flex-1 overflow-y-auto py-2">
               {blocks.length === 0 ? (
                 <p className="px-4 py-3 text-xs text-muted-foreground">
@@ -629,26 +720,27 @@ export default function QuizEditPage(): React.JSX.Element {
                 </ul>
               )}
             </div>
+            )}
           </div>
 
           {/* Add-block panel — accordion */}
           <div className="shrink-0 rounded-xl border border-border bg-card shadow-sm">
             <button
               type="button"
-              onClick={() => setOpenPanel("add-block")}
+              onClick={() => togglePanel("add-block")}
               className="flex w-full items-center gap-2 px-4 py-3 text-left"
             >
               <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-sm font-semibold text-amber-950">
                 Ajouter un bloc
               </span>
-              {openPanel === "add-block" ? (
+              {openPanels.has("add-block") ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />
               ) : (
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               )}
             </button>
-            {openPanel === "add-block" && (
+            {openPanels.has("add-block") && (
               <div className="border-t border-border px-4 pb-4 pt-3">
                 <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 xl:grid-cols-2">
                   {AVAILABLE_BLOCK_TYPES.map((type) => {
@@ -687,20 +779,20 @@ export default function QuizEditPage(): React.JSX.Element {
           <div className="shrink-0 rounded-xl border border-border bg-card shadow-sm">
             <button
               type="button"
-              onClick={() => setOpenPanel("settings")}
+              onClick={() => togglePanel("settings")}
               className="flex w-full items-center gap-2 px-4 py-3 text-left"
             >
               <Pencil className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-sm font-semibold text-amber-950">
                 Paramètres
               </span>
-              {openPanel === "settings" ? (
+              {openPanels.has("settings") ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />
               ) : (
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               )}
             </button>
-            {openPanel === "settings" && (
+            {openPanels.has("settings") && (
               <div className="space-y-3 border-t border-border px-4 pb-4 pt-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Titre</Label>

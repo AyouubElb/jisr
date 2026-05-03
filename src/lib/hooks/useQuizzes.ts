@@ -37,13 +37,13 @@ export function useUpdateQuiz(courseId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: QuizUpdate }) =>
+    mutationFn: ({ id, updates }: { id: string; updates: QuizUpdate; silent?: boolean }) =>
       quizzesApi.update(id, updates),
-    onSuccess: (_, { id }) => {
+    onSuccess: (_, { id, silent }) => {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
       queryClient.invalidateQueries({ queryKey: quizKeys.detail(id) });
-      toast.success("Quiz mis a jour");
+      if (!silent) toast.success("Quiz mis a jour");
     },
     onError: (error: Error) => {
       toast.error(`Erreur : ${error.message}`);
@@ -131,11 +131,12 @@ export function useSaveQuizBlocks(courseId: string) {
     }: {
       quizId: string;
       blocks: Omit<QuizBlockInsert, "quiz_id">[];
+      silent?: boolean;
     }) => quizzesApi.saveBlocks(quizId, blocks),
-    onSuccess: (_, { quizId }) => {
+    onSuccess: (_, { quizId, silent }) => {
       queryClient.invalidateQueries({ queryKey: quizKeys.detail(quizId) });
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
-      toast.success("Blocs du quiz enregistres");
+      if (!silent) toast.success("Blocs du quiz enregistres");
     },
     onError: (error: Error) => {
       toast.error(`Erreur : ${error.message}`);

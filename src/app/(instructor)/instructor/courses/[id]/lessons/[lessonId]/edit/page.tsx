@@ -32,6 +32,7 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { FileUpload } from "@/components/course/file-upload";
 import { useLesson, useUpdateLesson } from "@/lib/hooks/useLessons";
 import { useCourse } from "@/lib/hooks/useCourses";
+import { useAutosave } from "@/lib/hooks/useAutosave";
 import {
   createLessonSchema,
   type CreateLessonInput,
@@ -79,6 +80,19 @@ export default function LessonEditPage(): React.JSX.Element {
   const type = form.watch("type");
   const content = form.watch("content");
   const title = form.watch("title");
+
+  const autosaveData = form.watch();
+
+  const { status: autosaveStatus, pendingRestore, acceptRestore, discardRestore, clearDraft } = useAutosave({
+    key: `lesson-draft-${lessonId}`,
+    data: autosaveData,
+    enabled: !!lesson,
+    onSave: (data) =>
+      new Promise<void>((resolve, reject) =>
+        updateLesson({ id: lessonId, updates: data, silent: true }, { onSuccess: () => resolve(), onError: reject }),
+      ),
+    dbDebounceMs: 15000,
+  });
 
   const sectionTitle = course?.sections?.find((s) =>
     s.lessons?.some((l) => l.id === lessonId),
@@ -152,10 +166,17 @@ export default function LessonEditPage(): React.JSX.Element {
       { id: lessonId, updates: data },
       {
         onSuccess: () => {
+          clearDraft();
           router.push(`/instructor/courses/${courseId}`);
         },
       },
     );
+  };
+
+  const onAcceptRestore = (): void => {
+    if (!pendingRestore) return;
+    form.reset(pendingRestore);
+    acceptRestore();
   };
 
   // ── Loading ──────────────────────────────────────────────────
@@ -245,11 +266,30 @@ export default function LessonEditPage(): React.JSX.Element {
             {isImporting ? "Import..." : "Importer Word"}
           </span>
         </Button>
+        {autosaveStatus === "saving-db" && (
+          <span className="hidden text-xs text-muted-foreground sm:inline">Sauvegarde...</span>
+        )}
+        {autosaveStatus === "saved" && (
+          <span className="hidden text-xs text-green-600 sm:inline">Sauvegardé</span>
+        )}
         <Button type="submit" disabled={isSaving} className="gap-1.5">
           <Save className="h-4 w-4" />
           {isSaving ? "Enregistrement..." : "Enregistrer"}
         </Button>
       </div>
+
+      {/* ── Restore banner ───────────────────────────────────── */}
+      {pendingRestore && (
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+          <span className="flex-1">Un brouillon non enregistré a été trouvé. Voulez-vous le restaurer ?</span>
+          <button type="button" onClick={onAcceptRestore} className="font-medium underline underline-offset-2 hover:text-amber-700">
+            Restaurer
+          </button>
+          <button type="button" onClick={discardRestore} className="text-amber-600 hover:text-amber-800">
+            Ignorer
+          </button>
+        </div>
+      )}
 
       {/* ── Bento grid ───────────────────────────────────────── */}
       <div className="grid min-h-0 flex-1 gap-3 sm:gap-4 lg:grid-cols-4">
