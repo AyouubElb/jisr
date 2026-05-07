@@ -8,7 +8,7 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
-import { fr } from "date-fns/locale";
+import { enUS } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -113,9 +113,9 @@ export function GradingInbox(): React.JSX.Element {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-amber-950">A corriger</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-amber-950">To grade</h1>
         <p className="text-muted-foreground">
-          Tentatives en attente de votre correction manuelle
+          Attempts awaiting your manual review
         </p>
       </div>
 
@@ -127,7 +127,7 @@ export function GradingInbox(): React.JSX.Element {
               className="group gap-2 rounded-lg px-5 py-4 data-active:bg-background data-active:shadow-md data-active:ring-1 data-active:ring-border/60"
             >
               <ClipboardCheck className="h-4 w-4" />
-              <span>En attente</span>
+              <span>Pending</span>
               {attempts !== undefined && (
                 <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground group-data-active:bg-primary/10 group-data-active:text-primary">
                   {attempts.length}
@@ -138,14 +138,14 @@ export function GradingInbox(): React.JSX.Element {
               value="all"
               className="gap-2 rounded-lg px-5 py-4 data-active:bg-background data-active:shadow-md data-active:ring-1 data-active:ring-border/60"
             >
-              <span>Tout</span>
+              <span>All</span>
             </TabsTrigger>
             <TabsTrigger
               value="graded"
               className="gap-2 rounded-lg px-5 py-4 data-active:bg-background data-active:shadow-md data-active:ring-1 data-active:ring-border/60"
             >
               <CheckCircle2 className="h-4 w-4" />
-              <span>Corriges</span>
+              <span>Graded</span>
             </TabsTrigger>
           </TabsList>
 
@@ -158,10 +158,10 @@ export function GradingInbox(): React.JSX.Element {
               }}
             >
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Cours" />
+                <SelectValue placeholder="Course" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les cours</SelectItem>
+                <SelectItem value="all">All courses</SelectItem>
                 {courseOptions.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     [{c.level}] {c.title}
@@ -172,10 +172,10 @@ export function GradingInbox(): React.JSX.Element {
 
             <Select value={studentId} onValueChange={(v) => setStudentId(v ?? "all")}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Etudiant" />
+                <SelectValue placeholder="Student" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les etudiants</SelectItem>
+                <SelectItem value="all">All students</SelectItem>
                 {studentOptions.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name}
@@ -254,12 +254,12 @@ function QuizGroup({
           </div>
           {pendingCount > 0 && (
             <Badge variant="secondary" className="shrink-0">
-              {pendingCount} en attente
+              {pendingCount} pending
             </Badge>
           )}
           <Badge variant="outline" className="shrink-0">
             {group.attempts.length}{" "}
-            {group.attempts.length === 1 ? "tentative" : "tentatives"}
+            {group.attempts.length === 1 ? "attempt" : "attempts"}
           </Badge>
         </button>
 
@@ -292,7 +292,7 @@ function AttemptRow({
 }): React.JSX.Element {
   const isPending = attempt.pending_count > 0;
   const submitted = formatDistanceToNowStrict(new Date(attempt.submitted_at), {
-    locale: fr,
+    locale: enUS,
     addSuffix: true,
   });
   const isStale = isPending && ageInDays(attempt.submitted_at) >= 7;
@@ -317,17 +317,17 @@ function AttemptRow({
           )}
           {isPending ? (
             <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-900">
-              {attempt.pending_count} / {attempt.manual_count} a corriger
+              {attempt.pending_count} / {attempt.manual_count} to grade
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-900">
               <CheckCircle2 className="h-3 w-3" />
-              {gradedManual} / {attempt.manual_count} corrige
+              {gradedManual} / {attempt.manual_count} graded
             </span>
           )}
         </div>
         <p className={`text-xs ${isStale ? "text-rose-600" : "text-muted-foreground"}`}>
-          Soumis {submitted}
+          Submitted {submitted}
         </p>
       </div>
       {!isPending && attempt.final_score !== null && (
@@ -342,10 +342,10 @@ function AttemptRow({
 function EmptyState({ filter }: { filter: Filter }): React.JSX.Element {
   const message =
     filter === "pending"
-      ? "Aucune tentative en attente de correction"
+      ? "No attempts awaiting review"
       : filter === "graded"
-        ? "Aucune tentative corrigee"
-        : "Aucune tentative";
+        ? "No graded attempts"
+        : "No attempts";
   return (
     <Card>
       <CardContent className="flex flex-col items-center gap-3 py-12 text-center">

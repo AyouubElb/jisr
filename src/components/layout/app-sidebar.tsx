@@ -48,19 +48,20 @@ const studentNav: NavItem[] = [
 ];
 
 const instructorNav: NavItem[] = [
-  { title: "Tableau de bord", href: "/instructor", icon: LayoutDashboard },
-  { title: "Mes cours", href: "/instructor/courses", icon: BookOpen },
-  { title: "A corriger", href: "/instructor/grading", icon: ClipboardCheck, badgeKey: "pendingGrading" },
-  { title: "Sessions en direct", href: "/instructor/sessions", icon: Calendar },
-  { title: "Etudiants", href: "/instructor/students", icon: Users },
+  { title: "Dashboard", href: "/instructor", icon: LayoutDashboard },
+  { title: "My courses", href: "/instructor/courses", icon: BookOpen },
+  { title: "To grade", href: "/instructor/grading", icon: ClipboardCheck, badgeKey: "pendingGrading" },
+  { title: "Live sessions", href: "/instructor/sessions", icon: Calendar },
+  { title: "Students", href: "/instructor/students", icon: Users },
+  { title: "Settings", href: "/instructor/settings", icon: Settings },
 ];
 
 const adminNav: NavItem[] = [
-  { title: "Vue d'ensemble", href: "/admin", icon: LayoutDashboard },
-  { title: "Invitations", href: "/admin/invites", icon: Mail },
-  { title: "Instructeurs", href: "/admin/instructors", icon: GraduationCap },
-  { title: "Etudiants", href: "/admin/students", icon: Users },
-  { title: "Générations IA", href: "/admin/ai/generations", icon: Sparkles },
+  { title: "Overview", href: "/admin", icon: LayoutDashboard },
+  { title: "Invites", href: "/admin/invites", icon: Mail },
+  { title: "Instructors", href: "/admin/instructors", icon: GraduationCap },
+  { title: "Students", href: "/admin/students", icon: Users },
+  { title: "AI generations", href: "/admin/ai/generations", icon: Sparkles },
 ];
 
 export function AppSidebar({ role }: AppSidebarProps): React.JSX.Element {
@@ -78,7 +79,7 @@ export function AppSidebar({ role }: AppSidebarProps): React.JSX.Element {
           <div className="flex flex-col">
             <span className="text-sm font-semibold">English Learn</span>
             <span className="text-xs text-muted-foreground">
-              {role === "admin" ? "Administrateur" : role === "instructor" ? "Instructeur" : "Etudiant"}
+              {role === "admin" ? "Administrator" : role === "instructor" ? "Instructor" : "Etudiant"}
             </span>
           </div>
         </div>

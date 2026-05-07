@@ -60,7 +60,7 @@ import {
   useDeleteQuiz,
 } from "@/lib/hooks/useQuizzes";
 import { useResolveAIGeneration } from "@/lib/hooks/useAIQuiz";
-import { useAutosave } from "@/lib/hooks/useAutosave";
+// import { useAutosave } from "@/lib/hooks/useAutosave"; // disabled — see hook call below
 
 const AVAILABLE_BLOCK_TYPES: BlockType[] = [
   "section",
@@ -250,8 +250,8 @@ export default function QuizEditPage(): React.JSX.Element {
           prompt: "",
           allow_multiple: false,
           options: [
-            { id: `opt-${Date.now()}-vrai`, label: "Vrai", is_correct: false },
-            { id: `opt-${Date.now()}-faux`, label: "Faux", is_correct: false },
+            { id: `opt-${Date.now()}-true`, label: "True", is_correct: false },
+            { id: `opt-${Date.now()}-false`, label: "False", is_correct: false },
           ],
         },
         points: 1,
@@ -335,8 +335,8 @@ export default function QuizEditPage(): React.JSX.Element {
       if (!result.success) {
         const issues = result.error.flatten().formErrors;
         errors[b.clientId] = issues[0] ?? result.error.flatten().fieldErrors
-          ? Object.values(result.error.flatten().fieldErrors).flat()[0] ?? "Bloc invalide"
-          : "Bloc invalide";
+          ? Object.values(result.error.flatten().fieldErrors).flat()[0] ?? "Invalid block"
+          : "Invalid block";
       }
     }
     setBlockErrors(errors);
@@ -357,8 +357,9 @@ export default function QuizEditPage(): React.JSX.Element {
             { quizId, blocks: blockInserts },
             {
               onSuccess: () => {
-                clearDraft();
+                // clearDraft(); // autosave disabled
                 resolveGeneration({ quizId, action: "save" });
+                router.push(`/instructor/courses/${courseId}`);
               },
             },
           );
@@ -386,39 +387,29 @@ export default function QuizEditPage(): React.JSX.Element {
 
   const isSaving = isUpdatingQuiz || isSavingBlocks;
 
-  // ── Autosave ─────────────────────────────────────────────────────
-  const autosaveData = { meta: form.watch(), blocks };
-
-  const { status: autosaveStatus, pendingRestore, acceptRestore, discardRestore, clearDraft } = useAutosave({
-    key: `quiz-draft-${quizId}`,
-    data: autosaveData,
-    enabled: !!quiz,
-    dbDebounceMs: 15000,
-    onSave: (data) =>
-      new Promise<void>((resolve, reject) => {
-        const blockInserts = data.blocks.map((b) => ({
-          type: b.type,
-          content: b.content,
-          weight: b.points,
-          order: b.order,
-        }));
-        updateQuiz(
-          { id: quizId, updates: data.meta as unknown as Parameters<typeof updateQuiz>[0]["updates"], silent: true },
-          {
-            onSuccess: () =>
-              saveBlocks({ quizId, blocks: blockInserts, silent: true }, { onSuccess: () => resolve(), onError: reject }),
-            onError: reject,
-          },
-        );
-      }),
-  });
-
-  const onAcceptRestore = (): void => {
-    if (!pendingRestore) return;
-    form.reset(pendingRestore.meta);
-    setBlocks(pendingRestore.blocks);
-    acceptRestore();
-  };
+  // ── Autosave disabled ────────────────────────────────────────────
+  // To re-enable: uncomment this block + the import + toolbar indicators + restore banner + clearDraft() in onSubmit.
+  // const autosaveData = { meta: form.watch(), blocks };
+  // const { status: autosaveStatus, pendingRestore, acceptRestore, discardRestore, clearDraft } = useAutosave({
+  //   key: `quiz-draft-${quizId}`,
+  //   data: autosaveData,
+  //   enabled: !!quiz,
+  //   dbDebounceMs: 15000,
+  //   onSave: (data) =>
+  //     new Promise<void>((resolve, reject) => {
+  //       const blockInserts = data.blocks.map((b) => ({ type: b.type, content: b.content, weight: b.points, order: b.order }));
+  //       updateQuiz(
+  //         { id: quizId, updates: data.meta as unknown as Parameters<typeof updateQuiz>[0]["updates"], silent: true },
+  //         { onSuccess: () => saveBlocks({ quizId, blocks: blockInserts, silent: true }, { onSuccess: () => resolve(), onError: reject }), onError: reject },
+  //       );
+  //     }),
+  // });
+  // const onAcceptRestore = (): void => {
+  //   if (!pendingRestore) return;
+  //   form.reset(pendingRestore.meta);
+  //   setBlocks(pendingRestore.blocks);
+  //   acceptRestore();
+  // };
 
   // ── Block renderer ───────────────────────────────────────────────
   const renderBlockEditor = (block: LocalBlock): React.JSX.Element | null => {
@@ -514,9 +505,9 @@ export default function QuizEditPage(): React.JSX.Element {
   const blockTocLabel = (block: LocalBlock): string => {
     const c = block.content;
     if (block.type === "mcq") return (c.prompt as string) || "QCM";
-    if (block.type === "fill_blank") return (c.sentence as string) || "Texte à trous";
-    if (block.type === "free_text") return (c.prompt as string) || "Réponse écrite";
-    if (block.type === "voice") return (c.prompt as string) || "Réponse vocale";
+    if (block.type === "fill_blank") return (c.sentence as string) || "Fill in the blank";
+    if (block.type === "free_text") return (c.prompt as string) || "Written response";
+    if (block.type === "voice") return (c.prompt as string) || "Voice response";
     if (block.type === "text") return "Passage";
     if (block.type === "audio") return (c.caption as string) || "Audio";
     if (block.type === "image") return (c.alt as string) || "Image";
@@ -539,9 +530,9 @@ export default function QuizEditPage(): React.JSX.Element {
   if (!quiz) {
     return (
       <div className="flex flex-col items-center gap-4 py-16">
-        <p className="text-lg text-muted-foreground">Quiz introuvable</p>
+        <p className="text-lg text-muted-foreground">Quiz not found</p>
         <Link href={`/instructor/courses/${courseId}`}>
-          <Button variant="outline">Retour au cours</Button>
+          <Button variant="outline">Back to course</Button>
         </Link>
       </div>
     );
@@ -567,14 +558,14 @@ export default function QuizEditPage(): React.JSX.Element {
           </p>
           <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
             <span>
-              {blocks.length} bloc{blocks.length !== 1 ? "s" : ""}
+              {blocks.length} block{blocks.length !== 1 ? "s" : ""}
             </span>
             <span>·</span>
             <span>
               {questionCount} question{questionCount !== 1 ? "s" : ""}
             </span>
             <span>·</span>
-            <span>Poids: {totalWeight}</span>
+            <span>Weight: {totalWeight}</span>
           </div>
         </div>
         <Button
@@ -589,7 +580,7 @@ export default function QuizEditPage(): React.JSX.Element {
           className="gap-1.5"
         >
           <Sparkles className="h-4 w-4 text-primary" />
-          <span className="hidden sm:inline">Assistant IA</span>
+          <span className="hidden sm:inline">AI assistant</span>
         </Button>
         <Button
           type="button"
@@ -599,22 +590,23 @@ export default function QuizEditPage(): React.JSX.Element {
           className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
         >
           <Trash2 className="h-4 w-4" />
-          <span className="hidden sm:inline">Supprimer</span>
+          <span className="hidden sm:inline">Delete</span>
         </Button>
-        {autosaveStatus === "saving-db" && (
+        {/* autosave status indicators disabled — re-enable with autosave hook */}
+        {/* {autosaveStatus === "saving-db" && (
           <span className="hidden text-xs text-muted-foreground sm:inline">Sauvegarde...</span>
         )}
         {autosaveStatus === "saved" && (
           <span className="hidden text-xs text-green-600 sm:inline">Sauvegardé</span>
-        )}
+        )} */}
         <Button type="submit" disabled={isSaving || isDeleting} className="gap-1.5">
           <Save className="h-4 w-4" />
-          {isSaving ? "Enregistrement..." : "Enregistrer"}
+          {isSaving ? "Saving..." : "Save"}
         </Button>
       </div>
 
-      {/* ── Restore banner ───────────────────────────────────────── */}
-      {pendingRestore && (
+      {/* ── Restore banner disabled — re-enable with autosave hook ─ */}
+      {/* {pendingRestore && (
         <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
           <span className="flex-1">Un brouillon non enregistré a été trouvé. Voulez-vous le restaurer ?</span>
           <button type="button" onClick={onAcceptRestore} className="font-medium underline underline-offset-2 hover:text-amber-700">
@@ -624,14 +616,14 @@ export default function QuizEditPage(): React.JSX.Element {
             Ignorer
           </button>
         </div>
-      )}
+      )} */}
 
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}
-        title="Supprimer ce quiz ?"
-        description="Cette action est irréversible. Tous les blocs et réponses associés seront perdus."
-        confirmLabel="Supprimer"
+        title="Delete this quiz?"
+        description="This action is irreversible. All blocks and associated responses will be lost."
+        confirmLabel="Delete"
         onConfirm={onDeleteConfirmed}
         isPending={isDeleting}
       />
@@ -667,9 +659,9 @@ export default function QuizEditPage(): React.JSX.Element {
               </div>
               {openPanels.has("plan") && (
                 <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                  <span>{blocks.length} bloc{blocks.length !== 1 ? "s" : ""}</span>
+                  <span>{blocks.length} block{blocks.length !== 1 ? "s" : ""}</span>
                   <span>{questionCount} question{questionCount !== 1 ? "s" : ""}</span>
-                  <span>Poids: {totalWeight}</span>
+                  <span>Weight: {totalWeight}</span>
                   {form.watch("time_limit_minutes") && (
                     <span>{form.watch("time_limit_minutes")} min</span>
                   )}
@@ -680,7 +672,7 @@ export default function QuizEditPage(): React.JSX.Element {
             <div className="min-h-0 flex-1 overflow-y-auto py-2">
               {blocks.length === 0 ? (
                 <p className="px-4 py-3 text-xs text-muted-foreground">
-                  Aucun bloc pour le moment
+                  No blocks yet
                 </p>
               ) : (
                 <ul className="space-y-0.5 px-2">
@@ -732,7 +724,7 @@ export default function QuizEditPage(): React.JSX.Element {
             >
               <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-sm font-semibold text-amber-950">
-                Ajouter un bloc
+                Add a block
               </span>
               {openPanels.has("add-block") ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -760,7 +752,7 @@ export default function QuizEditPage(): React.JSX.Element {
                 </div>
                 <div className="mt-2 border-t border-border pt-2">
                   <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Modèles
+                    Templates
                   </p>
                   <button
                     type="button"
@@ -768,7 +760,7 @@ export default function QuizEditPage(): React.JSX.Element {
                     className="flex w-full items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-xs font-medium text-amber-950 transition-colors hover:border-violet-500/50 hover:bg-violet-50"
                   >
                     <ToggleLeft className="h-3.5 w-3.5 shrink-0 text-violet-600" />
-                    <span>Vrai / Faux</span>
+                    <span>True / False</span>
                   </button>
                 </div>
               </div>
@@ -784,7 +776,7 @@ export default function QuizEditPage(): React.JSX.Element {
             >
               <Pencil className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-sm font-semibold text-amber-950">
-                Paramètres
+                Settings
               </span>
               {openPanels.has("settings") ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -795,9 +787,9 @@ export default function QuizEditPage(): React.JSX.Element {
             {openPanels.has("settings") && (
               <div className="space-y-3 border-t border-border px-4 pb-4 pt-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Titre</Label>
+                  <Label className="text-xs">Title</Label>
                   <Input
-                    placeholder="ex : Present Simple"
+                    placeholder="e.g. Present Simple"
                     {...form.register("title")}
                   />
                   {form.formState.errors.title && (
@@ -810,18 +802,18 @@ export default function QuizEditPage(): React.JSX.Element {
                   <Label className="text-xs">Description</Label>
                   <Textarea
                     rows={3}
-                    placeholder="Courte description..."
+                    placeholder="Short description..."
                     className="resize-none"
                     {...form.register("description")}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Durée limite (min)</Label>
+                  <Label className="text-xs">Time limit (min)</Label>
                   <Input
                     type="number"
                     min={1}
                     max={180}
-                    placeholder="Aucune"
+                    placeholder="None"
                     {...form.register("time_limit_minutes", {
                       setValueAs: (v) =>
                         v === "" || v === null ? null : Number(v),
@@ -829,7 +821,7 @@ export default function QuizEditPage(): React.JSX.Element {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Note de passage (%)</Label>
+                  <Label className="text-xs">Passing score (%)</Label>
                   <Input
                     type="number"
                     min={0}
@@ -840,23 +832,23 @@ export default function QuizEditPage(): React.JSX.Element {
                     })}
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Seuil minimum pour réussir le quiz (sur 100)
+                    Minimum threshold to pass the quiz (out of 100)
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Tentatives max</Label>
+                  <Label className="text-xs">Max attempts</Label>
                   <Input
                     type="number"
                     min={1}
                     max={5}
-                    placeholder="Illimitées"
+                    placeholder="Unlimited"
                     {...form.register("max_attempts", {
                       setValueAs: (v) =>
                         v === "" || v === null ? null : Number(v),
                     })}
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Maximum 5. Laissez vide pour des tentatives illimitées. Une tentative non terminée (étudiant qui ferme le navigateur) compte aussi.
+                    Maximum 5. Leave empty for unlimited attempts. An incomplete attempt (student who closes the browser) also counts.
                   </p>
                 </div>
               </div>
@@ -870,15 +862,15 @@ export default function QuizEditPage(): React.JSX.Element {
             <div className="flex items-center gap-2">
               <ListChecks className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-amber-950">
-                Blocs du quiz
+                Quiz blocks
               </h2>
             </div>
             <div className="flex items-center gap-1.5">
               <Badge variant="outline" className="text-[10px]">
-                {blocks.length} bloc{blocks.length !== 1 ? "s" : ""}
+                {blocks.length} block{blocks.length !== 1 ? "s" : ""}
               </Badge>
               <Badge variant="outline" className="text-[10px]">
-                Poids: {totalWeight}
+                Weight: {totalWeight}
               </Badge>
             </div>
           </div>
@@ -888,10 +880,10 @@ export default function QuizEditPage(): React.JSX.Element {
               <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-12 text-center">
                 <ClipboardList className="h-8 w-8 text-muted-foreground/50" />
                 <p className="text-sm font-medium text-amber-950">
-                  Aucun bloc pour le moment
+                  No blocks yet
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Utilisez le panneau a gauche pour ajouter un bloc
+                  Use the panel on the left to add a block
                 </p>
               </div>
             ) : (

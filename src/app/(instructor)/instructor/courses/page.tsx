@@ -17,13 +17,13 @@ export default function InstructorCoursesPage(): React.JSX.Element {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Mes cours</h1>
-          <p className="text-muted-foreground">Gerez et organisez vos cours</p>
+          <h1 className="text-2xl font-bold">My courses</h1>
+          <p className="text-muted-foreground">Manage and organize your courses</p>
         </div>
         <Link href="/instructor/courses/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
-            Nouveau cours
+            New course
           </Button>
         </Link>
       </div>
@@ -38,12 +38,12 @@ export default function InstructorCoursesPage(): React.JSX.Element {
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12">
             <BookOpen className="h-12 w-12 text-muted-foreground" />
-            <p className="text-lg font-medium">Aucun cours</p>
-            <p className="text-muted-foreground">Commencez par creer votre premier cours</p>
+            <p className="text-lg font-medium">No courses yet</p>
+            <p className="text-muted-foreground">Start by creating your first course</p>
             <Link href="/instructor/courses/new">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                Creer un cours
+                Create a course
               </Button>
             </Link>
           </CardContent>
@@ -59,7 +59,7 @@ export default function InstructorCoursesPage(): React.JSX.Element {
                       {course.level}
                     </Badge>
                     <Badge variant={course.is_published ? "default" : "secondary"}>
-                      {course.is_published ? "Publie" : "Brouillon"}
+                      {course.is_published ? "Published" : "Draft"}
                     </Badge>
                   </div>
                   <h3 className="mt-3 font-semibold">{course.title}</h3>

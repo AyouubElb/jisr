@@ -11,17 +11,30 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { LogOut } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+import type { UserRole } from "@/lib/types";
 
 interface AppHeaderProps {
   fullName: string;
+  role: UserRole;
 }
 
-export function AppHeader({ fullName }: AppHeaderProps): React.JSX.Element {
+export function AppHeader({ fullName, role }: AppHeaderProps): React.JSX.Element {
+  const settingsHref =
+    role === "instructor"
+      ? "/instructor/settings"
+      : role === "student"
+        ? "/student/settings"
+        : null;
+  const isStudent = role === "student";
+  const labels = isStudent
+    ? { account: "Mon compte", settings: "Parametres", logout: "Se deconnecter" }
+    : { account: "My account", settings: "Settings", logout: "Sign out" };
   const router = useRouter();
 
   useEffect(() => {
@@ -63,11 +76,22 @@ export function AppHeader({ fullName }: AppHeaderProps): React.JSX.Element {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Mon compte</DropdownMenuLabel>
+            <DropdownMenuLabel>{labels.account}</DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {settingsHref && (
+              <DropdownMenuItem
+                className="cursor-pointer"
+                render={
+                  <Link href={settingsHref}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    {labels.settings}
+                  </Link>
+                }
+              />
+            )}
             <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
               <LogOut className="mr-2 h-4 w-4" />
-              Se deconnecter
+              {labels.logout}
             </DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>

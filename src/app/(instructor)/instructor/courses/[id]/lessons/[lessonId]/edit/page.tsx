@@ -13,6 +13,7 @@ import {
   Loader2,
   Pencil,
   Save,
+  Sparkles,
   Upload,
 } from "lucide-react";
 
@@ -30,9 +31,12 @@ import {
 } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { FileUpload } from "@/components/course/file-upload";
+import { useSidebar } from "@/components/ui/sidebar";
+import { LessonAIEditChat } from "@/components/course/lesson/lesson-ai-edit-chat";
+import { LessonAIGenerateDialog } from "@/components/course/lesson/lesson-ai-generate-dialog";
 import { useLesson, useUpdateLesson } from "@/lib/hooks/useLessons";
 import { useCourse } from "@/lib/hooks/useCourses";
-import { useAutosave } from "@/lib/hooks/useAutosave";
+// import { useAutosave } from "@/lib/hooks/useAutosave"; // disabled — see hook call below
 import {
   createLessonSchema,
   type CreateLessonInput,
@@ -41,9 +45,9 @@ import {
 const MAX_DOCX_SIZE_MB = 10;
 
 const LESSON_TYPE_LABEL: Record<CreateLessonInput["type"], string> = {
-  grammar: "Grammaire",
-  vocabulary: "Vocabulaire",
-  resource: "Ressource",
+  grammar: "Grammar",
+  vocabulary: "Vocabulary",
+  resource: "Resource",
 };
 
 export default function LessonEditPage(): React.JSX.Element {
@@ -60,13 +64,25 @@ export default function LessonEditPage(): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [aiGenerateOpen, setAiGenerateOpen] = useState(false);
+  const [aiProposal, setAiProposal] = useState<{
+    generationId: string | null;
+    summary: string;
+    newContent: string;
+    diffHtml: string;
+  } | null>(null);
+  const { setOpen: setSidebarOpen, setOpenMobile: setSidebarOpenMobile, isMobile } = useSidebar();
 
   const form = useForm<CreateLessonInput>({
     resolver: zodResolver(createLessonSchema),
     defaultValues: { title: "", content: "", type: "grammar" },
   });
 
-  // Hydrate form once lesson loads
+  // Editor mounts only after the form is hydrated from DB to avoid Tiptap
+  // emitting an empty <p></p> on initial mount and clobbering real content.
+  const [formHydrated, setFormHydrated] = useState(false);
+
   useEffect(() => {
     if (!lesson) return;
     form.reset({
@@ -74,6 +90,7 @@ export default function LessonEditPage(): React.JSX.Element {
       content: lesson.content ?? "",
       type: lesson.type as CreateLessonInput["type"],
     });
+    setFormHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson?.id]);
 
@@ -81,18 +98,20 @@ export default function LessonEditPage(): React.JSX.Element {
   const content = form.watch("content");
   const title = form.watch("title");
 
-  const autosaveData = form.watch();
-
-  const { status: autosaveStatus, pendingRestore, acceptRestore, discardRestore, clearDraft } = useAutosave({
-    key: `lesson-draft-${lessonId}`,
-    data: autosaveData,
-    enabled: !!lesson,
-    onSave: (data) =>
-      new Promise<void>((resolve, reject) =>
-        updateLesson({ id: lessonId, updates: data, silent: true }, { onSuccess: () => resolve(), onError: reject }),
-      ),
-    dbDebounceMs: 15000,
-  });
+  // ── Autosave disabled (commented out — see git history if you want it back) ──
+  // It races with Tiptap normalization on mount and with the AI agent's
+  // accept/reject flow. Manual "Enregistrer" is enough at this stage.
+  // const autosaveData = form.watch();
+  // const { status: autosaveStatus, pendingRestore, acceptRestore, discardRestore, clearDraft } = useAutosave({
+  //   key: `lesson-draft-${lessonId}`,
+  //   data: autosaveData,
+  //   enabled: !!lesson,
+  //   onSave: (data) =>
+  //     new Promise<void>((resolve, reject) =>
+  //       updateLesson({ id: lessonId, updates: data, silent: true }, { onSuccess: () => resolve(), onError: reject }),
+  //     ),
+  //   dbDebounceMs: 15000,
+  // });
 
   const sectionTitle = course?.sections?.find((s) =>
     s.lessons?.some((l) => l.id === lessonId),
@@ -122,16 +141,16 @@ export default function LessonEditPage(): React.JSX.Element {
 
       if (result.messages.length > 0) {
         toast.success(
-          `Import reussi. ${result.messages.length} element${result.messages.length !== 1 ? "s" : ""} non supporte${result.messages.length !== 1 ? "s" : ""} ignore${result.messages.length !== 1 ? "s" : ""}.`,
+          `Import successful. ${result.messages.length} unsupported element${result.messages.length !== 1 ? "s" : ""} skipped.`,
         );
       } else {
-        toast.success("Import reussi");
+        toast.success("Import successful");
       }
     } catch (error) {
       toast.error(
         error instanceof Error
-          ? `Erreur d'import : ${error.message}`
-          : "Erreur d'import",
+          ? `Import error: ${error.message}`
+          : "Import error",
       );
     } finally {
       setIsImporting(false);
@@ -146,11 +165,11 @@ export default function LessonEditPage(): React.JSX.Element {
     if (!file) return;
 
     if (!file.name.toLowerCase().endsWith(".docx")) {
-      toast.error("Seuls les fichiers .docx sont supportes");
+      toast.error("Only .docx files are supported");
       return;
     }
     if (file.size > MAX_DOCX_SIZE_MB * 1024 * 1024) {
-      toast.error(`Le fichier ne doit pas depasser ${MAX_DOCX_SIZE_MB} Mo`);
+      toast.error(`File must not exceed ${MAX_DOCX_SIZE_MB} MB`);
       return;
     }
 
@@ -166,18 +185,17 @@ export default function LessonEditPage(): React.JSX.Element {
       { id: lessonId, updates: data },
       {
         onSuccess: () => {
-          clearDraft();
           router.push(`/instructor/courses/${courseId}`);
         },
       },
     );
   };
 
-  const onAcceptRestore = (): void => {
-    if (!pendingRestore) return;
-    form.reset(pendingRestore);
-    acceptRestore();
-  };
+  // const onAcceptRestore = (): void => {
+  //   if (!pendingRestore) return;
+  //   form.reset(pendingRestore);
+  //   acceptRestore();
+  // };
 
   // ── Loading ──────────────────────────────────────────────────
   if (isLoading) {
@@ -195,9 +213,9 @@ export default function LessonEditPage(): React.JSX.Element {
   if (!lesson) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
-        <p className="text-lg text-muted-foreground">Lecon introuvable</p>
+        <p className="text-lg text-muted-foreground">Lesson not found</p>
         <Link href={`/instructor/courses/${courseId}`}>
-          <Button variant="outline">Retour au cours</Button>
+          <Button variant="outline">Back to course</Button>
         </Link>
       </div>
     );
@@ -217,7 +235,7 @@ export default function LessonEditPage(): React.JSX.Element {
             variant="ghost"
             size="icon"
             className="shrink-0"
-            title="Retour au cours"
+            title="Back to course"
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -237,7 +255,7 @@ export default function LessonEditPage(): React.JSX.Element {
             <span>{LESSON_TYPE_LABEL[type]}</span>
             <span>·</span>
             <span>
-              {wordCount} mot{wordCount !== 1 ? "s" : ""}
+              {wordCount} word{wordCount !== 1 ? "s" : ""}
             </span>
           </div>
         </div>
@@ -255,7 +273,7 @@ export default function LessonEditPage(): React.JSX.Element {
           disabled={isImporting}
           onClick={() => fileInputRef.current?.click()}
           className="gap-1.5"
-          title="Importer depuis un fichier Word (.docx)"
+          title="Import from a Word file (.docx)"
         >
           {isImporting ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -263,33 +281,64 @@ export default function LessonEditPage(): React.JSX.Element {
             <Upload className="h-4 w-4" />
           )}
           <span className="hidden sm:inline">
-            {isImporting ? "Import..." : "Importer Word"}
+            {isImporting ? "Importing..." : "Import Word"}
           </span>
         </Button>
-        {autosaveStatus === "saving-db" && (
-          <span className="hidden text-xs text-muted-foreground sm:inline">Sauvegarde...</span>
-        )}
-        {autosaveStatus === "saved" && (
-          <span className="hidden text-xs text-green-600 sm:inline">Sauvegardé</span>
-        )}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            if (hasContent) {
+              if (isMobile) setSidebarOpenMobile(false);
+              else setSidebarOpen(false);
+              setAiChatOpen(true);
+            } else {
+              setAiGenerateOpen(true);
+            }
+          }}
+          disabled={isSaving}
+          className="gap-1.5"
+          title={
+            hasContent
+              ? "Open the AI assistant to edit the lesson"
+              : "Generate the lesson with AI"
+          }
+        >
+          <Sparkles className="h-4 w-4 text-primary" />
+          <span className="hidden sm:inline">
+            {hasContent ? "AI assistant" : "Generate (AI)"}
+          </span>
+        </Button>
+        {/*
+          Autosave status disabled. To re-enable, bring back:
+          autosaveStatus === "saving-db" && (<span ...>Sauvegarde...</span>)
+          autosaveStatus === "saved"     && (<span ...>Sauvegardé</span>)
+        */}
         <Button type="submit" disabled={isSaving} className="gap-1.5">
           <Save className="h-4 w-4" />
-          {isSaving ? "Enregistrement..." : "Enregistrer"}
+          {isSaving ? "Saving..." : "Save"}
         </Button>
       </div>
 
-      {/* ── Restore banner ───────────────────────────────────── */}
-      {pendingRestore && (
-        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
-          <span className="flex-1">Un brouillon non enregistré a été trouvé. Voulez-vous le restaurer ?</span>
-          <button type="button" onClick={onAcceptRestore} className="font-medium underline underline-offset-2 hover:text-amber-700">
-            Restaurer
-          </button>
-          <button type="button" onClick={discardRestore} className="text-amber-600 hover:text-amber-800">
-            Ignorer
-          </button>
-        </div>
-      )}
+      {/*
+        Restore banner disabled — autosave is off. To re-enable, restore the
+        useAutosave hook above and bring back this block:
+
+        pendingRestore && (
+          <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+            <span className="flex-1">Un brouillon non enregistré a été trouvé. Voulez-vous le restaurer ?</span>
+            <button type="button" onClick={onAcceptRestore} className="font-medium underline underline-offset-2 hover:text-amber-700">
+              Restaurer
+            </button>
+            <button type="button" onClick={discardRestore} className="text-amber-600 hover:text-amber-800">
+              Ignorer
+            </button>
+          </div>
+        )
+      */}
+
+      {/* ── Content area: bento grid + chat panel ───────────── */}
+      <div className="flex min-h-0 flex-1 gap-3 sm:gap-4">
 
       {/* ── Bento grid ───────────────────────────────────────── */}
       <div className="grid min-h-0 flex-1 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -300,14 +349,14 @@ export default function LessonEditPage(): React.JSX.Element {
             <div className="mb-3 flex items-center gap-2">
               <Pencil className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-amber-950">
-                Parametres
+                Settings
               </h2>
             </div>
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Titre</Label>
+                <Label className="text-xs">Title</Label>
                 <Input
-                  placeholder="ex : Present Simple"
+                  placeholder="e.g. Present Simple"
                   {...form.register("title")}
                 />
                 {form.formState.errors.title && (
@@ -327,12 +376,12 @@ export default function LessonEditPage(): React.JSX.Element {
                   }
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selectionner un type" />
+                    <SelectValue placeholder="Select a type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="grammar">Grammaire</SelectItem>
-                    <SelectItem value="vocabulary">Vocabulaire</SelectItem>
-                    <SelectItem value="resource">Ressource</SelectItem>
+                    <SelectItem value="grammar">Grammar</SelectItem>
+                    <SelectItem value="vocabulary">Vocabulary</SelectItem>
+                    <SelectItem value="resource">Resource</SelectItem>
                   </SelectContent>
                 </Select>
                 {form.formState.errors.type && (
@@ -362,31 +411,71 @@ export default function LessonEditPage(): React.JSX.Element {
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-amber-950">
-                Contenu de la lecon
+                Lesson content
               </h2>
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <RichTextEditor
-              content={content}
-              onChange={(html) =>
-                form.setValue("content", html, { shouldDirty: true })
-              }
-              placeholder="Commencez a ecrire votre lecon ici..."
-              className="min-h-full"
+            {formHydrated ? (
+              <RichTextEditor
+                content={content}
+                onChange={(html) =>
+                  form.setValue("content", html, { shouldDirty: true })
+                }
+                placeholder="Start writing your lesson here..."
+                className="min-h-full"
+                diffContent={aiProposal?.diffHtml ?? null}
+              />
+            ) : (
+              <Skeleton className="h-full min-h-[150px] w-full rounded-md" />
+            )}
+          </div>
+        </div>
+      </div>{/* end bento grid */}
+
+      {aiChatOpen && (
+        <div className="hidden w-[380px] shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:flex">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <LessonAIEditChat
+              lessonId={lessonId}
+              currentContent={content}
+              onProposalChange={setAiProposal}
+              onAccept={(newContent) => {
+                form.setValue("content", newContent, { shouldDirty: true });
+              }}
+              onClose={() => {
+                setAiChatOpen(false);
+                setAiProposal(null);
+              }}
             />
           </div>
         </div>
-      </div>
+      )}
+
+
+      </div>{/* end content area */}
+
+      <LessonAIGenerateDialog
+        open={aiGenerateOpen}
+        onOpenChange={setAiGenerateOpen}
+        lessonId={lessonId}
+        lessonTitle={title || lesson.title}
+        lessonType={type}
+        courseLevel={(course?.level ?? "A1") as "A1" | "A2" | "B1" | "B2" | "C1" | "C2"}
+        hasExistingContent={hasContent}
+        onGenerated={(newContent) => {
+          form.setValue("content", newContent, { shouldDirty: true });
+        }}
+      />
 
       <ConfirmDialog
         open={pendingImportFile !== null}
         onOpenChange={(open) => {
           if (!open) setPendingImportFile(null);
         }}
-        title="Remplacer le contenu actuel ?"
-        description="Le contenu de la lecon sera remplace par celui du fichier Word. Cette action ne peut pas etre annulee."
-        confirmLabel="Remplacer"
+        title="Replace current content?"
+        description="The lesson content will be replaced with the Word file. This action cannot be undone."
+        confirmLabel="Replace"
         onConfirm={() => {
           const file = pendingImportFile;
           setPendingImportFile(null);

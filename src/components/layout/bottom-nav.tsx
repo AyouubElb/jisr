@@ -34,19 +34,19 @@ const studentItems: NavItem[] = [
 ];
 
 const instructorItems: NavItem[] = [
-  { label: "Accueil", href: "/instructor", icon: LayoutDashboard },
-  { label: "Cours", href: "/instructor/courses", icon: BookOpen },
-  { label: "Corriger", href: "/instructor/grading", icon: ClipboardCheck, badgeKey: "pendingGrading" },
+  { label: "Home", href: "/instructor", icon: LayoutDashboard },
+  { label: "Courses", href: "/instructor/courses", icon: BookOpen },
+  { label: "Grade", href: "/instructor/grading", icon: ClipboardCheck, badgeKey: "pendingGrading" },
   { label: "Sessions", href: "/instructor/sessions", icon: Calendar },
-  { label: "Etudiants", href: "/instructor/students", icon: Users },
+  { label: "Students", href: "/instructor/students", icon: Users },
 ];
 
 const adminItems: NavItem[] = [
-  { label: "Accueil", href: "/admin", icon: LayoutDashboard },
+  { label: "Home", href: "/admin", icon: LayoutDashboard },
   { label: "Invites", href: "/admin/invites", icon: Mail },
-  { label: "Instructeurs", href: "/admin/instructors", icon: GraduationCap },
-  { label: "Etudiants", href: "/admin/students", icon: Users },
-  { label: "IA", href: "/admin/ai/generations", icon: Sparkles },
+  { label: "Instructors", href: "/admin/instructors", icon: GraduationCap },
+  { label: "Students", href: "/admin/students", icon: Users },
+  { label: "AI", href: "/admin/ai/generations", icon: Sparkles },
 ];
 
 export function BottomNav({ role }: { role: UserRole }): React.JSX.Element {

@@ -1,30 +1,38 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Search,
   Sparkles,
   XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAIGenerations } from "@/lib/hooks/useAIAdmin";
 import type { AIGenerationListItem } from "@/lib/api/ai-admin.api";
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
+
 export function AIGenerationsListContent(): React.JSX.Element {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [feature, setFeature] = useState<string>("");
   const [model, setModel] = useState<string>("");
+  const [instructorId, setInstructorId] = useState<string>("");
   const [onlyUnrated, setOnlyUnrated] = useState(false);
   const [onlyErrors, setOnlyErrors] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [page, setPage] = useState(0);
 
   const { data, isLoading } = useAIGenerations({
     feature: feature || undefined,
@@ -41,16 +49,43 @@ export function AIGenerationsListContent(): React.JSX.Element {
     return Array.from(set).sort();
   }, [rows]);
 
+  const distinctInstructors = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of rows) {
+      if (!r.user_id) continue;
+      if (!map.has(r.user_id)) {
+        map.set(r.user_id, r.user_full_name ?? "(sans nom)");
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
+
   const filtered = rows.filter((r) => {
+    if (instructorId && r.user_id !== instructorId) return false;
     if (!search) return true;
     const s = search.toLowerCase();
     return (
       (r.title?.toLowerCase().includes(s) ?? false) ||
       r.model.toLowerCase().includes(s) ||
       r.feature.toLowerCase().includes(s) ||
+      (r.user_full_name?.toLowerCase().includes(s) ?? false) ||
       r.id.toLowerCase().startsWith(s)
     );
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const paginated = filtered.slice(
+    safePage * pageSize,
+    safePage * pageSize + pageSize,
+  );
+
+  // Reset to first page whenever a filter or page size changes
+  useEffect(() => {
+    setPage(0);
+  }, [search, feature, model, instructorId, onlyUnrated, onlyErrors, pageSize]);
 
   // ── Stats (computed from the loaded rows) ──────────────────────
   const total = rows.length;
@@ -62,7 +97,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Générations IA</h1>
         <p className="text-muted-foreground">
@@ -132,13 +167,13 @@ export function AIGenerationsListContent(): React.JSX.Element {
       </div>
 
       {/* ── FILTER BAR + LIST ──────────────────────────────────── */}
-      <Card>
+      <Card className="min-w-0 overflow-hidden">
         <CardContent className="p-0">
           <div className="space-y-3 border-b p-4">
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Rechercher (titre, modèle, feature, id…)"
+                placeholder="Rechercher (titre, instructeur, modèle, feature, id…)"
                 className="pl-9"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -166,6 +201,18 @@ export function AIGenerationsListContent(): React.JSX.Element {
                 {distinctModels.map((m) => (
                   <option key={m} value={m}>
                     {m}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={instructorId}
+                onChange={(e) => setInstructorId(e.target.value)}
+                className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              >
+                <option value="">Tous instructeurs</option>
+                {distinctInstructors.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
                   </option>
                 ))}
               </select>
@@ -206,23 +253,77 @@ export function AIGenerationsListContent(): React.JSX.Element {
             <div className="flex flex-col items-center gap-2 py-16 text-center">
               <Sparkles className="h-8 w-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                {search || feature || model || onlyUnrated || onlyErrors
+                {search || feature || model || instructorId || onlyUnrated || onlyErrors
                   ? "Aucune génération ne correspond aux filtres"
                   : "Aucune génération pour le moment"}
               </p>
             </div>
           ) : (
-            <div className="divide-y">
-              {filtered.map((r) => (
-                <GenerationRow
-                  key={r.id}
-                  row={r}
-                  onClick={() =>
-                    router.push(`/admin/ai/generations/${r.id}`)
-                  }
-                />
-              ))}
-            </div>
+            <>
+              <div className="divide-y">
+                {paginated.map((r) => (
+                  <GenerationRow
+                    key={r.id}
+                    row={r}
+                    onClick={() =>
+                      router.push(`/admin/ai/generations/${r.id}`)
+                    }
+                  />
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {filtered.length === 0
+                      ? "0 résultat"
+                      : `${safePage * pageSize + 1}–${Math.min(
+                          (safePage + 1) * pageSize,
+                          filtered.length,
+                        )} sur ${filtered.length}`}
+                  </span>
+                  <span aria-hidden>·</span>
+                  <label className="flex items-center gap-1.5">
+                    <span>Afficher</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+                    >
+                      {PAGE_SIZE_OPTIONS.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    Page {safePage + 1} sur {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={safePage === 0}
+                    onClick={() => setPage(Math.max(0, safePage - 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    disabled={safePage >= totalPages - 1}
+                    onClick={() =>
+                      setPage(Math.min(totalPages - 1, safePage + 1))
+                    }
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -265,8 +366,8 @@ function GenerationRow({
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="line-clamp-1 block min-w-0 flex-1 text-sm font-medium">
             {row.title ?? <span className="text-muted-foreground italic">(sans titre)</span>}
           </span>
         </div>
@@ -277,6 +378,11 @@ function GenerationRow({
           <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
             {row.model}
           </span>
+          {row.user_full_name ? (
+            <span className="font-medium text-foreground/80">
+              {row.user_full_name}
+            </span>
+          ) : null}
           <span>
             {formatDistanceToNowStrict(new Date(row.created_at), {
               locale: fr,

@@ -57,7 +57,7 @@ import {
 } from "@/lib/schemas/course.schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { enUS } from "date-fns/locale";
 import {
   ArrowLeft,
   BookOpen,
@@ -177,9 +177,9 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
 
   const onDeleteCourse = (): void => {
     setConfirmDialog({
-      title: "Supprimer ce cours",
-      description: "Cette action est irreversible. Toutes les sections, lecons, exercices et sessions associes seront supprimes.",
-      confirmLabel: "Supprimer le cours",
+      title: "Delete this course",
+      description: "This action is irreversible. All sections, lessons, exercises, and associated sessions will be deleted.",
+      confirmLabel: "Delete course",
       onConfirm: () =>
         deleteCourse(courseId, {
           onSuccess: () => router.push("/instructor/courses"),
@@ -206,9 +206,9 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
   if (!course) {
     return (
       <div className="flex flex-col items-center gap-4 py-16">
-        <p className="text-lg text-muted-foreground">Cours introuvable</p>
+        <p className="text-lg text-muted-foreground">Course not found</p>
         <Link href="/instructor/courses">
-          <Button variant="outline">Retour aux cours</Button>
+          <Button variant="outline">Back to courses</Button>
         </Link>
       </div>
     );
@@ -216,10 +216,10 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
 
   const lessonTypeLabel = (type: string): string =>
     type === "grammar"
-      ? "Grammaire"
+      ? "Grammar"
       : type === "vocabulary"
-        ? "Vocabulaire"
-        : "Ressource";
+        ? "Vocabulary"
+        : "Resource";
 
   const totalLessons = sections?.reduce((acc, s) => acc + (s.lessons?.length ?? 0), 0) ?? 0;
   const totalQuizzes = sections?.reduce((acc, s) => acc + (s.quizzes?.length ?? 0), 0) ?? 0;
@@ -246,7 +246,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                 variant={course.is_published ? "default" : "secondary"}
                 className="capitalize"
               >
-                {course.is_published ? "Publie" : "Brouillon"}
+                {course.is_published ? "Published" : "Draft"}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -265,12 +265,12 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
             {course.is_published ? (
               <>
                 <EyeOff className="mr-1.5 h-4 w-4" />
-                Depublier
+                Unpublish
               </>
             ) : (
               <>
                 <Eye className="mr-1.5 h-4 w-4" />
-                Publier
+                Publish
               </>
             )}
           </Button>
@@ -285,7 +285,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
             className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <BookOpen className="h-4 w-4" />
-            <span className="hidden md:inline">Contenu</span>
+            <span className="hidden md:inline">Content</span>
             <span className="hidden lg:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {sections?.length ?? 0}
             </span>
@@ -305,7 +305,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
             className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <Users className="h-4 w-4" />
-            <span className="hidden md:inline">Etudiants</span>
+            <span className="hidden md:inline">Students</span>
             <span className="hidden lg:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {enrollments?.length ?? 0}
             </span>
@@ -325,7 +325,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
             className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <Settings className="h-4 w-4" />
-            <span className="hidden md:inline">Parametres</span>
+            <span className="hidden md:inline">Settings</span>
           </TabsTrigger>
         </TabsList>
 
@@ -333,9 +333,9 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
         <TabsContent value="content" className="mt-4 space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-lg font-semibold text-amber-950">Contenu du cours</p>
+              <p className="text-lg font-semibold text-amber-950">Course content</p>
               <p className="text-sm text-muted-foreground">
-                {sections?.length ?? 0} section{(sections?.length ?? 0) !== 1 ? "s" : ""} · {totalLessons} lecon{totalLessons !== 1 ? "s" : ""} · {totalQuizzes} quiz{totalQuizzes !== 1 ? "s" : ""}
+                {sections?.length ?? 0} section{(sections?.length ?? 0) !== 1 ? "s" : ""} · {totalLessons} lesson{totalLessons !== 1 ? "s" : ""} · {totalQuizzes} quiz{totalQuizzes !== 1 ? "zes" : ""}
               </p>
             </div>
             <SectionDialog
@@ -344,7 +344,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
               trigger={
                 <Button>
                   <FolderPlus className="mr-1.5 h-4 w-4" />
-                  Ajouter une section
+                  Add section
                 </Button>
               }
             />
@@ -403,10 +403,10 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                 </div>
                 <div>
                   <p className="font-medium text-amber-950">
-                    Aucune section pour le moment
+                    No sections yet
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Creez votre premiere section pour organiser le contenu
+                    Create your first section to organize the content
                   </p>
                 </div>
               </CardContent>
@@ -434,8 +434,8 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                   }
                   onDeleteLesson={(id) =>
                     setConfirmDialog({
-                      title: "Supprimer cette lecon",
-                      description: "Le contenu et les documents associes seront supprimes.",
+                      title: "Delete this lesson",
+                      description: "The content and associated documents will be deleted.",
                       onConfirm: () => deleteLesson(id),
                     })
                   }
@@ -468,16 +468,16 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                   }
                   onDeleteQuiz={(id) =>
                     setConfirmDialog({
-                      title: "Supprimer ce quiz",
-                      description: "Toutes les questions et les tentatives des etudiants seront supprimees.",
+                      title: "Delete this quiz",
+                      description: "All questions and student attempts will be deleted.",
                       onConfirm: () => deleteQuiz(id),
                     })
                   }
                   onDeleteSection={() =>
                     setConfirmDialog({
-                      title: "Supprimer cette section",
-                      description: "Toutes les lecons, exercices et quiz de cette section seront supprimes.",
-                      confirmLabel: "Supprimer la section",
+                      title: "Delete this section",
+                      description: "All lessons, exercises, and quizzes in this section will be deleted.",
+                      confirmLabel: "Delete section",
                       onConfirm: () => deleteSection(section.id),
                     })
                   }
@@ -492,11 +492,10 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
         <TabsContent value="sessions" className="mt-4 space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-lg font-semibold text-amber-950">Sessions en direct</p>
+              <p className="text-lg font-semibold text-amber-950">Live sessions</p>
               <p className="text-sm text-muted-foreground">
                 {course.live_sessions?.length ?? 0} session
-                {(course.live_sessions?.length ?? 0) !== 1 ? "s" : ""} planifiee
-                {(course.live_sessions?.length ?? 0) !== 1 ? "s" : ""}
+                {(course.live_sessions?.length ?? 0) !== 1 ? "s" : ""} scheduled
               </p>
             </div>
             <SessionDialog
@@ -504,7 +503,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
               trigger={
                 <Button>
                   <Plus className="mr-1.5 h-4 w-4" />
-                  Planifier une session
+                  Schedule a session
                 </Button>
               }
             />
@@ -518,10 +517,10 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                 </div>
                 <div>
                   <p className="font-medium text-amber-950">
-                    Aucune session planifiee
+                    No sessions scheduled
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Planifiez votre premiere session en direct
+                    Schedule your first live session
                   </p>
                 </div>
               </CardContent>
@@ -541,7 +540,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                         {format(sessionDate, "d")}
                       </span>
                       <span className="text-[10px] uppercase leading-none">
-                        {format(sessionDate, "MMM", { locale: fr })}
+                        {format(sessionDate, "MMM", { locale: enUS })}
                       </span>
                     </div>
                     <div className="min-w-0 flex-1">
@@ -554,7 +553,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                         </span>
                         {isPast && (
                           <Badge variant="secondary" className="text-[10px]">
-                            Terminee
+                            Ended
                           </Badge>
                         )}
                       </div>
@@ -568,7 +567,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                         >
                           <Button variant="outline" size="sm">
                             <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                            Lien
+                            Link
                           </Button>
                         </a>
                       )}
@@ -581,7 +580,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                           }
                         >
                           <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />
-                          Presence
+                          Attendance
                         </Button>
                       )}
                       <Button
@@ -590,8 +589,8 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                         className="text-muted-foreground hover:text-destructive"
                         onClick={() =>
                           setConfirmDialog({
-                            title: "Supprimer cette session",
-                            description: "La session sera definitivement supprimee.",
+                            title: "Delete this session",
+                            description: "The session will be permanently deleted.",
                             onConfirm: () => deleteSession(session.id),
                           })
                         }
@@ -613,10 +612,10 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
               <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
               <div className="text-sm">
                 <p className="font-medium text-amber-900">
-                  Ce cours est en brouillon
+                  This course is a draft
                 </p>
                 <p className="text-amber-800">
-                  Publiez le cours avant de pouvoir inscrire des etudiants.
+                  Publish the course before enrolling students.
                 </p>
               </div>
             </div>
@@ -624,9 +623,9 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-lg font-semibold text-amber-950">Etudiants inscrits</p>
+              <p className="text-lg font-semibold text-amber-950">Enrolled students</p>
               <p className="text-sm text-muted-foreground">
-                {enrollments?.length ?? 0} etudiant
+                {enrollments?.length ?? 0} student
                 {(enrollments?.length ?? 0) !== 1 ? "s" : ""}
               </p>
             </div>
@@ -636,7 +635,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
               trigger={
                 <Button>
                   <UserPlus className="mr-1.5 h-4 w-4" />
-                  Ajouter un etudiant
+                  Add student
                 </Button>
               }
             />
@@ -650,12 +649,12 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                 </div>
                 <div>
                   <p className="font-medium text-amber-950">
-                    Aucun etudiant inscrit
+                    No students enrolled
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {course.is_published
-                      ? "Ajoutez des etudiants pour qu'ils accedent au cours"
-                      : "Publiez d'abord le cours pour pouvoir inscrire des etudiants"}
+                      ? "Add students so they can access the course"
+                      : "Publish the course first to enroll students"}
                   </p>
                 </div>
               </CardContent>
@@ -680,9 +679,9 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                       {enrollment.profiles.full_name}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Inscrit le{" "}
-                      {format(new Date(enrollment.enrolled_at), "d MMMM yyyy", {
-                        locale: fr,
+                      Enrolled on{" "}
+                      {format(new Date(enrollment.enrolled_at), "MMMM d, yyyy", {
+                        locale: enUS,
                       })}
                     </p>
                   </div>
@@ -692,18 +691,18 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                     className="shrink-0 text-muted-foreground hover:text-destructive"
                     onClick={() =>
                       setConfirmDialog({
-                        title: "Retirer l'etudiant",
+                        title: "Remove student",
                         description: (
                           <span className="space-y-1">
                             <span className="block">
-                              Retirer {enrollment.profiles.full_name} de ce cours ?
+                              Remove {enrollment.profiles.full_name} from this course?
                             </span>
                             <span className="block text-xs text-muted-foreground">
-                              L&apos;historique (quiz, lecons, presence) est conserve. Vous pourrez le reinscrire a tout moment.
+                              History (quizzes, lessons, attendance) is preserved. You can re-enroll them at any time.
                             </span>
                           </span>
                         ),
-                        confirmLabel: "Retirer",
+                        confirmLabel: "Remove",
                         onConfirm: () =>
                           removeStudent({ courseId, studentId: enrollment.student_id }),
                       })
@@ -731,10 +730,10 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle className="text-amber-950">
-                Modifier le cours
+                Edit course
               </CardTitle>
               <CardDescription>
-                Mettez a jour les informations de base du cours
+                Update the course's basic information
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -743,7 +742,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                 className="space-y-4"
               >
                 <div className="space-y-2">
-                  <Label>Titre</Label>
+                  <Label>Title</Label>
                   <Input {...editForm.register("title")} />
                   {editForm.formState.errors.title && (
                     <p className="text-xs text-destructive">
@@ -761,7 +760,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label>Niveau CECRL</Label>
+                  <Label>CEFR level</Label>
                   <Select
                     value={editLevel}
                     onValueChange={(v) =>
@@ -785,8 +784,8 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                 </div>
                 <Button type="submit" disabled={isUpdating}>
                   {isUpdating
-                    ? "Enregistrement..."
-                    : "Enregistrer les modifications"}
+                    ? "Saving..."
+                    : "Save changes"}
                 </Button>
               </form>
             </CardContent>
@@ -797,16 +796,16 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
           <Card className="border-destructive/50">
             <CardHeader>
               <CardTitle className="text-destructive">
-                Zone dangereuse
+                Danger zone
               </CardTitle>
               <CardDescription>
-                Ces actions sont irreversibles. Procedez avec precaution.
+                These actions are irreversible. Proceed with caution.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button variant="destructive" onClick={onDeleteCourse}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                Supprimer definitivement ce cours
+                Permanently delete this course
               </Button>
             </CardContent>
           </Card>
@@ -890,7 +889,7 @@ function SectionCard({
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-amber-950">{section.title}</p>
           <p className="text-xs text-muted-foreground">
-            {section.lessons?.length ?? 0} lecon{(section.lessons?.length ?? 0) !== 1 ? "s" : ""} · {section.quizzes?.length ?? 0} quiz{(section.quizzes?.length ?? 0) !== 1 ? "s" : ""}
+            {section.lessons?.length ?? 0} lesson{(section.lessons?.length ?? 0) !== 1 ? "s" : ""} · {section.quizzes?.length ?? 0} quiz{(section.quizzes?.length ?? 0) !== 1 ? "zes" : ""}
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -901,7 +900,7 @@ function SectionCard({
             onClick={onAddLesson}
           >
             <BookOpen className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Lecon</span>
+            <span className="hidden sm:inline">Lesson</span>
           </Button>
           <Button
             variant="ghost"
@@ -920,12 +919,12 @@ function SectionCard({
             disabled={(section.lessons?.length ?? 0) === 0}
             title={
               (section.lessons?.length ?? 0) === 0
-                ? "Ajoutez au moins une leçon pour générer avec l'IA"
-                : "Générer un quiz avec l'IA"
+                ? "Add at least one lesson to generate with AI"
+                : "Generate a quiz with AI"
             }
           >
             <Sparkles className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Quiz IA</span>
+            <span className="hidden sm:inline">AI quiz</span>
           </Button>
           <Button
             variant="ghost"
@@ -981,7 +980,7 @@ function SectionCard({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            title="Modifier le contenu"
+                            title="Edit content"
                             onClick={() => onEditLesson(lesson)}
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -1016,7 +1015,7 @@ function SectionCard({
                             Quiz
                           </Badge>
                           <Badge variant="outline" className="text-[10px]">
-                            {quiz.quiz_blocks?.length ?? 0} bloc{(quiz.quiz_blocks?.length ?? 0) !== 1 ? "s" : ""}
+                            {quiz.quiz_blocks?.length ?? 0} block{(quiz.quiz_blocks?.length ?? 0) !== 1 ? "s" : ""}
                           </Badge>
                           {quiz.time_limit_minutes && (
                             <Badge variant="outline" className="text-[10px]">
@@ -1030,7 +1029,7 @@ function SectionCard({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          title="Apercu etudiant"
+                          title="Student preview"
                           onClick={() => onPreviewQuiz(quiz)}
                         >
                           <Eye className="h-3.5 w-3.5" />
@@ -1039,7 +1038,7 @@ function SectionCard({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          title="Modifier le quiz"
+                          title="Edit quiz"
                           onClick={() => onEditQuiz(quiz)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -1048,7 +1047,7 @@ function SectionCard({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          title="Dupliquer le quiz"
+                          title="Duplicate quiz"
                           onClick={() => onDuplicateQuiz(quiz)}
                         >
                           <Copy className="h-3.5 w-3.5" />
@@ -1073,7 +1072,7 @@ function SectionCard({
           {!section.lessons?.length && !section.quizzes?.length && (
             <div className="px-4 py-8 text-center">
               <p className="text-sm text-muted-foreground">
-                Cette section est vide. Ajoutez des lecons, des exercices ou des quiz.
+                This section is empty. Add lessons, exercises, or quizzes.
               </p>
             </div>
           )}

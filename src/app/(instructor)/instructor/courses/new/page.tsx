@@ -47,25 +47,25 @@ export default function NewCoursePage(): React.JSX.Element {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Nouveau cours</h1>
-          <p className="text-muted-foreground">Creez un nouveau cours pour vos etudiants</p>
+          <h1 className="text-2xl font-bold">New course</h1>
+          <p className="text-muted-foreground">Create a new course for your students</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Details du cours</CardTitle>
+          <CardTitle>Course details</CardTitle>
           <CardDescription>
-            Remplissez les informations de base. Vous pourrez ajouter des lecons et des sessions apres la creation.
+            Fill in the basic information. You can add lessons and sessions after creation.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Titre du cours</Label>
+              <Label htmlFor="title">Course title</Label>
               <Input
                 id="title"
-                placeholder="ex: English for Beginners"
+                placeholder="e.g. English for Beginners"
                 {...form.register("title")}
               />
               {form.formState.errors.title && (
@@ -77,7 +77,7 @@ export default function NewCoursePage(): React.JSX.Element {
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                placeholder="Decrivez le contenu et les objectifs du cours..."
+                placeholder="Describe the course content and goals..."
                 rows={4}
                 {...form.register("description")}
               />
@@ -87,13 +87,13 @@ export default function NewCoursePage(): React.JSX.Element {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="level">Niveau</Label>
+              <Label htmlFor="level">Level</Label>
               <Select
                 value={selectedLevel}
                 onValueChange={(value) => form.setValue("level", value as CreateCourseInput["level"])}
               >
                 <SelectTrigger id="level">
-                  <SelectValue placeholder="Selectionner un niveau" />
+                  <SelectValue placeholder="Select a level" />
                 </SelectTrigger>
                 <SelectContent>
                   {CEFR_LEVELS.map((level) => (
@@ -110,11 +110,11 @@ export default function NewCoursePage(): React.JSX.Element {
 
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={isPending}>
-                {isPending ? "Creation..." : "Creer le cours"}
+                {isPending ? "Creating..." : "Create course"}
               </Button>
               <Link href="/instructor/courses">
                 <Button type="button" variant="outline">
-                  Annuler
+                  Cancel
                 </Button>
               </Link>
             </div>

@@ -23,7 +23,7 @@ import {
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { format, formatDistanceToNowStrict } from "date-fns";
-import { fr } from "date-fns/locale";
+import { enUS } from "date-fns/locale";
 import type { CEFRLevel } from "@/lib/types";
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -34,10 +34,10 @@ function activityTone(lastActiveAt: string | null): {
   dot: string;
 } {
   if (!lastActiveAt) {
-    return { label: "Jamais actif", color: "text-muted-foreground", dot: "text-muted-foreground/40" };
+    return { label: "Never active", color: "text-muted-foreground", dot: "text-muted-foreground/40" };
   }
   const days = (Date.now() - new Date(lastActiveAt).getTime()) / (1000 * 60 * 60 * 24);
-  const rel = formatDistanceToNowStrict(new Date(lastActiveAt), { locale: fr, addSuffix: true });
+  const rel = formatDistanceToNowStrict(new Date(lastActiveAt), { locale: enUS, addSuffix: true });
   if (days <= 3) return { label: rel, color: "text-emerald-700", dot: "text-emerald-500 fill-emerald-500" };
   if (days <= 14) return { label: rel, color: "text-amber-700", dot: "text-amber-500 fill-amber-500" };
   return { label: rel, color: "text-rose-700", dot: "text-rose-500 fill-rose-500" };
@@ -98,8 +98,8 @@ export default function InstructorStudentsPage(): React.JSX.Element {
         {/* Page header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-amber-950">Etudiants</h1>
-            <p className="text-muted-foreground">Vue d&apos;ensemble de vos etudiants par cours</p>
+            <h1 className="text-2xl font-bold tracking-tight text-amber-950">Students</h1>
+            <p className="text-muted-foreground">Overview of your students by course</p>
           </div>
           <div className="self-start sm:self-auto">
             <CreateStudentDialog />
@@ -110,7 +110,7 @@ export default function InstructorStudentsPage(): React.JSX.Element {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <div className="col-span-2 flex flex-col justify-between rounded-xl border bg-primary p-5 text-primary-foreground">
             <div className="flex items-start justify-between">
-              <p className="text-sm font-medium opacity-80">Etudiants uniques</p>
+              <p className="text-sm font-medium opacity-80">Unique students</p>
               <GraduationCap className="h-5 w-5 opacity-60" />
             </div>
             {isLoading ? (
@@ -119,14 +119,14 @@ export default function InstructorStudentsPage(): React.JSX.Element {
               <>
                 <p className="mt-1 text-4xl font-bold tracking-tight">{totalStudents}</p>
                 <p className="text-sm opacity-70">
-                  {totalEnrollments} inscription{totalEnrollments !== 1 ? "s" : ""} au total
+                  {totalEnrollments} enrollment{totalEnrollments !== 1 ? "s" : ""} total
                 </p>
               </>
             )}
           </div>
           <div className="flex flex-col justify-between rounded-xl border bg-card p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Cours actifs</p>
+              <p className="text-sm font-medium text-muted-foreground">Active courses</p>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </div>
             {isLoading ? (
@@ -137,7 +137,7 @@ export default function InstructorStudentsPage(): React.JSX.Element {
           </div>
           <div className="flex flex-col justify-between rounded-xl border bg-card p-5">
             <div className="flex items-start justify-between">
-              <p className="text-sm font-medium text-muted-foreground">Cours total</p>
+              <p className="text-sm font-medium text-muted-foreground">Total courses</p>
               <Users className="h-4 w-4 text-muted-foreground" />
             </div>
             {isLoading ? (
@@ -169,9 +169,9 @@ export default function InstructorStudentsPage(): React.JSX.Element {
               ) : !courses?.length ? (
                 <div className="flex flex-col items-center gap-3 rounded-xl border bg-card py-16 text-center">
                   <BookOpen className="h-10 w-10 text-muted-foreground" />
-                  <p className="text-muted-foreground">Aucun cours cree pour le moment</p>
+                  <p className="text-muted-foreground">No courses created yet</p>
                   <Link href="/instructor/courses/new">
-                    <Button variant="outline" size="sm">Creer un cours</Button>
+                    <Button variant="outline" size="sm">Create a course</Button>
                   </Link>
                 </div>
               ) : (
@@ -191,7 +191,7 @@ export default function InstructorStudentsPage(): React.JSX.Element {
                         </Link>
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        {course.students.length} etudiant{course.students.length !== 1 ? "s" : ""}
+                        {course.students.length} student{course.students.length !== 1 ? "s" : ""}
                       </span>
                     </div>
 
@@ -199,7 +199,7 @@ export default function InstructorStudentsPage(): React.JSX.Element {
                     {course.students.length === 0 ? (
                       <div className="flex items-center gap-2 px-5 py-5 text-sm text-muted-foreground">
                         <Users className="h-4 w-4" />
-                        Aucun etudiant inscrit
+                        No students enrolled
                       </div>
                     ) : (
                       <div className="divide-y">
@@ -235,7 +235,7 @@ export default function InstructorStudentsPage(): React.JSX.Element {
                                   <p className="truncate text-sm font-medium">{student.fullName}</p>
                                   <div className={`flex items-center gap-1.5 text-xs ${tone.color}`}>
                                     <Circle className={`h-2 w-2 ${tone.dot}`} strokeWidth={0} />
-                                    <span className="truncate">Actif {tone.label}</span>
+                                    <span className="truncate">Active {tone.label}</span>
                                   </div>
                                 </div>
                               </button>
@@ -284,20 +284,20 @@ export default function InstructorStudentsPage(): React.JSX.Element {
       <ConfirmDialog
         open={!!confirmRemove}
         onOpenChange={(open) => { if (!open) setConfirmRemove(null); }}
-        title="Retirer l'etudiant"
+        title="Remove student"
         description={
           confirmRemove ? (
             <span className="space-y-1">
               <span className="block">
-                Retirer {confirmRemove.studentName} du cours &quot;{confirmRemove.courseTitle}&quot; ?
+                Remove {confirmRemove.studentName} from the course &quot;{confirmRemove.courseTitle}&quot;?
               </span>
               <span className="block text-xs text-muted-foreground">
-                L&apos;historique de l&apos;etudiant (quiz, lecons, presence) est conserve. Vous pourrez le reinscrire a tout moment.
+                The student&apos;s history (quizzes, lessons, attendance) is preserved. You can re-enroll them at any time.
               </span>
             </span>
           ) : ""
         }
-        confirmLabel="Retirer"
+        confirmLabel="Remove"
         isPending={isRemoving}
         onConfirm={() => {
           if (!confirmRemove) return;
@@ -395,10 +395,10 @@ function StudentDetailPanel({
         {/* Activity pill */}
         <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${tone.color}`}>
           <Circle className={`h-2 w-2 ${tone.dot}`} strokeWidth={0} />
-          <span>Actif {tone.label}</span>
+          <span>Active {tone.label}</span>
           {data.enrollment?.enrolledAt && (
             <span className="text-muted-foreground">
-              · inscrit {format(new Date(data.enrollment.enrolledAt), "d MMM yyyy", { locale: fr })}
+              · enrolled {format(new Date(data.enrollment.enrolledAt), "MMM d, yyyy", { locale: enUS })}
             </span>
           )}
         </div>
@@ -406,25 +406,25 @@ function StudentDetailPanel({
         {/* Metric cards — 2x2 bento grid */}
         <div className="grid grid-cols-2 gap-3">
           <MetricCard
-            label="Lecons terminees"
+            label="Lessons completed"
             value={`${completedCount} / ${data.totals.lessonCount}`}
             pct={completionPct}
             icon={<BookOpen className="h-3.5 w-3.5" />}
           />
           <MetricCard
-            label="Quiz participes"
+            label="Quizzes taken"
             value={`${quizAttempted} / ${data.totals.quizCount}`}
             pct={quizParticipationPct}
             icon={<ClipboardCheck className="h-3.5 w-3.5" />}
           />
           <MetricCard
-            label="Score moyen"
+            label="Average score"
             value={avgPct !== null ? `${avgPct}%` : "—"}
             pct={avgPct}
             icon={<ClipboardCheck className="h-3.5 w-3.5" />}
           />
           <MetricCard
-            label="Presence"
+            label="Attendance"
             value={attendancePct !== null ? `${attendedCount} / ${data.attendance.length}` : "—"}
             pct={attendancePct}
             icon={<Calendar className="h-3.5 w-3.5" />}
@@ -436,29 +436,29 @@ function StudentDetailPanel({
           {/* Quiz attempts */}
           <Card className="border-0 shadow-none bg-muted/30">
             <CardHeader className="pb-2 px-4 pt-4">
-              <CardTitle className="text-sm">Tentatives de quiz</CardTitle>
+              <CardTitle className="text-sm">Quiz attempts</CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
               {data.attempts.length === 0 ? (
-                <p className="py-4 text-center text-xs text-muted-foreground">Aucune tentative</p>
+                <p className="py-4 text-center text-xs text-muted-foreground">No attempts</p>
               ) : (
                 <div className="max-h-56 space-y-0.5 overflow-y-auto">
                   {data.attempts.map((a) => {
                     const pct = a.finalScore !== null ? Math.round(a.finalScore) : null;
                     const statusLabel =
                       a.status === "graded"
-                        ? "Note"
+                        ? "Graded"
                         : a.status === "pending_review" || a.status === "submitted"
-                          ? "En attente"
-                          : "En cours";
+                          ? "Pending"
+                          : "In progress";
                     return (
                       <div key={a.id} className="flex items-center justify-between rounded-md px-2 py-2 hover:bg-background/60">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-medium">{a.quizTitle}</p>
                           <p className="text-[11px] text-muted-foreground">
                             {a.submittedAt
-                              ? format(new Date(a.submittedAt), "d MMM yyyy", { locale: fr })
-                              : "En cours"}
+                              ? format(new Date(a.submittedAt), "MMM d, yyyy", { locale: enUS })
+                              : "In progress"}
                             {" · "}
                             {statusLabel}
                           </p>
@@ -477,11 +477,11 @@ function StudentDetailPanel({
           {/* Session attendance */}
           <Card className="border-0 shadow-none bg-muted/30">
             <CardHeader className="pb-2 px-4 pt-4">
-              <CardTitle className="text-sm">Presence</CardTitle>
+              <CardTitle className="text-sm">Attendance</CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
               {data.attendance.length === 0 ? (
-                <p className="py-4 text-center text-xs text-muted-foreground">Aucune session</p>
+                <p className="py-4 text-center text-xs text-muted-foreground">No sessions</p>
               ) : (
                 <div className="max-h-56 space-y-0.5 overflow-y-auto">
                   {data.attendance
@@ -493,7 +493,7 @@ function StudentDetailPanel({
                           <p className="truncate text-xs font-medium">{row.sessionTitle}</p>
                           <p className="text-[11px] text-muted-foreground">
                             {row.scheduledAt
-                              ? format(new Date(row.scheduledAt), "d MMM yyyy", { locale: fr })
+                              ? format(new Date(row.scheduledAt), "MMM d, yyyy", { locale: enUS })
                               : ""}
                           </p>
                         </div>

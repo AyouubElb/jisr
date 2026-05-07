@@ -20,7 +20,7 @@ import {
   Users,
 } from "lucide-react";
 import { format, formatDistanceToNowStrict } from "date-fns";
-import { fr } from "date-fns/locale";
+import { enUS } from "date-fns/locale";
 import Link from "next/link";
 import type { CEFRLevel } from "@/lib/types";
 
@@ -72,10 +72,10 @@ function getAtRiskStudents(
 
 function activityLabel(lastActiveAt: string | null): { text: string; color: string; dot: string } {
   if (!lastActiveAt) {
-    return { text: "Jamais actif", color: "text-rose-700", dot: "text-rose-500 fill-rose-500" };
+    return { text: "Never active", color: "text-rose-700", dot: "text-rose-500 fill-rose-500" };
   }
   const days = (Date.now() - new Date(lastActiveAt).getTime()) / (1000 * 60 * 60 * 24);
-  const rel = formatDistanceToNowStrict(new Date(lastActiveAt), { locale: fr, addSuffix: true });
+  const rel = formatDistanceToNowStrict(new Date(lastActiveAt), { locale: enUS, addSuffix: true });
   if (days >= 30) return { text: rel, color: "text-rose-700", dot: "text-rose-500 fill-rose-500" };
   return { text: rel, color: "text-amber-700", dot: "text-amber-500 fill-amber-500" };
 }
@@ -95,13 +95,13 @@ export default function InstructorDashboardPage(): React.JSX.Element {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-amber-950">Tableau de bord</h1>
-          <p className="text-muted-foreground">Gerez vos cours et suivez vos etudiants</p>
+          <h1 className="text-2xl font-bold tracking-tight text-amber-950">Dashboard</h1>
+          <p className="text-muted-foreground">Manage your courses and track your students</p>
         </div>
         <Link href="/instructor/courses/new" className="self-start sm:self-auto">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
-            Nouveau cours
+            New course
           </Button>
         </Link>
       </div>
@@ -109,25 +109,25 @@ export default function InstructorDashboardPage(): React.JSX.Element {
       {/* ── STAT CARDS ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard
-          label="Cours publies"
+          label="Published courses"
           value={publishedCount}
           icon={<BookOpen className="h-4 w-4" />}
           loading={coursesLoading}
         />
         <StatCard
-          label="Brouillons"
+          label="Drafts"
           value={draftCount}
           icon={<BookOpen className="h-4 w-4" />}
           loading={coursesLoading}
         />
         <StatCard
-          label="Etudiants"
+          label="Students"
           value={totalStudents}
           icon={<Users className="h-4 w-4" />}
           loading={enrollmentsLoading}
         />
         <StatCard
-          label="Sessions a venir"
+          label="Upcoming sessions"
           value={sessions?.length ?? 0}
           icon={<Calendar className="h-4 w-4" />}
           loading={sessionsLoading}
@@ -141,10 +141,10 @@ export default function InstructorDashboardPage(): React.JSX.Element {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <CardTitle className="text-base">Etudiants a risque</CardTitle>
+              <CardTitle className="text-base">At-risk students</CardTitle>
             </div>
             <CardDescription>
-              Inactifs depuis {AT_RISK_DAYS}+ jours
+              Inactive for {AT_RISK_DAYS}+ days
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -158,7 +158,7 @@ export default function InstructorDashboardPage(): React.JSX.Element {
               <div className="flex flex-col items-center gap-2 py-8 text-center">
                 <CheckCircle2 className="h-8 w-8 text-emerald-500" />
                 <p className="text-sm text-muted-foreground">
-                  Tous vos etudiants sont actifs
+                  All your students are active
                 </p>
               </div>
             ) : (
@@ -196,7 +196,7 @@ export default function InstructorDashboardPage(): React.JSX.Element {
                   href="/instructor/students"
                   className="block pt-2 text-center text-sm text-primary hover:underline"
                 >
-                  Voir tous les etudiants
+                  View all students
                 </Link>
               </div>
             )}
@@ -208,16 +208,16 @@ export default function InstructorDashboardPage(): React.JSX.Element {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base">Activite recente</CardTitle>
+                <CardTitle className="text-base">Recent activity</CardTitle>
                 <CardDescription>
-                  Dernieres actions de vos etudiants
+                  Latest actions from your students
                 </CardDescription>
               </div>
               <Link
                 href="/instructor/activite"
                 className="text-xs text-primary hover:underline"
               >
-                Voir tout
+                View all
               </Link>
             </div>
           </CardHeader>
@@ -232,7 +232,7 @@ export default function InstructorDashboardPage(): React.JSX.Element {
               <div className="flex flex-col items-center gap-2 py-8 text-center">
                 <ClipboardCheck className="h-8 w-8 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  Aucune activite pour le moment
+                  No activity yet
                 </p>
               </div>
             ) : (
@@ -260,8 +260,8 @@ export default function InstructorDashboardPage(): React.JSX.Element {
                         <span className="font-medium">{item.studentName}</span>
                         {" "}
                         {item.type === "lesson_completed"
-                          ? "a termine la lecon"
-                          : "a soumis le quiz"}
+                          ? "completed the lesson"
+                          : "submitted the quiz"}
                         {" "}
                         <span className="font-medium">{item.label}</span>
                       </p>
@@ -270,7 +270,7 @@ export default function InstructorDashboardPage(): React.JSX.Element {
                         <span>&middot;</span>
                         <span>
                           {formatDistanceToNowStrict(new Date(item.timestamp), {
-                            locale: fr,
+                            locale: enUS,
                             addSuffix: true,
                           })}
                         </span>
@@ -289,8 +289,8 @@ export default function InstructorDashboardPage(): React.JSX.Element {
         {/* Recent courses — spans 3 cols */}
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle className="text-base">Mes cours</CardTitle>
-            <CardDescription>Vos cours recents</CardDescription>
+            <CardTitle className="text-base">My courses</CardTitle>
+            <CardDescription>Your recent courses</CardDescription>
           </CardHeader>
           <CardContent>
             {coursesLoading ? (
@@ -302,11 +302,11 @@ export default function InstructorDashboardPage(): React.JSX.Element {
             ) : !courses?.length ? (
               <div className="flex flex-col items-center gap-3 py-8 text-center">
                 <BookOpen className="h-10 w-10 text-muted-foreground" />
-                <p className="text-muted-foreground">Aucun cours pour le moment</p>
+                <p className="text-muted-foreground">No courses yet</p>
                 <Link href="/instructor/courses/new">
                   <Button variant="outline" size="sm">
                     <Plus className="mr-2 h-4 w-4" />
-                    Creer un cours
+                    Create a course
                   </Button>
                 </Link>
               </div>
@@ -330,7 +330,7 @@ export default function InstructorDashboardPage(): React.JSX.Element {
                       </div>
                     </div>
                     <Badge variant={course.is_published ? "default" : "secondary"} className="shrink-0">
-                      {course.is_published ? "Publie" : "Brouillon"}
+                      {course.is_published ? "Published" : "Draft"}
                     </Badge>
                   </Link>
                 ))}
@@ -342,8 +342,8 @@ export default function InstructorDashboardPage(): React.JSX.Element {
         {/* Upcoming sessions — spans 2 cols */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Sessions a venir</CardTitle>
-            <CardDescription>Vos prochaines sessions</CardDescription>
+            <CardTitle className="text-base">Upcoming sessions</CardTitle>
+            <CardDescription>Your next sessions</CardDescription>
           </CardHeader>
           <CardContent>
             {sessionsLoading ? (
@@ -355,7 +355,7 @@ export default function InstructorDashboardPage(): React.JSX.Element {
             ) : !sessions?.length ? (
               <div className="flex flex-col items-center gap-3 py-8 text-center">
                 <Calendar className="h-8 w-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Aucune session planifiee</p>
+                <p className="text-sm text-muted-foreground">No sessions scheduled</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -368,7 +368,7 @@ export default function InstructorDashboardPage(): React.JSX.Element {
                       <p className="truncate text-sm font-medium">{session.title}</p>
                       <p className="text-xs text-muted-foreground">
                         {session.courses?.title} &middot;{" "}
-                        {format(new Date(session.scheduled_at), "EEE d MMM 'a' HH:mm", { locale: fr })}
+                        {format(new Date(session.scheduled_at), "EEE MMM d 'at' HH:mm", { locale: enUS })}
                       </p>
                     </div>
                     <a
@@ -378,7 +378,7 @@ export default function InstructorDashboardPage(): React.JSX.Element {
                       className="shrink-0"
                     >
                       <Button variant="outline" size="sm">
-                        Rejoindre
+                        Join
                       </Button>
                     </a>
                   </div>
