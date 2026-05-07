@@ -106,7 +106,9 @@ export function RichTextEditor({
 
   const isDiffMode = diffContent != null;
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
   // Latest HTML the editor matches — used to skip echo emits.
   const lastSyncedHtml = useRef(content);
 

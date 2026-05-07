@@ -733,7 +733,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                 Edit course
               </CardTitle>
               <CardDescription>
-                Update the course's basic information
+                Update the course&apos;s basic information
               </CardDescription>
             </CardHeader>
             <CardContent>

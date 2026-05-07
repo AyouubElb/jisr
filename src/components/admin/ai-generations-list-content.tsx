@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
@@ -75,17 +75,20 @@ export function AIGenerationsListContent(): React.JSX.Element {
     );
   });
 
+  // Reset to page 0 on filter change (render-time, not an effect).
+  const filterKey = `${search}|${feature}|${model}|${instructorId}|${onlyUnrated}|${onlyErrors}|${pageSize}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(0);
+  }
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
   const paginated = filtered.slice(
     safePage * pageSize,
     safePage * pageSize + pageSize,
   );
-
-  // Reset to first page whenever a filter or page size changes
-  useEffect(() => {
-    setPage(0);
-  }, [search, feature, model, instructorId, onlyUnrated, onlyErrors, pageSize]);
 
   // ── Stats (computed from the loaded rows) ──────────────────────
   const total = rows.length;
