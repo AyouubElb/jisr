@@ -1,6 +1,11 @@
 import { generateObject, NoObjectGeneratedError } from "ai";
 import { getModel, getProvider } from "../client";
-import { DEFAULT_MODEL, PROMPT_VERSIONS, type ModelKey } from "../constants";
+import {
+  DEFAULT_MODEL,
+  MAX_OUTPUT_TOKENS,
+  PROMPT_VERSIONS,
+  type ModelKey,
+} from "../constants";
 import { hashPromptInput } from "../hash";
 import { cheapRepair } from "../repair";
 import { AIGenerationError } from "../types";
@@ -48,6 +53,7 @@ export const routeQuizEdit = async (
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0,
+      maxOutputTokens: MAX_OUTPUT_TOKENS.quiz_edit,
       experimental_repairText: async ({ text }) => {
         const cheap = cheapRepair(text);
         return cheap !== text ? cheap : null;

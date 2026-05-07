@@ -99,3 +99,29 @@ export const countGenerationsThisMonth = async (
   }
   return count ?? 0;
 };
+
+/**
+ * Sum of `cost_cents` across all ai_generations rows for this user in the
+ * current calendar month, regardless of feature. Used to enforce the hard
+ * $-budget cap.
+ */
+export const sumCostCentsThisMonth = async (
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<number> => {
+  const start = new Date();
+  start.setUTCDate(1);
+  start.setUTCHours(0, 0, 0, 0);
+
+  const { data, error } = await supabase
+    .from("ai_generations")
+    .select("cost_cents")
+    .eq("user_id", userId)
+    .gte("created_at", start.toISOString());
+
+  if (error) {
+    console.error("[ai.telemetry] cost sum failed:", error.message);
+    return 0;
+  }
+  return (data ?? []).reduce((sum, row) => sum + (row.cost_cents ?? 0), 0);
+};

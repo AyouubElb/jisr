@@ -104,3 +104,8 @@ export const aiAdminKeys = {
   evaluation: (generationId: string) =>
     [...aiAdminKeys.all, "evaluation", generationId] as const,
 };
+
+export const aiUsageKeys = {
+  all: ["ai-usage"] as const,
+  mine: () => [...aiUsageKeys.all, "mine"] as const,
+};

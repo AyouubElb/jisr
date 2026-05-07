@@ -15,6 +15,8 @@ export const AI_FEATURES = [
   "voice_grade",
   "intervention_suggest",
   "lesson_outline",
+  "lesson_edit",
+  "lesson_gen",
 ] as const;
 export type AIFeature = (typeof AI_FEATURES)[number];
 
@@ -57,6 +59,21 @@ export class AIQuotaExceededError extends Error {
       `Vous avez atteint votre limite mensuelle de générations IA (${usedCount}/${limit}).`,
     );
     this.name = "AIQuotaExceededError";
+  }
+}
+
+export class AICostBudgetExceededError extends Error {
+  readonly code = "AI_COST_BUDGET_EXCEEDED";
+  constructor(
+    public usedCents: number,
+    public budgetCents: number,
+  ) {
+    const usedDollars = (usedCents / 100).toFixed(2);
+    const budgetDollars = (budgetCents / 100).toFixed(2);
+    super(
+      `Vous avez atteint votre budget mensuel IA ($${usedDollars}/$${budgetDollars}).`,
+    );
+    this.name = "AICostBudgetExceededError";
   }
 }
 

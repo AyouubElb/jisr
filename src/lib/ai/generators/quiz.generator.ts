@@ -1,6 +1,11 @@
 import { generateObject, generateText, NoObjectGeneratedError } from "ai";
 import { getModel, getProvider } from "../client";
-import { DEFAULT_MODEL, PROMPT_VERSIONS, type ModelKey } from "../constants";
+import {
+  DEFAULT_MODEL,
+  MAX_OUTPUT_TOKENS,
+  PROMPT_VERSIONS,
+  type ModelKey,
+} from "../constants";
 import { hashPromptInput } from "../hash";
 import { cheapRepair } from "../repair";
 import { AIGenerationError } from "../types";
@@ -56,6 +61,7 @@ export const generateQuiz = async (
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0.4,
+      maxOutputTokens: MAX_OUTPUT_TOKENS.quiz_gen,
       experimental_repairText: async ({ text, error }) => {
         repairAttempts += 1;
         if (repairAttempts > 2) return null;
@@ -77,6 +83,7 @@ ${text}
 
 Return the corrected JSON only. Keep as much of the original content as possible — fix only what the error requires. Do not invent new fields.`,
           temperature: 0,
+          maxOutputTokens: MAX_OUTPUT_TOKENS.quiz_gen,
         });
 
         return cheapRepair(repaired.trim());

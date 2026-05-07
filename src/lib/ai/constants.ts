@@ -5,9 +5,11 @@ import type { AIModelConfig, AIFeature } from "./types";
  * Never edit an existing version in place — add a new one.
  */
 export const PROMPT_VERSIONS = {
-  quiz_gen: "quiz_gen_v9",
+  quiz_gen: "quiz_gen_v10",
   quiz_edit: "quiz_edit_v4",
   quiz_judge: "quiz_judge_v1",
+  lesson_edit: "lesson_edit_v4",
+  lesson_gen: "lesson_gen_v2",
 } as const;
 
 /**
@@ -99,19 +101,35 @@ const isModelKey = (v: string | undefined): v is ModelKey =>
 // Set e.g. AI_QUIZ_MODEL=kimi-k2-6 in .env.local to test.
 const envQuizModel = process.env.AI_QUIZ_MODEL;
 const envQuizEditModel = process.env.AI_QUIZ_EDIT_MODEL;
+const envLessonEditModel = process.env.AI_LESSON_EDIT_MODEL;
+const envLessonGenModel = process.env.AI_LESSON_GEN_MODEL;
 
-/**
- * Default model per feature. Switch via DB/env later; hard-coded today.
- * Stage 1 runs on Gemini Flash free tier.
- */
+// Hard output-token cap per feature. Prevents one runaway response from
+// blowing the per-call budget. Tune up only if real outputs hit the ceiling.
+export const MAX_OUTPUT_TOKENS: Record<AIFeature, number> = {
+  quiz_gen: 4096,
+  quiz_edit: 2048,
+  quiz_judge: 1024,
+  free_text_grade: 1024,
+  voice_grade: 1024,
+  intervention_suggest: 1024,
+  lesson_outline: 2048,
+  lesson_edit: 4096,
+  lesson_gen: 6144,
+};
+
+// Default model per feature. Claude Haiku 4.5 across the board for
+// consistency; env overrides let us A/B without editing this file.
 export const DEFAULT_MODEL: Record<AIFeature, ModelKey> = {
-  quiz_gen: isModelKey(envQuizModel) ? envQuizModel : "gemini-2.5-flash-lite-direct",
+  quiz_gen: isModelKey(envQuizModel) ? envQuizModel : "claude-haiku-4-5",
   quiz_edit: isModelKey(envQuizEditModel) ? envQuizEditModel : "claude-haiku-4-5",
   quiz_judge: "claude-haiku-4-5",
-  free_text_grade: "gemini-2.5-flash-lite",
-  voice_grade: "gemini-2.5-flash-lite",
-  intervention_suggest: "gemini-2.5-flash-lite",
-  lesson_outline: "gemini-2.5-flash-lite",
+  free_text_grade: "claude-haiku-4-5",
+  voice_grade: "claude-haiku-4-5",
+  intervention_suggest: "claude-haiku-4-5",
+  lesson_outline: "claude-haiku-4-5",
+  lesson_edit: isModelKey(envLessonEditModel) ? envLessonEditModel : "claude-haiku-4-5",
+  lesson_gen: isModelKey(envLessonGenModel) ? envLessonGenModel : "claude-haiku-4-5",
 };
 
 /**
@@ -131,6 +149,8 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
     voice_grade: 5,
     intervention_suggest: 5,
     lesson_outline: 3,
+    lesson_edit: 30,
+    lesson_gen: 5,
   },
   pro: {
     quiz_gen: 200,
@@ -140,6 +160,8 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
     voice_grade: 100,
     intervention_suggest: 100,
     lesson_outline: 50,
+    lesson_edit: 600,
+    lesson_gen: 100,
   },
   studio: {
     quiz_gen: 1000,
@@ -149,6 +171,8 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
     voice_grade: 500,
     intervention_suggest: 500,
     lesson_outline: 300,
+    lesson_edit: 3000,
+    lesson_gen: 500,
   },
 };
 
@@ -158,3 +182,24 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
  * Replace with profile lookup when pricing ships.
  */
 export const DEFAULT_TIER: Tier = "studio";
+
+// ── Quiz generation caps (enforced server-side in route; mirrored in dialog for UX) ──
+export const QUIZ_GEN_MAX_LESSONS = 1;
+export const QUIZ_GEN_MAX_DIRECT_QUESTIONS = 8;
+export const QUIZ_GEN_MAX_PASSAGES_PER_TYPE = 1;
+
+// ── TTS voice mapping ─────────────────────────────────────────────────────────────────
+export const VOICE_BY_HINT: Record<string, { voiceId: string; speed: number }> = {
+  neutral_female: { voiceId: "nova", speed: 1.0 },
+  neutral_male: { voiceId: "onyx", speed: 1.0 },
+  slow_clear: { voiceId: "nova", speed: 0.85 },
+};
+export const DEFAULT_VOICE = VOICE_BY_HINT.neutral_female;
+
+// Hard monthly $-budget per tier in cents. Catches per-call cost spikes
+// that the per-feature counts above can't (e.g. one runaway long output).
+export const TIER_COST_BUDGET_CENTS: Record<Tier, number> = {
+  free: 0,
+  pro: 300,
+  studio: 1000,
+};

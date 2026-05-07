@@ -57,7 +57,8 @@ interface QuizGenInput {
     free_text?: number;
     audio_passage?: number;
   };
-  questionsPerAudioPassage?: number;
+  questionsPerTextPassage?: { mcq?: number; fill_blank?: number };
+  questionsPerAudioPassage?: { mcq?: number; fill_blank?: number };
   focusTopic?: string;
 }
 
@@ -102,7 +103,9 @@ function QuizGenContext({
   const fill = c.mix?.fill_blank ?? 0;
   const free = c.mix?.free_text ?? 0;
   const audio = c.mix?.audio_passage ?? 0;
-  const perAudio = c.questionsPerAudioPassage ?? 0;
+  const perAudioMcq = c.questionsPerAudioPassage?.mcq ?? 0;
+  const perAudioFill = c.questionsPerAudioPassage?.fill_blank ?? 0;
+  const perAudioTotal = perAudioMcq + perAudioFill;
   const directTotal = mcq + fill + free;
 
   const mixParts: string[] = [];
@@ -190,11 +193,13 @@ function QuizGenContext({
               label="Passages audio"
               value={
                 <span>
-                  {audio} passage{audio > 1 ? "s" : ""} × {perAudio} question
-                  {perAudio > 1 ? "s" : ""}{" "}
-                  <span className="text-muted-foreground">
-                    (+{audio * perAudio} QCM)
-                  </span>
+                  {audio} passage{audio > 1 ? "s" : ""} × {perAudioTotal} question
+                  {perAudioTotal !== 1 ? "s" : ""}
+                  {perAudioMcq > 0 || perAudioFill > 0 ? (
+                    <span className="text-muted-foreground">
+                      {" "}({[perAudioMcq > 0 ? `${perAudioMcq} QCM` : "", perAudioFill > 0 ? `${perAudioFill} à trous` : ""].filter(Boolean).join(" + ")})
+                    </span>
+                  ) : null}
                 </span>
               }
             />

@@ -11,33 +11,32 @@ import { cheapRepair } from "../repair";
 import { AIGenerationError } from "../types";
 import type { AICallResult } from "../types";
 import {
-  QUIZ_EDIT_ADD_SYSTEM_PROMPT,
-  QUIZ_EDIT_ADD_RUBRIC_PROMPT,
-  buildQuizEditAddUserPrompt,
-  type QuizEditAddContext,
-} from "../prompts/quiz-edit-add";
+  LESSON_EDIT_SYSTEM_PROMPT,
+  buildLessonEditUserPrompt,
+  type LessonEditContext,
+} from "../prompts/lesson-edit";
 import {
-  aiQuizEditAddOutputSchema,
-  type AIQuizEditAddOutput,
-} from "../schemas/quiz-edit-add.schema";
+  aiLessonEditOutputSchema,
+  type AILessonEditOutput,
+} from "../schemas/lesson-edit.schema";
 
-export interface AddQuizBlocksArgs {
-  context: QuizEditAddContext;
+export interface RunLessonEditArgs {
+  context: LessonEditContext;
   modelKey?: ModelKey;
 }
 
-export const addQuizBlocks = async (
-  args: AddQuizBlocksArgs,
-): Promise<AICallResult<AIQuizEditAddOutput>> => {
-  const modelKey = args.modelKey ?? DEFAULT_MODEL.quiz_edit;
+export const runLessonEdit = async (
+  args: RunLessonEditArgs,
+): Promise<AICallResult<AILessonEditOutput>> => {
+  const modelKey = args.modelKey ?? DEFAULT_MODEL.lesson_edit;
   const model = getModel(modelKey);
   const provider = getProvider(modelKey);
-  const promptVersion = PROMPT_VERSIONS.quiz_edit;
+  const promptVersion = PROMPT_VERSIONS.lesson_edit;
 
-  const systemPrompt = `${QUIZ_EDIT_ADD_SYSTEM_PROMPT}\n\n${QUIZ_EDIT_ADD_RUBRIC_PROMPT}`;
-  const userPrompt = buildQuizEditAddUserPrompt(args.context);
+  const systemPrompt = LESSON_EDIT_SYSTEM_PROMPT;
+  const userPrompt = buildLessonEditUserPrompt(args.context);
   const inputHash = hashPromptInput(
-    `add\n${promptVersion}\n${systemPrompt}\n${userPrompt}`,
+    `lesson_edit\n${promptVersion}\n${systemPrompt}\n${userPrompt}`,
   );
 
   const startedAt = Date.now();
@@ -46,15 +45,14 @@ export const addQuizBlocks = async (
   try {
     const { object, usage } = await generateObject({
       model,
-      schema: aiQuizEditAddOutputSchema,
+      schema: aiLessonEditOutputSchema,
       system: systemPrompt,
       prompt: userPrompt,
-      temperature: 0.4,
-      maxOutputTokens: MAX_OUTPUT_TOKENS.quiz_edit,
+      temperature: 0.3,
+      maxOutputTokens: MAX_OUTPUT_TOKENS.lesson_edit,
       experimental_repairText: async ({ text, error }) => {
         repairAttempts += 1;
         if (repairAttempts > 2) return null;
-        // Cheap fix first; LLM repair only if it didn't help.
         const cheap = cheapRepair(text);
         if (repairAttempts === 1 && cheap !== text) return cheap;
         const { text: repaired } = await generateText({
@@ -71,7 +69,7 @@ ${text}
 
 Return the corrected JSON only. Keep as much of the original content as possible — fix only what the error requires.`,
           temperature: 0,
-          maxOutputTokens: MAX_OUTPUT_TOKENS.quiz_edit,
+          maxOutputTokens: MAX_OUTPUT_TOKENS.lesson_edit,
         });
         return cheapRepair(repaired.trim());
       },
@@ -97,8 +95,8 @@ Return the corrected JSON only. Keep as much of the original content as possible
     const message = err instanceof Error ? err.message : "Unknown error";
     const rawText = NoObjectGeneratedError.isInstance(err) ? err.text : undefined;
     throw new AIGenerationError(
-      `Quiz edit (add) failed: ${message}`,
-      "quiz_edit",
+      `Lesson edit failed: ${message}`,
+      "lesson_edit",
       err,
       rawText,
     );

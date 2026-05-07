@@ -10,6 +10,7 @@ import { TextAlign } from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
 import { Highlight } from "@tiptap/extension-highlight";
 import { FontSize } from "@/lib/extensions/font-size";
+import { DiffDelete, DiffInsert } from "@/lib/extensions/diff-marks";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +86,8 @@ interface RichTextEditorProps {
   onChange: (html: string) => void;
   placeholder?: string;
   className?: string;
+  // Set → render this HTML read-only instead of `content` (AI diff preview).
+  diffContent?: string | null;
 }
 
 export function RichTextEditor({
@@ -92,6 +95,7 @@ export function RichTextEditor({
   onChange,
   placeholder,
   className,
+  diffContent,
 }: RichTextEditorProps): React.JSX.Element | null {
   const [linkMode, setLinkMode] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
@@ -100,11 +104,20 @@ export function RichTextEditor({
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const colorPickerRef = useRef<HTMLDivElement>(null);
 
+  const isDiffMode = diffContent != null;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  // Latest HTML the editor matches — used to skip echo emits.
+  const lastSyncedHtml = useRef(content);
+
   const editor = useEditor({
     immediatelyRender: false,
+    editable: !isDiffMode,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4] },
+        link: false,
+        underline: false,
       }),
       TextStyle,
       Color,
@@ -117,8 +130,10 @@ export function RichTextEditor({
         autolink: true,
         HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
       }),
+      DiffDelete,
+      DiffInsert,
     ],
-    content,
+    content: isDiffMode ? diffContent : content,
     editorProps: {
       attributes: {
         class:
@@ -127,15 +142,30 @@ export function RichTextEditor({
       },
     },
     onUpdate: ({ editor: e }) => {
-      onChange(e.getHTML());
+      const html = e.getHTML();
+      if (html === lastSyncedHtml.current) return;
+      console.log(
+        `[rich-text-editor] onUpdate | last="${lastSyncedHtml.current.slice(0, 80)}" → new="${html.slice(0, 80)}"`,
+      );
+      lastSyncedHtml.current = html;
+      onChangeRef.current(html);
     },
   });
 
   useEffect(() => {
     if (!editor) return;
-    if (editor.getHTML() === content) return;
-    editor.commands.setContent(content, { emitUpdate: false });
-  }, [editor, content]);
+    editor.setEditable(!isDiffMode);
+    const next = isDiffMode ? (diffContent ?? "") : content;
+    if (editor.getHTML() === next) return;
+    console.log(
+      `[rich-text-editor] setContent | mode=${isDiffMode ? "diff" : "edit"} | from="${editor.getHTML().slice(0, 80)}" | to="${next.slice(0, 80)}"`,
+    );
+    editor.commands.setContent(next, { emitUpdate: false });
+    // Snapshot what the editor actually shows after Tiptap normalizes the
+    // HTML, so the next onUpdate (which may report this normalized form)
+    // is treated as a no-op.
+    lastSyncedHtml.current = editor.getHTML();
+  }, [editor, content, diffContent, isDiffMode]);
 
   const openLinkMode = useCallback(() => {
     if (!editor) return;

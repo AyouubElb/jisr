@@ -157,7 +157,9 @@ export function AIOutputPreview({
                 <ol className="space-y-3 border-l-2 border-slate-200 pl-4">
                   {(block.questions ?? []).map((q, qi) => (
                     <li key={qi} className="space-y-1">
-                      <p className="font-medium">{q.question}</p>
+                      <p className="font-medium">
+                        {q.type === "fill_blank" ? q.sentence : q.question}
+                      </p>
                       <ul className="space-y-1 pl-4">
                         {q.options.map((opt, i) => (
                           <li
@@ -202,7 +204,9 @@ export function AIOutputPreview({
                 <ol className="space-y-3 border-l-2 border-slate-200 pl-4">
                   {(block.questions ?? []).map((q, qi) => (
                     <li key={qi} className="space-y-1">
-                      <p className="font-medium">{q.question}</p>
+                      <p className="font-medium">
+                        {q.type === "fill_blank" ? q.sentence : q.question}
+                      </p>
                       <ul className="space-y-1 pl-4">
                         {q.options.map((opt, i) => (
                           <li

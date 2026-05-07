@@ -56,46 +56,54 @@ const aiVoiceResponseBlockSchema = z.object({
   max_seconds: z.number().int().optional(),
 });
 
+/** Comprehension MCQ nested inside a passage block. */
+const aiPassageQuestionMcqSchema = z.object({
+  type: z.literal("mcq"),
+  question: z.string(),
+  options: z.array(z.string()),
+  correct_index: z.number().int(),
+  explanation: z.string().optional(),
+});
+
+/** Comprehension fill-blank nested inside a passage block. */
+const aiPassageQuestionFillBlankSchema = z.object({
+  type: z.literal("fill_blank"),
+  sentence: z.string(),
+  options: z.array(z.string()),
+  correct_index: z.number().int(),
+  explanation: z.string().optional(),
+});
+
+const aiPassageQuestionSchema = z.discriminatedUnion("type", [
+  aiPassageQuestionMcqSchema,
+  aiPassageQuestionFillBlankSchema,
+]);
+
+export type AIPassageQuestion = z.infer<typeof aiPassageQuestionSchema>;
+
 /**
- * A listening passage + its comprehension MCQs in one block. The route
+ * A listening passage + its comprehension questions in one block. The route
  * handler runs TTS on `script`, then expands this into one audio block
- * followed by N MCQ blocks linked back to it. Keeping script and
- * questions together in the model output is what guarantees they stay
- * aligned.
+ * followed by N child blocks linked back to it.
  */
 const aiAudioPassageBlockSchema = z.object({
   type: z.literal("audio_passage"),
   script: z.string(),
   voice_hint: z.enum(["neutral_female", "neutral_male", "slow_clear"]).optional(),
   caption: z.string().optional(),
-  questions: z.array(
-    z.object({
-      question: z.string(),
-      options: z.array(z.string()),
-      correct_index: z.number().int(),
-      explanation: z.string().optional(),
-    }),
-  ).optional(),
+  questions: z.array(aiPassageQuestionSchema).optional(),
 });
 
 /**
- * Reading comprehension — text passage + comprehension MCQs in one block.
- * Same shape as audio_passage minus TTS. The route handler stores the
- * passage as a `text` quiz_block followed by N MCQ blocks linked via
- * `passage_block_id`.
+ * Reading comprehension — text passage + comprehension questions in one block.
+ * The route handler stores the passage as a `text` quiz_block followed by N
+ * child blocks linked via `passage_block_id`.
  */
 const aiTextPassageBlockSchema = z.object({
   type: z.literal("text_passage"),
   passage: z.string(),
   caption: z.string().optional(),
-  questions: z.array(
-    z.object({
-      question: z.string(),
-      options: z.array(z.string()),
-      correct_index: z.number().int(),
-      explanation: z.string().optional(),
-    }),
-  ).optional(),
+  questions: z.array(aiPassageQuestionSchema).optional(),
 });
 
 /** Section header — purely structural, no scoring. */

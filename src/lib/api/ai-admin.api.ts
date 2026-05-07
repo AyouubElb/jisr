@@ -21,6 +21,8 @@ export interface AIGenerationListItem {
   output_quiz_id: AIGenerationRow["output_quiz_id"];
   error: AIGenerationRow["error"];
   has_evaluation: boolean;
+  user_id: AIGenerationRow["user_id"];
+  user_full_name: string | null;
   /**
    * Derived from output.model_output.title (quiz_gen) or
    * input_context.instruction (quiz_edit). Null for rows where neither
@@ -52,7 +54,7 @@ export const aiAdminApi = {
     let q = supabase
       .from("ai_generations")
       .select(
-        "id, created_at, feature, model, provider, schema_valid, cost_cents, latency_ms, instructor_accepted, instructor_edited, instructor_rejected, output_quiz_id, error, output, input_context, ai_evaluations(id)",
+        "id, created_at, feature, model, provider, schema_valid, cost_cents, latency_ms, instructor_accepted, instructor_edited, instructor_rejected, output_quiz_id, error, output, input_context, user_id, profiles:user_id(full_name), ai_evaluations(id)",
       )
       .order("created_at", { ascending: false })
       .limit(filters.limit ?? 100);
@@ -81,6 +83,9 @@ export const aiAdminApi = {
         (typeof inCtx?.instruction === "string" ? inCtx.instruction : null) ??
         null;
 
+      const profile = (r as unknown as { profiles: { full_name: string | null } | null })
+        .profiles;
+
       return {
         id: r.id,
         created_at: r.created_at,
@@ -96,6 +101,8 @@ export const aiAdminApi = {
         output_quiz_id: r.output_quiz_id,
         error: r.error,
         has_evaluation: Array.isArray(evals) && evals.length > 0,
+        user_id: r.user_id,
+        user_full_name: profile?.full_name ?? null,
         title,
       };
     });

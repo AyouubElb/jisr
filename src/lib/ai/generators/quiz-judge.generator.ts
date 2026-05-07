@@ -8,7 +8,7 @@ import {
   buildQuizJudgeUserPrompt,
   type QuizJudgeContext,
 } from "../prompts/quiz-judge";
-import { PROMPT_VERSIONS } from "../constants";
+import { MAX_OUTPUT_TOKENS, PROMPT_VERSIONS } from "../constants";
 import { hashPromptInput } from "../hash";
 import { computeCostCents } from "../cost";
 import { logGeneration } from "../telemetry";
@@ -61,6 +61,7 @@ export const judgeAndStoreQuizEval = async ({
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0,
+      maxOutputTokens: MAX_OUTPUT_TOKENS.quiz_judge,
       experimental_repairText: async ({ text }) => {
         const cheap = cheapRepair(text);
         return cheap !== text ? cheap : null;

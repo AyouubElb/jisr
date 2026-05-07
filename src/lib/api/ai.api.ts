@@ -4,6 +4,9 @@
  * consistent across every AI feature.
  */
 import type { AIQuizChange } from "@/lib/ai/schemas/quiz-edit.schema";
+import type { MonthlyUsageSummary } from "@/lib/ai/quotas";
+
+export type { MonthlyUsageSummary };
 
 export interface GenerateQuizInput {
   sectionId: string;
@@ -17,7 +20,8 @@ export interface GenerateQuizInput {
     audio_passage: number;
     text_passage: number;
   };
-  questionsPerPassage: number;
+  questionsPerTextPassage: { mcq: number; fill_blank: number };
+  questionsPerAudioPassage: { mcq: number; fill_blank: number };
   focusTopic?: string;
 }
 
@@ -63,6 +67,43 @@ export interface ResolveGenerationResponse {
   state?: "accepted" | "edited" | "rejected";
   reason?: string;
 }
+
+export interface GenerateLessonInput {
+  lessonId: string;
+  scope: string;
+  depth: "quick" | "detailed";
+  includeExercises: boolean;
+  includeFrenchSupport: boolean;
+  theme?: string;
+  extraNotes?: string;
+}
+
+export interface GenerateLessonResponse {
+  generationId: string | null;
+  summary: string;
+  newContent: string;
+}
+
+export interface ProposeLessonEditInput {
+  lessonId: string;
+  instruction: string;
+  chatHistory?: string;
+  currentContent?: string;
+}
+
+export type ProposeLessonEditResponse =
+  | {
+      generationId: string | null;
+      kind: "reply";
+      summary: string;
+    }
+  | {
+      generationId: string | null;
+      kind: "edit";
+      summary: string;
+      newContent: string;
+      diffHtml: string;
+    };
 
 export const aiApi = {
   resolveGeneration: async (
@@ -123,6 +164,52 @@ export const aiApi = {
     return (await res.json()) as ApplyQuizEditResponse;
   },
 
+  generateLesson: async (
+    input: GenerateLessonInput,
+  ): Promise<GenerateLessonResponse> => {
+    const res = await fetch("/api/ai/generate-lesson", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as
+        | { error?: string; rawText?: string | null }
+        | null;
+      if (payload?.rawText) {
+        console.groupCollapsed(
+          "[AI lesson gen] raw model output (schema mismatch)",
+        );
+        console.log(payload.rawText);
+        console.groupEnd();
+      }
+      throw new Error(payload?.error ?? "La génération IA a échoué");
+    }
+    return (await res.json()) as GenerateLessonResponse;
+  },
+
+  proposeLessonEdit: async (
+    input: ProposeLessonEditInput,
+  ): Promise<ProposeLessonEditResponse> => {
+    const res = await fetch("/api/ai/edit-lesson", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as
+        | { error?: string; rawText?: string | null }
+        | null;
+      if (payload?.rawText) {
+        console.groupCollapsed("[AI lesson edit] raw model output (schema mismatch)");
+        console.log(payload.rawText);
+        console.groupEnd();
+      }
+      throw new Error(payload?.error ?? "L'édition IA a échoué");
+    }
+    return (await res.json()) as ProposeLessonEditResponse;
+  },
+
   generateQuiz: async (input: GenerateQuizInput): Promise<GenerateQuizResponse> => {
     const res = await fetch("/api/ai/generate-quiz", {
       method: "POST",
@@ -147,5 +234,16 @@ export const aiApi = {
     }
 
     return (await res.json()) as GenerateQuizResponse;
+  },
+
+  getMyUsage: async (): Promise<MonthlyUsageSummary> => {
+    const res = await fetch("/api/ai/usage/me");
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      throw new Error(payload?.error ?? "Échec du chargement de l'utilisation");
+    }
+    return (await res.json()) as MonthlyUsageSummary;
   },
 };

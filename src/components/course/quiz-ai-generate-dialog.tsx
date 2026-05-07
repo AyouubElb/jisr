@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   BookOpen,
   Compass,
+  Headphones,
   Layers,
   ListChecks,
   Sparkles,
@@ -23,6 +24,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useGenerateAIQuiz } from "@/lib/hooks/useAIQuiz";
+import {
+  QUIZ_GEN_MAX_LESSONS,
+  QUIZ_GEN_MAX_DIRECT_QUESTIONS,
+  QUIZ_GEN_MAX_PASSAGES_PER_TYPE,
+} from "@/lib/ai/constants";
 import type { Lesson } from "@/lib/types";
 
 interface QuizAIGenerateDialogProps {
@@ -42,11 +48,19 @@ interface Mix {
   text_passage: number;
 }
 
-// Stage 1 caps — keep generation under Vercel Hobby's 60s limit.
-const MAX_LESSONS = 1;
-const MAX_DIRECT_QUESTIONS = 8;
-const MAX_PASSAGES_PER_TYPE = 1;
+interface PassageQuestionMix {
+  mcq: number;
+  fill_blank: number;
+}
+
+interface PassageQs {
+  text: PassageQuestionMix;
+  audio: PassageQuestionMix;
+}
+
 const HEAVY_CONFIG_THRESHOLD = 8;
+
+const DEFAULT_PASSAGE_QS: PassageQuestionMix = { mcq: 2, fill_blank: 1 };
 
 const DEFAULT_MIX: Mix = {
   mcq: 4,
@@ -56,7 +70,6 @@ const DEFAULT_MIX: Mix = {
   audio_passage: 0,
   text_passage: 0,
 };
-const DEFAULT_QUESTIONS_PER_PASSAGE = 3;
 
 const directTotal = (m: Mix): number =>
   m.mcq + m.fill_blank + m.free_text + m.voice_response;
@@ -102,17 +115,18 @@ function QuizAIGenerateDialogBody({
     lessons.length === 1 ? [lessons[0].id] : [],
   );
   const [mix, setMix] = useState<Mix>(DEFAULT_MIX);
-  const [questionsPerPassage, setQuestionsPerPassage] = useState<number>(
-    DEFAULT_QUESTIONS_PER_PASSAGE,
-  );
+  const [passageQs, setPassageQs] = useState<PassageQs>({
+    text: { ...DEFAULT_PASSAGE_QS },
+    audio: { ...DEFAULT_PASSAGE_QS },
+  });
   const [focusTopic, setFocusTopic] = useState<string>("");
 
   const toggleLesson = (id: string): void => {
     setSelectedLessonIds((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
       // Stage 1: only one lesson allowed — replace any prior selection.
-      if (MAX_LESSONS === 1) return [id];
-      if (prev.length >= MAX_LESSONS) return prev;
+      if (QUIZ_GEN_MAX_LESSONS === 1) return [id];
+      if (prev.length >= QUIZ_GEN_MAX_LESSONS) return prev;
       return [...prev, id];
     });
   };
@@ -120,23 +134,21 @@ function QuizAIGenerateDialogBody({
   // Direct gradable count = the 4 question types. Passage parents are
   // ungraded but their derived MCQs add to the final block count.
   const directQs = directTotal(mix);
-  const usesAnyPassage = mix.audio_passage + mix.text_passage > 0;
-  const derivedMCQs = (mix.audio_passage + mix.text_passage) * questionsPerPassage;
+  const derivedMCQs =
+    mix.text_passage * (passageQs.text.mcq + passageQs.text.fill_blank) +
+    mix.audio_passage * (passageQs.audio.mcq + passageQs.audio.fill_blank);
   const grandTotal = directQs + derivedMCQs;
+  const usesAnyPassage = mix.audio_passage + mix.text_passage > 0;
 
-  const directInRange = directQs >= 0 && directQs <= MAX_DIRECT_QUESTIONS;
-  const passageQsValid =
-    !usesAnyPassage || (questionsPerPassage >= 0 && questionsPerPassage <= 5);
-  // Quiz must have at least one block of any kind.
+  const directInRange = directQs >= 0 && directQs <= QUIZ_GEN_MAX_DIRECT_QUESTIONS;
   const hasAtLeastOneBlock = grandTotal >= 1;
   const isHeavyConfig = grandTotal >= HEAVY_CONFIG_THRESHOLD || usesAnyPassage;
   const canSubmit =
     selectedLessonIds.length > 0 &&
     directInRange &&
-    passageQsValid &&
     hasAtLeastOneBlock &&
-    mix.audio_passage <= MAX_PASSAGES_PER_TYPE &&
-    mix.text_passage <= MAX_PASSAGES_PER_TYPE &&
+    mix.audio_passage <= QUIZ_GEN_MAX_PASSAGES_PER_TYPE &&
+    mix.text_passage <= QUIZ_GEN_MAX_PASSAGES_PER_TYPE &&
     !isPending;
 
   const onSubmit = (): void => {
@@ -147,7 +159,8 @@ function QuizAIGenerateDialogBody({
         lessonIds: selectedLessonIds,
         numQuestions: directQs,
         mix,
-        questionsPerPassage,
+        questionsPerTextPassage: passageQs.text,
+        questionsPerAudioPassage: passageQs.audio,
         focusTopic: focusTopic.trim() || undefined,
       },
       {
@@ -173,11 +186,11 @@ function QuizAIGenerateDialogBody({
         </DialogDescription>
       </DialogHeader>
 
-      {/* ── 3-COL BENTO ────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {/* ── BENTO: 3 equal columns, each one card ──────────────── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
         {/* COL 1 — Leçons */}
-        <Card className="lg:row-span-2">
-          <CardContent className="flex h-full flex-col gap-3 p-4">
+        <Card>
+          <CardContent className="flex flex-col gap-3 p-4">
             <SectionTitle icon={<BookOpen className="h-4 w-4" />}>
               Leçons sources
             </SectionTitle>
@@ -187,7 +200,7 @@ function QuizAIGenerateDialogBody({
               </p>
             ) : (
               <>
-                <div className="flex-1 space-y-1 overflow-y-auto rounded-md border p-2">
+                <div className="space-y-1 overflow-y-auto rounded-md border p-2">
                   {lessons.map((l) => {
                     const checked = selectedLessonIds.includes(l.id);
                     return (
@@ -220,59 +233,138 @@ function QuizAIGenerateDialogBody({
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {selectedLessonIds.length} sélectionnée
-                  {selectedLessonIds.length > 1 ? "s" : ""} — max {MAX_LESSONS}
+                  {selectedLessonIds.length > 1 ? "s" : ""} — max {QUIZ_GEN_MAX_LESSONS}
                 </p>
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* COL 2 ROW 1 — Répartition */}
+        {/* COL 2 — Tout le mix (questions directes + passages) */}
         <Card>
-          <CardContent className="space-y-3 p-4">
-            <SectionTitle icon={<ListChecks className="h-4 w-4" />}>
-              Répartition (questions directes)
-            </SectionTitle>
-            <div className="grid grid-cols-2 gap-3">
-              <MixField
-                label="QCM"
-                hint="incl. Vrai/Faux"
-                value={mix.mcq}
-                onChange={(v) => setMix((m) => ({ ...m, mcq: v }))}
-              />
-              <MixField
-                label="Texte à trous"
-                value={mix.fill_blank}
-                onChange={(v) => setMix((m) => ({ ...m, fill_blank: v }))}
-              />
-              <MixField
-                label="Réponse écrite"
-                value={mix.free_text}
-                onChange={(v) => setMix((m) => ({ ...m, free_text: v }))}
-              />
-              <MixField
-                label="Réponse vocale"
-                hint="audio enregistré"
-                value={mix.voice_response}
-                onChange={(v) => setMix((m) => ({ ...m, voice_response: v }))}
-              />
+          <CardContent className="flex flex-col gap-4 p-4">
+            {/* Section: questions directes */}
+            <div className="space-y-3">
+              <SectionTitle icon={<ListChecks className="h-4 w-4" />}>
+                Questions directes
+              </SectionTitle>
+              <div className="grid grid-cols-2 gap-3">
+                <MixField
+                  label="QCM"
+                  hint="incl. Vrai/Faux"
+                  value={mix.mcq}
+                  onChange={(v) => setMix((m) => ({ ...m, mcq: v }))}
+                />
+                <MixField
+                  label="Texte à trous"
+                  value={mix.fill_blank}
+                  onChange={(v) => setMix((m) => ({ ...m, fill_blank: v }))}
+                />
+                <MixField
+                  label="Réponse écrite"
+                  value={mix.free_text}
+                  onChange={(v) => setMix((m) => ({ ...m, free_text: v }))}
+                />
+                <MixField
+                  label="Réponse vocale"
+                  hint="audio enregistré"
+                  value={mix.voice_response}
+                  onChange={(v) => setMix((m) => ({ ...m, voice_response: v }))}
+                />
+              </div>
+              {!directInRange ? (
+                <p className="text-xs text-destructive">
+                  Le total direct doit être entre 0 et {QUIZ_GEN_MAX_DIRECT_QUESTIONS} (actuel : {directQs}).
+                </p>
+              ) : null}
+              {!hasAtLeastOneBlock ? (
+                <p className="text-xs text-destructive">
+                  Le quiz doit contenir au moins un bloc.
+                </p>
+              ) : null}
             </div>
-            {!directInRange ? (
-              <p className="text-xs text-destructive">
-                Le total direct doit être entre 0 et {MAX_DIRECT_QUESTIONS} (actuel : {directQs}).
-              </p>
-            ) : null}
-            {!hasAtLeastOneBlock ? (
-              <p className="text-xs text-destructive">
-                Le quiz doit contenir au moins un bloc.
-              </p>
-            ) : null}
+
+            <div className="border-t" />
+
+            {/* Section: passage texte */}
+            <div className="space-y-3">
+              <SectionTitle icon={<Layers className="h-4 w-4" />}>
+                Passage texte
+              </SectionTitle>
+              <div className="grid grid-cols-3 gap-3">
+                <PassageField
+                  label="Passages"
+                  max={QUIZ_GEN_MAX_PASSAGES_PER_TYPE}
+                  value={mix.text_passage}
+                  onChange={(v) =>
+                    setMix((m) => ({
+                      ...m,
+                      text_passage: clamp(v, 0, QUIZ_GEN_MAX_PASSAGES_PER_TYPE),
+                    }))
+                  }
+                />
+                <PassageQuestionField
+                  label="QCM"
+                  disabled={mix.text_passage === 0}
+                  value={passageQs.text.mcq}
+                  onChange={(v) =>
+                    setPassageQs((q) => ({ ...q, text: { ...q.text, mcq: v } }))
+                  }
+                />
+                <PassageQuestionField
+                  label="À trous"
+                  disabled={mix.text_passage === 0}
+                  value={passageQs.text.fill_blank}
+                  onChange={(v) =>
+                    setPassageQs((q) => ({ ...q, text: { ...q.text, fill_blank: v } }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="border-t" />
+
+            {/* Section: passage audio */}
+            <div className="space-y-3">
+              <SectionTitle icon={<Headphones className="h-4 w-4" />}>
+                Passage audio
+              </SectionTitle>
+              <div className="grid grid-cols-3 gap-3">
+                <PassageField
+                  label="Passages"
+                  max={QUIZ_GEN_MAX_PASSAGES_PER_TYPE}
+                  value={mix.audio_passage}
+                  onChange={(v) =>
+                    setMix((m) => ({
+                      ...m,
+                      audio_passage: clamp(v, 0, QUIZ_GEN_MAX_PASSAGES_PER_TYPE),
+                    }))
+                  }
+                />
+                <PassageQuestionField
+                  label="QCM"
+                  disabled={mix.audio_passage === 0}
+                  value={passageQs.audio.mcq}
+                  onChange={(v) =>
+                    setPassageQs((q) => ({ ...q, audio: { ...q.audio, mcq: v } }))
+                  }
+                />
+                <PassageQuestionField
+                  label="À trous"
+                  disabled={mix.audio_passage === 0}
+                  value={passageQs.audio.fill_blank}
+                  onChange={(v) =>
+                    setPassageQs((q) => ({ ...q, audio: { ...q.audio, fill_blank: v } }))
+                  }
+                />
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* COL 3 — Instructions complémentaires (full height) */}
-        <Card className="lg:row-span-2">
-          <CardContent className="flex h-full flex-col gap-3 p-4">
+        {/* COL 3 — Instructions complémentaires */}
+        <Card>
+          <CardContent className="flex flex-col gap-3 p-4">
             <SectionTitle icon={<Compass className="h-4 w-4" />}>
               Instructions complémentaires
             </SectionTitle>
@@ -284,62 +376,11 @@ function QuizAIGenerateDialogBody({
               maxLength={500}
               value={focusTopic}
               onChange={(e) => setFocusTopic(e.target.value)}
-              className="min-h-[180px] flex-1 resize-none"
+              className="min-h-[120px] max-h-[220px] resize-none"
             />
             <p className="text-right text-[11px] text-muted-foreground">
               {focusTopic.length} / 500
             </p>
-          </CardContent>
-        </Card>
-
-        {/* COL 2 ROW 2 — Passages (audio + text + Q par passage) */}
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <SectionTitle icon={<Layers className="h-4 w-4" />}>
-              Passages de compréhension
-            </SectionTitle>
-            <p className="text-xs text-muted-foreground">
-              Chaque passage génère plusieurs QCM en plus.
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              <PassageField
-                label="Audio"
-                max={MAX_PASSAGES_PER_TYPE}
-                value={mix.audio_passage}
-                onChange={(v) =>
-                  setMix((m) => ({
-                    ...m,
-                    audio_passage: clamp(v, 0, MAX_PASSAGES_PER_TYPE),
-                  }))
-                }
-              />
-              <PassageField
-                label="Texte"
-                max={MAX_PASSAGES_PER_TYPE}
-                value={mix.text_passage}
-                onChange={(v) =>
-                  setMix((m) => ({
-                    ...m,
-                    text_passage: clamp(v, 0, MAX_PASSAGES_PER_TYPE),
-                  }))
-                }
-              />
-              <div>
-                <Label className="text-xs">QCM / passage</Label>
-                <p className="text-[10px] text-muted-foreground">0–5</p>
-                <Input
-                  type="number"
-                  min={0}
-                  max={5}
-                  disabled={!usesAnyPassage}
-                  value={questionsPerPassage}
-                  onChange={(e) =>
-                    setQuestionsPerPassage(clamp(Number(e.target.value) || 0, 0, 5))
-                  }
-                  className="mt-1"
-                />
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -362,7 +403,7 @@ function QuizAIGenerateDialogBody({
             {directQs} question{directQs > 1 ? "s" : ""} directe
             {directQs > 1 ? "s" : ""}
             {derivedMCQs > 0
-              ? ` + ${derivedMCQs} QCM dérivés des passages`
+              ? ` + ${derivedMCQs} question${derivedMCQs > 1 ? "s" : ""} de passage`
               : ""}
             {usesAnyPassage
               ? ` + ${mix.audio_passage + mix.text_passage} passage${
@@ -463,6 +504,34 @@ function PassageField({
         max={max}
         value={value}
         onChange={(e) => onChange(Number(e.target.value) || 0)}
+        className="mt-1"
+      />
+    </div>
+  );
+}
+
+function PassageQuestionField({
+  label,
+  disabled,
+  value,
+  onChange,
+}: {
+  label: string;
+  disabled: boolean;
+  value: number;
+  onChange: (v: number) => void;
+}): React.JSX.Element {
+  return (
+    <div>
+      <Label className="text-xs">{label}</Label>
+      <p className="text-[10px] text-muted-foreground">0–5</p>
+      <Input
+        type="number"
+        min={0}
+        max={5}
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(clamp(Number(e.target.value) || 0, 0, 5))}
         className="mt-1"
       />
     </div>
