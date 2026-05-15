@@ -9,6 +9,9 @@ import { Underline } from "@tiptap/extension-underline";
 import { TextAlign } from "@tiptap/extension-text-align";
 import Link from "@tiptap/extension-link";
 import { Highlight } from "@tiptap/extension-highlight";
+import { Image } from "@tiptap/extension-image";
+import { lessonImagesApi, LessonImageUploadError } from "@/lib/api/lesson-images.api";
+import { toast } from "sonner";
 import { FontSize } from "@/lib/extensions/font-size";
 import { DiffDelete, DiffInsert } from "@/lib/extensions/diff-marks";
 import { cn } from "@/lib/utils";
@@ -45,11 +48,14 @@ import {
   Redo,
   Minus,
   Link2,
+  ImageIcon,
+  Loader2,
   X,
   Quote,
   Code,
   Highlighter,
   Palette,
+  MoreHorizontal,
 } from "lucide-react";
 
 const TEXT_COLORS = [
@@ -102,7 +108,12 @@ export function RichTextEditor({
   const [linkText, setLinkText] = useState("");
   const [linkHasSelection, setLinkHasSelection] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  // Bumped on every selection/transaction so toolbar isActive checks refresh.
+  const [, forceTick] = useState(0);
   const colorPickerRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const isDiffMode = diffContent != null;
   const onChangeRef = useRef(onChange);
@@ -125,13 +136,23 @@ export function RichTextEditor({
       Color,
       FontSize,
       Underline,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TextAlign.configure({ types: ["heading", "paragraph", "image"] }),
       Highlight,
       Link.configure({
         openOnClick: false,
         autolink: true,
         HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
       }),
+      // `class` declared so updateAttributes can swap the size class.
+      // `textAlign` is added by the TextAlign extension via global attributes.
+      Image.extend({
+        addAttributes() {
+          return {
+            ...this.parent?.(),
+            class: { default: "img-size-medium" },
+          };
+        },
+      }).configure({ inline: false, allowBase64: false }),
       DiffDelete,
       DiffInsert,
     ],
@@ -153,6 +174,20 @@ export function RichTextEditor({
       onChangeRef.current(html);
     },
   });
+
+  // Force a re-render on selection/transaction so isActive() reflects the
+  // current cursor — without this, S/M/F buttons don't appear when the user
+  // clicks an existing image.
+  useEffect(() => {
+    if (!editor) return;
+    const bump = () => forceTick((n) => n + 1);
+    editor.on("selectionUpdate", bump);
+    editor.on("transaction", bump);
+    return () => {
+      editor.off("selectionUpdate", bump);
+      editor.off("transaction", bump);
+    };
+  }, [editor]);
 
   useEffect(() => {
     if (!editor) return;
@@ -213,6 +248,50 @@ export function RichTextEditor({
     editor?.commands.focus();
   }, [editor]);
 
+  const isImageActive = editor?.isActive("image") ?? false;
+  const currentImageSize =
+    (editor?.getAttributes("image")?.class as string | undefined) ??
+    "img-size-medium";
+
+  const setImageSize = useCallback(
+    (size: "small" | "medium" | "full") => {
+      if (!editor) return;
+      editor
+        .chain()
+        .focus()
+        .updateAttributes("image", { class: `img-size-${size}` })
+        .run();
+    },
+    [editor],
+  );
+
+  const onImageFileSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // Reset the input so the same file can be picked again next time.
+      e.target.value = "";
+      if (!file || !editor) return;
+      setImageUploading(true);
+      try {
+        const url = await lessonImagesApi.upload(file);
+        editor
+          .chain()
+          .focus()
+          .setImage({ src: url, alt: file.name })
+          .run();
+      } catch (err) {
+        const msg =
+          err instanceof LessonImageUploadError
+            ? err.message
+            : "Image upload failed.";
+        toast.error(msg);
+      } finally {
+        setImageUploading(false);
+      }
+    },
+    [editor],
+  );
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -235,38 +314,40 @@ export function RichTextEditor({
   return (
     <div
       className={cn(
-        "rounded-lg border border-input bg-background overflow-hidden",
+        "flex min-h-0 flex-col rounded-lg border border-input bg-background",
         className,
       )}
     >
       <TooltipProvider delay={500}>
-        <div className="flex flex-wrap items-center gap-0.5 border-b border-border bg-muted/30 px-2 py-1.5 min-h-10.5">
-          {/* Font size */}
-          <Select
-            value={editor.getAttributes("textStyle").fontSize ?? ""}
-            onValueChange={(value) => {
-              if (value === "default") {
-                editor.chain().focus().unsetFontSize().run();
-              } else {
-                editor.chain().focus().setFontSize(value).run();
-              }
-            }}
-          >
-            <SelectTrigger className="h-7 w-17.5 gap-1 border-none bg-transparent px-2 text-xs shadow-none">
-              <SelectValue placeholder="Taille" />
-            </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false}>
-              <SelectItem value="default">Par défaut</SelectItem>
-              {FONT_SIZES.map((size) => (
-                <SelectItem key={size.value} value={size.value}>
-                  {size.label}px
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-0.5 shrink-0 rounded-t-lg border-b border-border bg-muted/30 px-2 py-1.5 min-h-10.5">
+          {/* Font size — secondary on mobile */}
+          <div className="hidden items-center gap-0.5 sm:flex">
+            <Select
+              value={editor.getAttributes("textStyle").fontSize ?? ""}
+              onValueChange={(value) => {
+                if (value === "default") {
+                  editor.chain().focus().unsetFontSize().run();
+                } else {
+                  editor.chain().focus().setFontSize(value).run();
+                }
+              }}
+            >
+              <SelectTrigger className="h-7 w-17.5 gap-1 border-none bg-transparent px-2 text-xs shadow-none">
+                <SelectValue placeholder="Taille" />
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false}>
+                <SelectItem value="default">Par défaut</SelectItem>
+                {FONT_SIZES.map((size) => (
+                  <SelectItem key={size.value} value={size.value}>
+                    {size.label}px
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="mx-1 h-5 w-px bg-border" />
+          </div>
 
-          <div className="mx-1 h-5 w-px bg-border" />
-
+          {/* Essentials — always visible */}
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
             active={editor.isActive("bold")}
@@ -291,22 +372,25 @@ export function RichTextEditor({
 
           <div className="mx-1 h-5 w-px bg-border" />
 
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setParagraph().run()}
-            active={editor.isActive("paragraph")}
-            title="Texte normal"
-          >
-            <Type className="h-4 w-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() =>
-              editor.chain().focus().toggleHeading({ level: 1 }).run()
-            }
-            active={editor.isActive("heading", { level: 1 })}
-            title="Titre 1"
-          >
-            <Heading1 className="h-4 w-4" />
-          </ToolbarButton>
+          {/* Paragraph + H1/H3/H4 — secondary on mobile */}
+          <div className="hidden items-center gap-0.5 sm:flex">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setParagraph().run()}
+              active={editor.isActive("paragraph")}
+              title="Texte normal"
+            >
+              <Type className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 1 }).run()
+              }
+              active={editor.isActive("heading", { level: 1 })}
+              title="Titre 1"
+            >
+              <Heading1 className="h-4 w-4" />
+            </ToolbarButton>
+          </div>
           <ToolbarButton
             onClick={() =>
               editor.chain().focus().toggleHeading({ level: 2 }).run()
@@ -316,48 +400,50 @@ export function RichTextEditor({
           >
             <Heading2 className="h-4 w-4" />
           </ToolbarButton>
-          <ToolbarButton
-            onClick={() =>
-              editor.chain().focus().toggleHeading({ level: 3 }).run()
-            }
-            active={editor.isActive("heading", { level: 3 })}
-            title="Titre 3"
-          >
-            <Heading3 className="h-4 w-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() =>
-              editor.chain().focus().toggleHeading({ level: 4 }).run()
-            }
-            active={editor.isActive("heading", { level: 4 })}
-            title="Titre 4"
-          >
-            <Heading4 className="h-4 w-4" />
-          </ToolbarButton>
+          <div className="hidden items-center gap-0.5 sm:flex">
+            <ToolbarButton
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 3 }).run()
+              }
+              active={editor.isActive("heading", { level: 3 })}
+              title="Titre 3"
+            >
+              <Heading3 className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level: 4 }).run()
+              }
+              active={editor.isActive("heading", { level: 4 })}
+              title="Titre 4"
+            >
+              <Heading4 className="h-4 w-4" />
+            </ToolbarButton>
 
-          <div className="mx-1 h-5 w-px bg-border" />
+            <div className="mx-1 h-5 w-px bg-border" />
 
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign("left").run()}
-            active={editor.isActive({ textAlign: "left" })}
-            title="Aligner à gauche"
-          >
-            <AlignLeft className="h-4 w-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign("center").run()}
-            active={editor.isActive({ textAlign: "center" })}
-            title="Centrer"
-          >
-            <AlignCenter className="h-4 w-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign("right").run()}
-            active={editor.isActive({ textAlign: "right" })}
-            title="Aligner à droite"
-          >
-            <AlignRight className="h-4 w-4" />
-          </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign("left").run()}
+              active={editor.isActive({ textAlign: "left" })}
+              title="Aligner à gauche"
+            >
+              <AlignLeft className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign("center").run()}
+              active={editor.isActive({ textAlign: "center" })}
+              title="Centrer"
+            >
+              <AlignCenter className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign("right").run()}
+              active={editor.isActive({ textAlign: "right" })}
+              title="Aligner à droite"
+            >
+              <AlignRight className="h-4 w-4" />
+            </ToolbarButton>
+          </div>
 
           <div className="mx-1 h-5 w-px bg-border" />
 
@@ -378,30 +464,32 @@ export function RichTextEditor({
 
           <div className="mx-1 h-5 w-px bg-border" />
 
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            active={editor.isActive("blockquote")}
-            title="Citation"
-          >
-            <Quote className="h-4 w-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            active={editor.isActive("codeBlock")}
-            title="Bloc de code"
-          >
-            <Code className="h-4 w-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHighlight().run()}
-            active={editor.isActive("highlight")}
-            title="Surligner"
-          >
-            <Highlighter className="h-4 w-4" />
-          </ToolbarButton>
+          <div className="hidden items-center gap-0.5 sm:flex">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              active={editor.isActive("blockquote")}
+              title="Citation"
+            >
+              <Quote className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              active={editor.isActive("codeBlock")}
+              title="Bloc de code"
+            >
+              <Code className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHighlight().run()}
+              active={editor.isActive("highlight")}
+              title="Surligner"
+            >
+              <Highlighter className="h-4 w-4" />
+            </ToolbarButton>
+          </div>
 
-          {/* Color picker */}
-          <div className="relative" ref={colorPickerRef}>
+          {/* Color picker — secondary on mobile */}
+          <div className="relative hidden sm:block" ref={colorPickerRef}>
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -463,7 +551,7 @@ export function RichTextEditor({
             )}
           </div>
 
-          <div className="mx-1 h-5 w-px bg-border" />
+          <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
 
           <Tooltip>
             <TooltipTrigger
@@ -485,30 +573,234 @@ export function RichTextEditor({
             <TooltipContent>Lien</TooltipContent>
           </Tooltip>
 
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setHorizontalRule().run()}
-            title="Séparateur"
-          >
-            <Minus className="h-4 w-4" />
-          </ToolbarButton>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={imageUploading}
+                >
+                  {imageUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ImageIcon className="h-4 w-4" />
+                  )}
+                </Button>
+              }
+            />
+            <TooltipContent>Image</TooltipContent>
+          </Tooltip>
 
-          <div className="mx-1 h-5 w-px bg-border" />
+          {isImageActive && (
+            <div className="ml-1 flex items-center gap-0.5">
+              <ToolbarButton
+                onClick={() => setImageSize("small")}
+                active={currentImageSize === "img-size-small"}
+                title="Petite image"
+              >
+                <span className="text-[10px] font-medium">S</span>
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => setImageSize("medium")}
+                active={currentImageSize === "img-size-medium"}
+                title="Image moyenne"
+              >
+                <span className="text-[10px] font-medium">M</span>
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => setImageSize("full")}
+                active={currentImageSize === "img-size-full"}
+                title="Image pleine largeur"
+              >
+                <span className="text-[10px] font-medium">F</span>
+              </ToolbarButton>
+            </div>
+          )}
 
-          <ToolbarButton
-            onClick={() => editor.chain().focus().undo().run()}
-            disabled={!editor.can().undo()}
-            title="Annuler"
-          >
-            <Undo className="h-4 w-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().redo().run()}
-            disabled={!editor.can().redo()}
-            title="Rétablir"
-          >
-            <Redo className="h-4 w-4" />
-          </ToolbarButton>
+          <div className="hidden items-center gap-0.5 sm:flex">
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setHorizontalRule().run()}
+              title="Séparateur"
+            >
+              <Minus className="h-4 w-4" />
+            </ToolbarButton>
+
+            <div className="mx-1 h-5 w-px bg-border" />
+
+            <ToolbarButton
+              onClick={() => editor.chain().focus().undo().run()}
+              disabled={!editor.can().undo()}
+              title="Annuler"
+            >
+              <Undo className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().redo().run()}
+              disabled={!editor.can().redo()}
+              title="Rétablir"
+            >
+              <Redo className="h-4 w-4" />
+            </ToolbarButton>
+          </div>
+
+          {/* Mobile More toggle */}
+          <div className="ml-auto flex items-center sm:hidden">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      "h-7 w-7 shrink-0",
+                      mobileMoreOpen && "bg-accent text-accent-foreground",
+                    )}
+                    onClick={() => setMobileMoreOpen((o) => !o)}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                }
+              />
+              <TooltipContent>Plus d&apos;options</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
+
+        {/* Mobile secondary toolbar — appears below when "More" is toggled */}
+        {mobileMoreOpen && (
+          <div className="flex flex-wrap items-center gap-0.5 border-b border-border bg-muted/20 px-2 py-1.5 sm:hidden">
+            <Select
+              value={editor.getAttributes("textStyle").fontSize ?? ""}
+              onValueChange={(value) => {
+                if (value === "default") {
+                  editor.chain().focus().unsetFontSize().run();
+                } else {
+                  editor.chain().focus().setFontSize(value).run();
+                }
+              }}
+            >
+              <SelectTrigger className="h-7 w-17.5 gap-1 border-none bg-transparent px-2 text-xs shadow-none">
+                <SelectValue placeholder="Taille" />
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false}>
+                <SelectItem value="default">Par défaut</SelectItem>
+                {FONT_SIZES.map((size) => (
+                  <SelectItem key={size.value} value={size.value}>
+                    {size.label}px
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="mx-1 h-5 w-px bg-border" />
+
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setParagraph().run()}
+              active={editor.isActive("paragraph")}
+              title="Texte normal"
+            >
+              <Type className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+              active={editor.isActive("heading", { level: 1 })}
+              title="Titre 1"
+            >
+              <Heading1 className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+              active={editor.isActive("heading", { level: 3 })}
+              title="Titre 3"
+            >
+              <Heading3 className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
+              active={editor.isActive("heading", { level: 4 })}
+              title="Titre 4"
+            >
+              <Heading4 className="h-4 w-4" />
+            </ToolbarButton>
+
+            <div className="mx-1 h-5 w-px bg-border" />
+
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign("left").run()}
+              active={editor.isActive({ textAlign: "left" })}
+              title="Aligner à gauche"
+            >
+              <AlignLeft className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign("center").run()}
+              active={editor.isActive({ textAlign: "center" })}
+              title="Centrer"
+            >
+              <AlignCenter className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setTextAlign("right").run()}
+              active={editor.isActive({ textAlign: "right" })}
+              title="Aligner à droite"
+            >
+              <AlignRight className="h-4 w-4" />
+            </ToolbarButton>
+
+            <div className="mx-1 h-5 w-px bg-border" />
+
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              active={editor.isActive("blockquote")}
+              title="Citation"
+            >
+              <Quote className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              active={editor.isActive("codeBlock")}
+              title="Bloc de code"
+            >
+              <Code className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleHighlight().run()}
+              active={editor.isActive("highlight")}
+              title="Surligner"
+            >
+              <Highlighter className="h-4 w-4" />
+            </ToolbarButton>
+
+            <div className="mx-1 h-5 w-px bg-border" />
+
+            <ToolbarButton
+              onClick={() => editor.chain().focus().setHorizontalRule().run()}
+              title="Séparateur"
+            >
+              <Minus className="h-4 w-4" />
+            </ToolbarButton>
+
+            <ToolbarButton
+              onClick={() => editor.chain().focus().undo().run()}
+              disabled={!editor.can().undo()}
+              title="Annuler"
+            >
+              <Undo className="h-4 w-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor.chain().focus().redo().run()}
+              disabled={!editor.can().redo()}
+              title="Rétablir"
+            >
+              <Redo className="h-4 w-4" />
+            </ToolbarButton>
+          </div>
+        )}
       </TooltipProvider>
       {linkMode && (
         <div className="flex items-center gap-2 border-b border-border bg-muted/20 px-3 py-2">
@@ -574,7 +866,16 @@ export function RichTextEditor({
           </Button>
         </div>
       )}
-      <EditorContent editor={editor} />
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={onImageFileSelected}
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   );
 }

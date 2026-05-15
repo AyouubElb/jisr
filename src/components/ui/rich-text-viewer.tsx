@@ -19,8 +19,12 @@ export function RichTextViewer({
       "ul", "ol", "li",
       "blockquote", "hr", "code", "pre",
       "a", "mark", "span",
+      "img",
     ],
-    ALLOWED_ATTR: ["href", "target", "rel", "style", "class"],
+    ALLOWED_ATTR: [
+      "href", "target", "rel", "style", "class",
+      "src", "alt", "title", "width", "height", "loading",
+    ],
   });
 
   return (
