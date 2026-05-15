@@ -1,16 +1,24 @@
 /**
- * Lesson generation prompt — single-call agent that produces a STUDENT
- * REVISION DOCUMENT (not a teacher's lesson plan). The output is reference
- * material the student keeps and re-reads at home.
+ * Lesson generation prompt — single-call agent producing a DUAL-PURPOSE
+ * document: the instructor screen-shares it in the meeting AND the student
+ * re-reads it at home. PEDAGOGY.md §3.1.
  *
- * Two templates, one per lesson type:
- * - grammar    → definition + use + form + examples + common mistakes + check
- * - vocabulary → word list, each entry with meaning + example + collocations
- *                + false-friend warnings
+ * Templates branch on level (PEDAGOGY §3.3):
+ * - A1/A2 → simple, pattern-driven, no metalanguage, per-word Say/Not pairs
+ * - B1+   → documentation pattern (definition → use → form → examples → CM → check)
  *
- * CEFR level controls vocabulary budget, explanation complexity, French
- * scaffolding, and example count — not the structural skeleton.
+ * All pedagogy blocks (CEFR rules, L1 interference, templates, self-check)
+ * are imported from lesson-pedagogy.ts — single source of truth shared with
+ * lesson-edit so the two agents never drift.
  */
+import {
+  CEFR_LESSON_RULES,
+  FRENCH_L1_INTERFERENCE,
+  LESSON_SELF_CHECK,
+  A1_A2_TEMPLATES,
+  B1_PLUS_TEMPLATES,
+} from "./lesson-pedagogy";
+
 export type CEFRLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 export type LessonType = "grammar" | "vocabulary" | "resource";
 export type LessonDepth = "quick" | "detailed";
@@ -27,7 +35,6 @@ export interface LessonGenContext {
   includeExercises: boolean;
   includeFrenchSupport: boolean;
   theme?: string;
-  extraNotes?: string;
 }
 
 export const LESSON_GEN_SYSTEM_PROMPT = `You generate a STUDENT REVISION DOCUMENT in HTML for an English lesson. The reader is a Moroccan student (French L1) who will re-read this at home AFTER the live class. You are NOT writing a lesson plan for a teacher.
@@ -49,79 +56,28 @@ HARD RULES for new_content:
 8. NO closing remarks like "I hope this helps" or "Bonne révision !". The document is reference material, not a letter.
 
 ═══════════════════════════════════════════════════════════════════
-TEMPLATE A — GRAMMAR LESSON (lessonType = "grammar")
-═══════════════════════════════════════════════════════════════════
-Sections, in this exact order. Skip a section only if it does not apply.
-
-  <h2>What is it</h2>          → 1-2 sentence definition. Plain English at A1-A2.
-  <h2>When to use it</h2>      → Function / meaning. List 2-4 typical uses with <ul>.
-  <h2>How to form it</h2>      → Structure / rule. Use <ul> for affirmative / negative / question forms when relevant.
-  <h2>Examples</h2>            → 3-8 example sentences, each in its own <blockquote>.
-  <h2>Common mistakes</h2>     → French L1 interference + typical errors. Use <ul>.
-  <h2>Quick check</h2>         → 2-4 self-test items (only if includeExercises = true).
-
-═══════════════════════════════════════════════════════════════════
-TEMPLATE B — VOCABULARY LESSON (lessonType = "vocabulary")
+TEMPLATE — depends on level
 ═══════════════════════════════════════════════════════════════════
 
-  <h2>About these words</h2>   → 1-2 sentence intro framing the theme/group.
-  <h2>Word list</h2>           → For each word, use a <h3>word</h3> followed by <p>meaning</p> + <blockquote>example</blockquote>. Add <p><em>Collocations:</em> ...</p> if natural. Add <p><em>Be careful:</em> ...</p> for false friends.
-  <h2>Common mistakes</h2>     → Pronunciation / spelling / French interference traps. Use <ul>.
-  <h2>Quick check</h2>         → 2-4 self-test items (only if includeExercises = true).
+The template skeleton is NOT the same across levels. A1/A2 use a simpler,
+pattern-driven, screen-share-friendly shape. B1+ use the documentation
+pattern. The user prompt below inlines the exact template for the level you
+must follow — read it before writing.
 
-═══════════════════════════════════════════════════════════════════
-RESOURCE LESSON (lessonType = "resource")
-═══════════════════════════════════════════════════════════════════
-Free-form. Use clear <h2> sections that match what the instructor asked for. Still follow rules 1-8 (HTML, blockquotes for examples, no placeholders).
+For lessonType = "resource" at any level: free-form. Use clear <h2> sections
+that match what the instructor asked for. Still follow HARD RULES 1-8.
 
 ═══════════════════════════════════════════════════════════════════
 CEFR LEVEL RULES
 ═══════════════════════════════════════════════════════════════════
 
-A1 (Beginner):
-- Max 8 new vocabulary items in any one lesson.
-- Vocabulary from Oxford 3000 only. No academic words, no idioms, no phrasal verbs.
-- Sentences in explanations: short, present tense, max 12 words.
-- 4-6 examples for grammar, plain everyday situations.
-- Always include French translations in blockquotes (next line via <br>).
-- French interference notes are mandatory in "Common mistakes".
+${CEFR_LESSON_RULES}
 
-A2 (Elementary):
-- Max 12 new vocabulary items.
-- Oxford 3000 + a few high-frequency domain words (work, home, travel).
-- Sentences max 15 words. Simple past, present, basic future are OK.
-- 4-6 examples.
-- French translations in blockquotes still encouraged.
-- Include 2-3 French interference notes.
+═══════════════════════════════════════════════════════════════════
+COMMON MISTAKES — FRENCH INTERFERENCE
+═══════════════════════════════════════════════════════════════════
 
-B1 (Intermediate):
-- Max 18 vocabulary items.
-- Oxford 3000-5000. Phrasal verbs OK if common (find out, look for, give up).
-- Sentences may be complex but stay readable. Avoid academic jargon.
-- 5-8 examples.
-- French translations only for tricky phrases or false friends, NOT every example.
-- 1-2 French interference notes when relevant.
-
-B2 (Upper Intermediate):
-- Max 25 vocabulary items.
-- Full Oxford 5000 + early Academic Word List.
-- Nuanced explanations OK. Compare close synonyms.
-- 5-8 examples, including at least one in formal register.
-- NO blanket French translations. Only flag false friends explicitly.
-- Common mistakes section focuses on register, collocation, register-appropriate use.
-
-C1 (Advanced):
-- Max 25 vocabulary items, including specialized / less frequent words.
-- Cover register, connotation, stylistic variation.
-- 5-8 examples mixing registers.
-- French only when a false friend or pragmatic gap is genuinely useful.
-- "Common mistakes" focuses on overuse, register mismatch, idiomatic precision.
-
-C2 (Proficiency):
-- Up to 25 items, often rare / literary / idiomatic.
-- Discuss connotation, irony, register, collocation strength.
-- 5-8 examples, varied registers and styles.
-- No French unless a faux ami is the actual point.
+${FRENCH_L1_INTERFERENCE}
 
 ═══════════════════════════════════════════════════════════════════
 DEPTH RULES
@@ -175,56 +131,10 @@ If a theme is provided (work, family, travel, daily life, etc.), all examples sh
 If no theme: use general everyday situations.
 
 ═══════════════════════════════════════════════════════════════════
-SELF-CHECK BEFORE FINALIZING (do this internally, do not output it)
+SELF-CHECK BEFORE FINALIZING
 ═══════════════════════════════════════════════════════════════════
 
-Before you write the final "new_content", review your draft once with this
-checklist. Fix any violation, THEN output. Do NOT include the checklist in
-the output, and do not narrate the review.
-
-1. VOCABULARY LEVEL — for every content word you used (noun, verb,
-   adjective, adverb), ask: "Is this word common everyday English at this
-   CEFR level?"
-   - At A1: only the most frequent ~1500 English words. If a word feels
-     formal, technical, or rarely heard in casual speech, REPLACE it with a
-     simpler everyday synonym.
-     Examples of words that FEEL common but are above A1 (replace them):
-       destination → place you go to / where you go
-       journey     → trip
-       luggage     → bag / bags
-       booking     → reservation is ALSO too hard — use the verb "book" ("I book a hotel")
-       reservation → "book" (verb)
-       official    → simpler description, often droppable
-       emphasize   → show / mean
-       opportunity → chance
-       individual  → person
-       purchase    → buy
-       location    → place
-       accommodate → fit / take
-       anxious / frustrated / embarrassed → sad / angry / not happy
-       sufficient  → enough
-       immediately → now / fast
-       require     → need
-       provide     → give
-   - At A2: ~2500 most frequent words. Avoid academic / abstract vocabulary.
-   - At B1: ~4000 most frequent + common phrasal verbs. Avoid academic words.
-   - At B2: Oxford 5000 + early Academic Word List is OK.
-   - At C1/C2: unrestricted, but be deliberate about register.
-
-2. DEFINITION SIMPLICITY — a definition must NEVER use a word that is
-   harder than the word being defined. If you defined a hard word with an
-   even harder synonym, rewrite using simple everyday English.
-
-3. SENTENCE COMPLEXITY — at A1, no sentence over 12 words; at A2, max 15.
-   Break long sentences into two short ones.
-
-4. VOCAB BUDGET — count distinct new vocabulary items introduced (the
-   <h3>word</h3> entries for vocabulary lessons; or new content words in
-   grammar lessons). Stay within the cap for the level (A1: 8, A2: 12,
-   B1: 18, B2-C2: 25). If over, drop the most advanced items.
-
-5. FACTS — every claim about English must be true. If unsure, omit. No
-   invented register notes, no fake British/American distinctions.
+${LESSON_SELF_CHECK}
 
 After this internal review, output ONLY the JSON with "summary" and
 "new_content".
@@ -245,9 +155,10 @@ export const buildLessonGenUserPrompt = (ctx: LessonGenContext): string => {
     ? `Theme / context: ${ctx.theme.trim()}`
     : "Theme / context: (none — use general everyday situations)";
 
-  const notesBlock = ctx.extraNotes?.trim()
-    ? `\nExtra instructor notes:\n${ctx.extraNotes.trim()}\n`
-    : "";
+  // Branch the template by level — A1/A2 get the simple pattern-driven
+  // shape, B1+ get the documentation pattern. PEDAGOGY §3.3.
+  const isLowLevel = ctx.courseLevel === "A1" || ctx.courseLevel === "A2";
+  const templateBlock = isLowLevel ? A1_A2_TEMPLATES : B1_PLUS_TEMPLATES;
 
   return `Course: ${ctx.courseTitle} (Level: ${ctx.courseLevel})
 Lesson title: ${ctx.lessonTitle}
@@ -255,9 +166,17 @@ Lesson type: ${ctx.lessonType}
 
 Scope: ${ctx.scope}
 Depth: ${ctx.depth}
-Include exercises (Quick check section): ${ctx.includeExercises ? "yes" : "no"}
+Include exercises: ${ctx.includeExercises ? "yes" : "no"}
 Include French support (translations + contrastive notes): ${ctx.includeFrenchSupport ? "yes" : "no"}
 ${themeLine}
-${notesBlock}
-Generate the full lesson HTML following the template for "${ctx.lessonType}" lessons at level ${ctx.courseLevel}, with depth = "${ctx.depth}". Return JSON with "summary" and "new_content".`;
+
+═══════════════════════════════════════════════════════════════════
+TEMPLATE TO FOLLOW (for level ${ctx.courseLevel})
+═══════════════════════════════════════════════════════════════════
+
+${templateBlock}
+
+═══════════════════════════════════════════════════════════════════
+
+Generate the full lesson HTML following the "${ctx.lessonType}" template above for level ${ctx.courseLevel}, with depth = "${ctx.depth}". Return JSON with "summary" and "new_content".`;
 };

@@ -11,6 +11,7 @@ import {
   AIGenerationError,
   AIQuotaExceededError,
 } from "@/lib/ai/types";
+import { aiLimiter, enforceRateLimit } from "@/lib/services/rate-limit.service";
 
 const Body = z.object({
   lessonId: z.uuid(),
@@ -19,7 +20,6 @@ const Body = z.object({
   includeExercises: z.boolean(),
   includeFrenchSupport: z.boolean(),
   theme: z.string().max(200).optional(),
-  extraNotes: z.string().max(1000).optional(),
 });
 
 export async function POST(req: Request): Promise<Response> {
@@ -32,6 +32,9 @@ export async function POST(req: Request): Promise<Response> {
   if (authError || !user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
+
+  const limited = await enforceRateLimit(aiLimiter, user.id);
+  if (limited) return limited;
 
   let body: z.infer<typeof Body>;
   try {

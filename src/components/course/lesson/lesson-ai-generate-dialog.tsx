@@ -44,7 +44,6 @@ interface FormState {
   includeExercises: boolean;
   includeFrenchSupport: boolean;
   theme: string;
-  extraNotes: string;
 }
 
 const defaultForm = (level: CEFRLevel): FormState => ({
@@ -54,16 +53,15 @@ const defaultForm = (level: CEFRLevel): FormState => ({
   // French support is the recommended default for A1/A2.
   includeFrenchSupport: level === "A1" || level === "A2",
   theme: "",
-  extraNotes: "",
 });
 
 const SCOPE_PLACEHOLDER: Record<LessonType, string> = {
   grammar:
-    "ex: present simple, affirmative + negative + questions",
+    "e.g. present simple, affirmative + negative + questions",
   vocabulary:
-    "ex: 12 words about travel and transportation",
+    "e.g. 12 words about travel and transportation",
   resource:
-    "ex: a short reading on Moroccan tea culture",
+    "e.g. a short reading on Moroccan tea culture",
 };
 
 export function LessonAIGenerateDialog({
@@ -94,7 +92,6 @@ export function LessonAIGenerateDialog({
         includeExercises: form.includeExercises,
         includeFrenchSupport: form.includeFrenchSupport,
         theme: form.theme.trim() || undefined,
-        extraNotes: form.extraNotes.trim() || undefined,
       },
       {
         onSuccess: (res) => {
@@ -111,25 +108,23 @@ export function LessonAIGenerateDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            Générer la leçon avec l&apos;IA
+            Generate the lesson with AI
           </DialogTitle>
           <DialogDescription>
-            Quelques questions pour produire une leçon adaptée. Vous pourrez
-            ensuite l&apos;éditer librement.
+            A few questions to produce a tailored lesson. You can edit it freely afterwards.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           {hasExistingContent ? (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Cette leçon contient déjà du contenu. La génération le
-              remplacera entièrement.
+              This lesson already has content. Generation will replace it entirely.
             </div>
           ) : null}
 
           <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             <div>
-              <span className="font-medium text-foreground">Niveau:</span>{" "}
+              <span className="font-medium text-foreground">Level:</span>{" "}
               {courseLevel}
             </div>
             <div>
@@ -137,14 +132,14 @@ export function LessonAIGenerateDialog({
               {lessonType}
             </div>
             <div className="col-span-2 truncate">
-              <span className="font-medium text-foreground">Titre:</span>{" "}
+              <span className="font-medium text-foreground">Title:</span>{" "}
               {lessonTitle}
             </div>
           </div>
 
           <div className="space-y-1.5">
             <Label className="text-xs">
-              Que doit couvrir cette leçon ?{" "}
+              What should this lesson cover?{" "}
               <span className="text-destructive">*</span>
             </Label>
             <Textarea
@@ -159,7 +154,7 @@ export function LessonAIGenerateDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Profondeur</Label>
+              <Label className="text-xs">Depth</Label>
               <Select
                 value={form.depth}
                 onValueChange={(v) => update("depth", v as Depth)}
@@ -169,18 +164,18 @@ export function LessonAIGenerateDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="quick">Rapide (1 page)</SelectItem>
-                  <SelectItem value="detailed">Détaillée (2-3 pages)</SelectItem>
+                  <SelectItem value="quick">Quick (1 page)</SelectItem>
+                  <SelectItem value="detailed">Detailed (2-3 pages)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs">Thème (optionnel)</Label>
+              <Label className="text-xs">Theme (optional)</Label>
               <Input
                 value={form.theme}
                 onChange={(e) => update("theme", e.target.value)}
-                placeholder="ex: travail, voyage, famille"
+                placeholder="e.g. work, travel, family"
                 disabled={isPending}
               />
             </div>
@@ -196,9 +191,9 @@ export function LessonAIGenerateDialog({
                 className="mt-0.5"
               />
               <span>
-                <span className="font-medium">Inclure des exercices</span>
+                <span className="font-medium">Include exercises</span>
                 <span className="block text-xs text-muted-foreground">
-                  Section &laquo; Quick check &raquo; à la fin (2-4 questions)
+                  &ldquo;Quick check&rdquo; section at the end (2-4 questions)
                 </span>
               </span>
             </label>
@@ -215,27 +210,15 @@ export function LessonAIGenerateDialog({
               />
               <span>
                 <span className="font-medium">
-                  Support en français
+                  French support
                 </span>
                 <span className="block text-xs text-muted-foreground">
-                  Traductions et notes contrastives FR/EN (recommandé pour
-                  A1-A2)
+                  Translations and FR/EN contrastive notes (recommended for A1-A2)
                 </span>
               </span>
             </label>
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs">Notes pour l&apos;IA (optionnel)</Label>
-            <Textarea
-              value={form.extraNotes}
-              onChange={(e) => update("extraNotes", e.target.value)}
-              placeholder="Précisions, points à éviter, exigences particulières…"
-              rows={2}
-              disabled={isPending}
-              className="resize-none text-sm"
-            />
-          </div>
         </div>
 
         <DialogFooter>
@@ -245,7 +228,7 @@ export function LessonAIGenerateDialog({
             onClick={() => onOpenChange(false)}
             disabled={isPending}
           >
-            Annuler
+            Cancel
           </Button>
           <Button
             type="button"
@@ -256,12 +239,12 @@ export function LessonAIGenerateDialog({
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Génération…
+                Generating…
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Générer la leçon
+                Generate lesson
               </>
             )}
           </Button>

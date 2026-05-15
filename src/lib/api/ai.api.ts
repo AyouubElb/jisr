@@ -75,7 +75,6 @@ export interface GenerateLessonInput {
   includeExercises: boolean;
   includeFrenchSupport: boolean;
   theme?: string;
-  extraNotes?: string;
 }
 
 export interface GenerateLessonResponse {

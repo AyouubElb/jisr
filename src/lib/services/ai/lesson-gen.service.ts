@@ -19,7 +19,6 @@ export interface ProposeLessonGenInput {
   includeExercises: boolean;
   includeFrenchSupport: boolean;
   theme?: string;
-  extraNotes?: string;
 }
 
 export interface ProposeLessonGenResult {
@@ -92,7 +91,6 @@ export const proposeLessonGen = async (
       includeExercises: input.includeExercises,
       includeFrenchSupport: input.includeFrenchSupport,
       theme: input.theme,
-      extraNotes: input.extraNotes,
     },
   });
 
