@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useProposeAILessonEdit } from "@/lib/hooks/useAILesson";
 import type { ProposeLessonEditResponse } from "@/lib/api/ai.api";
 import { applyDiffDecision } from "@/lib/ai/lesson-diff";
+import { normalizeHtml } from "@/lib/ai/html-normalize";
 
 interface LessonAIEditChatProps {
   lessonId: string;
@@ -132,8 +133,10 @@ export function LessonAIEditChat({
 
   const onAcceptAll = (): void => {
     if (!proposal) return;
-    // Clean diff: drop deletions, unwrap insertions.
-    onAccept(applyDiffDecision(proposal.diffHtml, "accept"));
+    // Drop deletions, unwrap insertions, then normalize — the diff path
+    // leaves empty tag skeletons when blocks change; clean them before
+    // they reach the form/DB instead of waiting for the next request.
+    onAccept(normalizeHtml(applyDiffDecision(proposal.diffHtml, "accept")));
     setHistory((prev) =>
       pruneHistory([
         ...prev,

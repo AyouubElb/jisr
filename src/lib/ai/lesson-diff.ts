@@ -1,84 +1,100 @@
 import { diff_match_patch } from "diff-match-patch";
+import { parse, HTMLElement, NodeType, type Node } from "node-html-parser";
 
-// Block-level HTML diff. Splits each side into block elements (<p>, <h2>,
-// <blockquote>, <li>, etc.), diffs the blocks as units, then wraps each
-// changed block's text content in <span data-diff="del"> / "ins">. The
-// Tiptap diff-marks extension renders these red/green when the editor is
-// in preview mode.
+// Block-level HTML diff. Splits each side into top-level blocks, diffs them
+// as units, wraps changed blocks' text in <span data-diff="del"|"ins">.
+// Walks a real parsed tree — never regex on HTML, which cuts nested
+// <blockquote>/<li> in half and produces unbalanced markup.
 
-// Resolve a diff-marked HTML to its final form. Accept = drop deletions, keep
-// insertions. Reject = drop insertions, keep deletions.
+// ── tree helpers ─────────────────────────────────────────────────────────
+
+const isElement = (n: Node): n is HTMLElement => n.nodeType === NodeType.ELEMENT_NODE;
+const isTextNode = (n: Node): boolean => n.nodeType === NodeType.TEXT_NODE;
+
+// Empty = no visible text and no real child element (a lone <br> doesn't count).
+const isEmptyBlock = (el: HTMLElement): boolean => {
+  if (el.text.trim().length > 0) return false;
+  const hasRealChild = el.childNodes.some(
+    (c) => isElement(c) && (c as HTMLElement).tagName !== "BR",
+  );
+  return !hasRealChild;
+};
+
+// Wrap every non-whitespace text node in a data-diff span. Rebuilds each
+// element's content (text nodes have no replaceWith — only elements do).
+const wrapTextNodes = (el: HTMLElement, kind: "del" | "ins"): void => {
+  for (const child of el.childNodes) {
+    if (isElement(child)) wrapTextNodes(child, kind);
+  }
+  let touched = false;
+  const rebuilt = el.childNodes
+    .map((child) => {
+      if (!isTextNode(child)) return child.toString();
+      const text = child.rawText;
+      if (text.trim().length === 0) return text;
+      touched = true;
+      return `<span data-diff="${kind}">${text}</span>`;
+    })
+    .join("");
+  if (touched) el.set_content(rebuilt);
+};
+
+// ── public: apply an accept/reject decision to diff-marked HTML ──────────
+
+// Accept = drop deletions, unwrap insertions. Reject = the opposite.
 export const applyDiffDecision = (
   diffHtml: string,
   decision: "accept" | "reject",
 ): string => {
   const drop = decision === "accept" ? "del" : "ins";
   const keep = decision === "accept" ? "ins" : "del";
-  const dropRe = new RegExp(
-    `<span[^>]*data-diff=["']${drop}["'][^>]*>[\\s\\S]*?</span>`,
-    "g",
-  );
-  const keepRe = new RegExp(
-    `<span[^>]*data-diff=["']${keep}["'][^>]*>([\\s\\S]*?)</span>`,
-    "g",
-  );
-  let result = diffHtml.replace(dropRe, "").replace(keepRe, "$1");
-  // Remove block tags left empty after deletions are stripped.
-  // Runs twice: first pass cleans inner <p>/<li>/etc., second pass cleans
-  // outer wrappers (e.g. <blockquote><p><br></p></blockquote>) left empty
-  // after the inner block was removed.
-  const emptyBlockRe = /<(p|h[1-6]|blockquote|li|pre)(\s[^>]*)?>\s*(<br[^>]*>\s*)*<\/\1>/g;
-  result = result.replace(emptyBlockRe, "").replace(emptyBlockRe, "");
-  return result;
+
+  const root = parse(diffHtml);
+
+  for (const span of root.querySelectorAll(`span[data-diff="${drop}"]`)) {
+    span.remove();
+  }
+  for (const span of root.querySelectorAll(`span[data-diff="${keep}"]`)) {
+    span.replaceWith(parse(span.innerHTML));
+  }
+
+  // Prune blocks emptied by a stripped deletion. Loop until stable so an
+  // emptied inner block also clears its now-childless wrapper.
+  let pruned = true;
+  while (pruned) {
+    pruned = false;
+    for (const el of root.querySelectorAll("p,h1,h2,h3,h4,h5,h6,blockquote,li,ul,ol,pre")) {
+      if (isEmptyBlock(el)) {
+        el.remove();
+        pruned = true;
+      }
+    }
+  }
+
+  return root.toString();
 };
 
-// Block tags we split on. Each becomes one diff unit.
-const BLOCK_TAGS = [
-  "p",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "blockquote",
-  "li",
-  "pre",
-  "hr",
-];
+// ── block splitting ──────────────────────────────────────────────────────
 
-// Split an HTML string into top-level block units. Each unit is a self-
-// contained outerHTML string. List wrappers (<ul>, <ol>) are preserved as
-// boundary markers so they survive in the output.
+// Split HTML into top-level block units — each a balanced outerHTML string.
+// <ul>/<ol> stays whole as one block (its items diff together).
 const splitBlocks = (html: string): string[] => {
   if (!html.trim()) return [];
+  const root = parse(html);
   const blocks: string[] = [];
-  // Match opening tag of each block element + capture until its closing tag.
-  // Also capture <ul>/<ol> wrappers so we can keep their structure.
-  const re = new RegExp(
-    `<(?:${BLOCK_TAGS.join("|")}|ul|ol)\\b[^>]*>[\\s\\S]*?</(?:${BLOCK_TAGS.join("|")}|ul|ol)>|<hr\\s*/?>`,
-    "gi",
-  );
-  let last = 0;
-  for (const m of html.matchAll(re)) {
-    const idx = m.index;
-    if (idx === undefined) continue;
-    if (idx > last) {
-      const between = html.slice(last, idx).trim();
-      if (between.length > 0) blocks.push(between);
+  for (const node of root.childNodes) {
+    if (isElement(node)) {
+      blocks.push(node.toString());
+    } else if (isTextNode(node)) {
+      const text = node.rawText.trim();
+      if (text.length > 0) blocks.push(text);
     }
-    blocks.push(m[0]);
-    last = idx + m[0].length;
-  }
-  if (last < html.length) {
-    const tail = html.slice(last).trim();
-    if (tail.length > 0) blocks.push(tail);
   }
   return blocks;
 };
 
-// Map each unique block to a unique code point so diff_match_patch can run
-// at block granularity. Same trick its line-mode uses.
+// Map each unique block to a code point so diff_match_patch runs at block
+// granularity. Same trick its line-mode uses.
 const blocksToChars = (
   s1: string[],
   s2: string[],
@@ -101,14 +117,15 @@ const blocksToChars = (
   return { chars1: munge(s1), chars2: munge(s2), blockArray };
 };
 
-// Wrap each text node inside an HTML block with a data-diff span.
-// Tags inside the block are kept untouched.
-const wrapBlockTextWith = (blockHtml: string, kind: "del" | "ins"): string => {
-  return blockHtml.replace(/(>)([^<]+)(<)/g, (_, before, text: string, after) => {
-    if (text.trim().length === 0) return `${before}${text}${after}`;
-    return `${before}<span data-diff="${kind}">${text}</span>${after}`;
-  });
+// Wrap every text node inside one block's HTML with a data-diff span.
+// Exported so the op-driven diff (lesson-blocks.ts) can reuse it.
+export const wrapBlockTextWith = (blockHtml: string, kind: "del" | "ins"): string => {
+  const root = parse(blockHtml);
+  wrapTextNodes(root, kind);
+  return root.toString();
 };
+
+// ── public: build diff-marked HTML from old + new ────────────────────────
 
 export const buildDiffHtml = (oldHtml: string, newHtml: string): string => {
   if (oldHtml === newHtml) return newHtml;
@@ -116,11 +133,9 @@ export const buildDiffHtml = (oldHtml: string, newHtml: string): string => {
   const oldBlocks = splitBlocks(oldHtml);
   const newBlocks = splitBlocks(newHtml);
 
-  // Empty -> all-new: wrap every new block as ins.
   if (oldBlocks.length === 0) {
     return newBlocks.map((b) => wrapBlockTextWith(b, "ins")).join("");
   }
-  // New empty -> all-deleted: wrap every old block as del.
   if (newBlocks.length === 0) {
     return oldBlocks.map((b) => wrapBlockTextWith(b, "del")).join("");
   }

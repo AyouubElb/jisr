@@ -5,7 +5,7 @@ import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
 import { DEFAULT_MODEL } from "@/lib/ai/constants";
-import { buildDiffHtml } from "@/lib/ai/lesson-diff";
+import { normalizeHtml } from "@/lib/ai/html-normalize";
 import type { CEFRLevel } from "@/lib/types";
 
 // Service-layer errors. Route handlers map these to HTTP status codes.
@@ -96,8 +96,11 @@ export const proposeLessonEdit = async (
   await assertQuota(supabase, userId, "lesson_edit");
 
   // ── Current content: client's unsaved buffer wins, else DB ─────────
-  const currentContent =
-    input.currentContent ?? (lesson.content as string | null) ?? "";
+  // Normalized so the model + diff baseline never see empty inline shells
+  // or nested blockquotes left by a past bad edit.
+  const currentContent = normalizeHtml(
+    input.currentContent ?? (lesson.content as string | null) ?? "",
+  );
 
   const requestStartedAt = Date.now();
   console.log(
@@ -105,16 +108,16 @@ export const proposeLessonEdit = async (
   );
 
   // ── LLM call (throws AIGenerationError on failure) ─────────────────
+  // The generator splits the lesson into numbered blocks, runs the model,
+  // applies the block ops, and returns the new HTML + diff.
   const result = await runLessonEdit({
-    context: {
-      courseTitle: course.title,
-      courseLevel: course.level,
-      lessonTitle: lesson.title,
-      lessonType: lesson.type as "grammar" | "vocabulary" | "resource",
-      currentContent,
-      chatHistory: input.chatHistory ?? "",
-      instruction: input.instruction,
-    },
+    courseTitle: course.title,
+    courseLevel: course.level,
+    lessonTitle: lesson.title,
+    lessonType: lesson.type as "grammar" | "vocabulary" | "resource",
+    currentContent,
+    chatHistory: input.chatHistory ?? "",
+    instruction: input.instruction,
   });
 
   const totalMs = Date.now() - requestStartedAt;
@@ -125,7 +128,7 @@ export const proposeLessonEdit = async (
     );
   } else {
     console.log(
-      `[ai/edit-lesson] ← edit | latency=${totalMs}ms (llm=${result.latencyMs}ms) | tokens in=${tokens.inputTokens ?? "?"} out=${tokens.outputTokens ?? "?"} | newContent=${result.output.new_content.length} chars | summary="${result.output.summary}"`,
+      `[ai/edit-lesson] ← edit | latency=${totalMs}ms (llm=${result.latencyMs}ms) | tokens in=${tokens.inputTokens ?? "?"} out=${tokens.outputTokens ?? "?"} | ${result.output.changeCount} ops | changedBlocks=[${result.output.changedBlocks.join(",")}] | newContent=${result.output.newContent.length} chars | summary="${result.output.summary}"`,
     );
   }
 
@@ -153,12 +156,13 @@ export const proposeLessonEdit = async (
     };
   }
 
-  const newContent = result.output.new_content;
+  // newContent + diffHtml are already computed by the generator (it owns
+  // the block split + apply + diff).
   return {
     kind: "edit",
     generationId,
     summary: result.output.summary,
-    newContent,
-    diffHtml: buildDiffHtml(currentContent, newContent),
+    newContent: result.output.newContent,
+    diffHtml: result.output.diffHtml,
   };
 };

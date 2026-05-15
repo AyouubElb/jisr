@@ -8,8 +8,8 @@ export const PROMPT_VERSIONS = {
   quiz_gen: "quiz_gen_v10",
   quiz_edit: "quiz_edit_v4",
   quiz_judge: "quiz_judge_v1",
-  lesson_edit: "lesson_edit_v4",
-  lesson_gen: "lesson_gen_v2",
+  lesson_edit: "lesson_edit_v7",
+  lesson_gen: "lesson_gen_v4",
 } as const;
 
 /**
@@ -176,12 +176,10 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
   },
 };
 
-/**
- * MVP default. Tier column is not in `profiles` yet — everyone is treated
- * as `studio` for now so we don't block the founder's sister.
- * Replace with profile lookup when pricing ships.
- */
-export const DEFAULT_TIER: Tier = "studio";
+// Fallback tier when profiles.tier is null or missing. "free" = $0 budget,
+// so a misconfigured account fails closed (no AI) instead of silently
+// granting paid quotas. Real tier comes from profiles.tier via getUserTier().
+export const DEFAULT_TIER: Tier = "free";
 
 // ── Quiz generation caps (enforced server-side in route; mirrored in dialog for UX) ──
 export const QUIZ_GEN_MAX_LESSONS = 1;
