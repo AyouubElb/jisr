@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   Check,
@@ -52,7 +52,6 @@ const LESSON_TYPE_LABEL: Record<Lesson["type"], string> = {
 
 export default function StudentLessonViewerPage(): React.JSX.Element {
   const params = useParams();
-  const router = useRouter();
   const courseId = params.id as string;
   const lessonId = params.lessonId as string;
 
@@ -122,16 +121,21 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
 
   const isDone = current ? completedLessonIds.has(current.id) : false;
 
-  // Auto-expand the section containing the current item so the sidebar
-  // lands pre-scrolled to the right place.
+  // Seed the active section as expanded — adjust state during render with a
+  // state guard, per react.dev "Adjusting some state when a prop changes".
   const currentSectionId = current
     ? course?.sections?.[current.sectionIndex]?.id
     : undefined;
-  const effectiveExpanded = useMemo(() => {
-    const set = new Set(expandedSections);
-    if (currentSectionId) set.add(currentSectionId);
-    return set;
-  }, [expandedSections, currentSectionId]);
+  const [seededSectionId, setSeededSectionId] = useState<string | null>(null);
+  if (currentSectionId && seededSectionId !== currentSectionId) {
+    setSeededSectionId(currentSectionId);
+    setExpandedSections((prev) => {
+      if (prev.has(currentSectionId)) return prev;
+      const nextSet = new Set(prev);
+      nextSet.add(currentSectionId);
+      return nextSet;
+    });
+  }
 
   const toggleSection = (id: string): void => {
     setExpandedSections((prev) => {
@@ -149,12 +153,7 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
 
   const handleComplete = (): void => {
     if (!current) return;
-    markComplete(current.id, {
-      onSuccess: () => {
-        // Flow naturally to the next item — lesson or quiz — when marking complete.
-        if (next) router.push(hrefFor(next));
-      },
-    });
+    markComplete(current.id);
   };
 
   const handleDownload = async (path: string, name: string): Promise<void> => {
@@ -230,7 +229,7 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
             onClick={() => window.print()}
           >
             <Printer className="h-4 w-4" />
-            <span className="hidden sm:inline">Télécharger PDF</span>
+            <span className="hidden md:inline">Télécharger PDF</span>
           </Button>
         ) : undefined
       }
@@ -241,7 +240,7 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
           activeItemId={current.id}
           completedLessonIds={completedLessonIds}
           submittedQuizIds={submittedQuizIds}
-          expandedSections={effectiveExpanded}
+          expandedSections={expandedSections}
           onToggleSection={toggleSection}
         />
       }
@@ -250,12 +249,12 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
           <div>
             {prev ? (
               <Link href={hrefFor(prev)}>
-                <Button variant="outline" size="sm">
+                <Button variant="ghost" size="sm" className="text-muted-foreground">
                   <ChevronLeft className="mr-1 h-4 w-4" />
-                  <span className="hidden sm:inline">
-                    {prev.kind === "quiz" ? "Quiz precedent" : "Lecon precedente"}
+                  <span className="hidden md:inline">
+                    {prev.kind === "quiz" ? "Quiz précédent" : "Leçon précédente"}
                   </span>
-                  <span className="sm:hidden">Prec.</span>
+                  <span className="md:hidden">Préc.</span>
                 </Button>
               </Link>
             ) : (
@@ -264,49 +263,52 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
           </div>
           <div className="flex items-center gap-2">
             {isDone ? (
-              <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-600">
+              <span className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-emerald-700">
                 <CheckCircle2 className="h-4 w-4" />
-                Termine
+                <span className="hidden md:inline">Terminé</span>
               </span>
             ) : (
-              <Button
-                size="sm"
-                disabled={marking}
-                onClick={handleComplete}
-              >
+              <Button size="sm" disabled={marking} onClick={handleComplete}>
                 <Check className="mr-1 h-4 w-4" />
-                Marquer termine
+                <span className="hidden md:inline">Marquer terminé</span>
+                <span className="md:hidden">Terminé</span>
               </Button>
             )}
-          </div>
-          <div>
             {next ? (
-              <Link href={hrefFor(next)}>
-                <Button variant="outline" size="sm">
-                  <span className="hidden sm:inline">
-                    {next.kind === "quiz" ? "Quiz suivant" : "Lecon suivante"}
+              isDone ? (
+                <Link href={hrefFor(next)}>
+                  <Button variant="outline" size="sm">
+                    <span className="hidden md:inline">
+                      {next.kind === "quiz" ? "Quiz suivant" : "Leçon suivante"}
+                    </span>
+                    <span className="md:hidden">Suiv.</span>
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </Link>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  title="Marquez la leçon terminée pour continuer"
+                >
+                  <span className="hidden md:inline">
+                    {next.kind === "quiz" ? "Quiz suivant" : "Leçon suivante"}
                   </span>
-                  <span className="sm:hidden">Suiv.</span>
+                  <span className="md:hidden">Suiv.</span>
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
-              </Link>
-            ) : (
-              <div />
-            )}
+              )
+            ) : null}
           </div>
         </>
       }
     >
       {/* Header */}
-      <div className="space-y-3 pb-6">
-        <div className="flex flex-wrap items-center gap-2 print:hidden">
-          <Badge variant="outline" className="text-[10px]">
-            {LESSON_TYPE_LABEL[lesson.type]}
-          </Badge>
-          <span className="text-xs text-muted-foreground">
-            Section {current.sectionIndex + 1} &middot; {current.sectionTitle}
-          </span>
-        </div>
+      <div className="space-y-2 pb-6">
+        <Badge variant="outline" className="text-[10px] print:hidden">
+          {LESSON_TYPE_LABEL[lesson.type]}
+        </Badge>
         <h1 className="text-3xl font-bold tracking-tight text-amber-950 print:text-black print:text-2xl">
           {lesson.title}
         </h1>
