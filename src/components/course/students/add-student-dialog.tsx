@@ -45,7 +45,7 @@ export function AddStudentDialog({
       <Tooltip>
         <TooltipTrigger render={cloneElement(trigger, { disabled: true })} />
         <TooltipContent>
-          Publiez le cours pour pouvoir inscrire des etudiants
+          Publish the course before enrolling students
         </TooltipContent>
       </Tooltip>
     );
@@ -69,16 +69,16 @@ export function AddStudentDialog({
       <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Ajouter un etudiant</DialogTitle>
+          <DialogTitle>Add student</DialogTitle>
           <DialogDescription>
-            Selectionnez un etudiant a inscrire a ce cours
+            Select a student to enroll in this course
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
-              placeholder="Rechercher par nom..."
+              placeholder="Search by name..."
               className="pl-10"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -88,8 +88,8 @@ export function AddStudentDialog({
             {!filtered.length ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 {search
-                  ? "Aucun resultat"
-                  : "Tous les etudiants sont deja inscrits"}
+                  ? "No results"
+                  : "All students are already enrolled"}
               </p>
             ) : (
               filtered.map((student) => (

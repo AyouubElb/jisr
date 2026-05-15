@@ -235,12 +235,12 @@ function QuizGroup({
   const pendingCount = group.attempts.filter((a) => a.pending_count > 0).length;
 
   return (
-    <Card>
-      <CardContent className="p-0">
+    <Card className="gap-0! py-0!">
+      <CardContent className="p-0!">
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-muted/40"
+          className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/40 md:px-4 md:py-4"
         >
           {expanded ? (
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -302,7 +302,7 @@ function AttemptRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-muted/30"
+      className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/30 md:px-4 md:py-4"
     >
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
         {attempt.student_name.charAt(0).toUpperCase()}

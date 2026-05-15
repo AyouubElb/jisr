@@ -53,7 +53,7 @@ export function SessionDialog({
         new URL(data.meeting_link ?? "");
       } catch {
         form.setError("meeting_link", {
-          message: "Veuillez entrer une URL valide (ex: https://zoom.us/...)",
+          message: "Please enter a valid URL (e.g. https://zoom.us/...)",
         });
         return;
       }
@@ -89,15 +89,15 @@ export function SessionDialog({
       <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nouvelle session</DialogTitle>
-          <DialogDescription>Planifiez une session en direct</DialogDescription>
+          <DialogTitle>New session</DialogTitle>
+          <DialogDescription>Schedule a live session</DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {/* Title */}
           <div className="space-y-2">
-            <Label>Titre</Label>
+            <Label>Title</Label>
             <Input
-              placeholder="ex : Conversation Practice"
+              placeholder="e.g. Conversation Practice"
               {...form.register("title")}
             />
             {form.formState.errors.title && (
@@ -109,7 +109,7 @@ export function SessionDialog({
 
           {/* Meeting mode picker */}
           <div className="space-y-2">
-            <Label>Comment se connecter à cette session ?</Label>
+            <Label>How will participants join?</Label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -123,11 +123,11 @@ export function SessionDialog({
                 <div className="flex items-center gap-1.5">
                   <Video className="h-3.5 w-3.5 shrink-0 text-primary" />
                   <span className="text-xs font-semibold text-amber-950">
-                    Lien automatique
+                    Auto-generated link
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Créé pour vous, aucun compte requis
+                  Created for you, no account needed
                 </p>
               </button>
               <button
@@ -142,11 +142,11 @@ export function SessionDialog({
                 <div className="flex items-center gap-1.5">
                   <Link className="h-3.5 w-3.5 shrink-0 text-primary" />
                   <span className="text-xs font-semibold text-amber-950">
-                    Mon propre lien
+                    My own link
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Zoom, Google Meet, autre...
+                  Zoom, Google Meet, other...
                 </p>
               </button>
             </div>
@@ -155,7 +155,7 @@ export function SessionDialog({
           {/* Custom link input — only shown when mode is custom */}
           {mode === "custom" && (
             <div className="space-y-2">
-              <Label>Lien de réunion</Label>
+              <Label>Meeting link</Label>
               <Input
                 placeholder="https://zoom.us/j/..."
                 {...form.register("meeting_link")}
@@ -171,7 +171,7 @@ export function SessionDialog({
           {/* Date + duration */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Date et heure</Label>
+              <Label>Date and time</Label>
               <Input
                 type="datetime-local"
                 {...form.register("scheduled_at")}
@@ -183,7 +183,7 @@ export function SessionDialog({
               )}
             </div>
             <div className="space-y-2">
-              <Label>Durée (min)</Label>
+              <Label>Duration (min)</Label>
               <Input
                 type="number"
                 min={15}
@@ -199,7 +199,7 @@ export function SessionDialog({
           </div>
 
           <Button type="submit" disabled={isPending} className="w-full">
-            {isPending ? "Planification..." : "Planifier la session"}
+            {isPending ? "Scheduling..." : "Schedule session"}
           </Button>
         </form>
       </DialogContent>

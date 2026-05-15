@@ -1,4 +1,4 @@
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, MessageCircle, Sparkles } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { SmoothScrollLink } from "@/components/home/smooth-scroll-link";
 import { CONTACT_WHATSAPP_URL } from "@/lib/constants/contact";
@@ -24,25 +24,26 @@ export function Hero(): React.JSX.Element {
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <SmoothScrollLink
+              href="#waitlist"
+              className={buttonVariants({ size: "lg" })}
+            >
+              Rejoindre la liste
+              <ArrowRight className="h-4 w-4" />
+            </SmoothScrollLink>
             <a
               href={CONTACT_WHATSAPP_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className={buttonVariants({ size: "lg" })}
-            >
-              Discutons de votre cas
-              <ArrowRight className="h-4 w-4" />
-            </a>
-            <SmoothScrollLink
-              href="#fonctionnalites"
               className={buttonVariants({ variant: "outline", size: "lg" })}
             >
-              Voir comment ça marche
-            </SmoothScrollLink>
+              <MessageCircle className="h-4 w-4" />
+              Nous contacter
+            </a>
           </div>
 
           <p className="mt-4 text-xs text-muted-foreground">
-            Sur invitation après une discussion · 99 DH/mois à vie pour les 10 premiers profs
+            Sur invitation · 1er mois gratuit + 99 DH/mois à vie pour les 10 premiers profs
           </p>
         </div>
       </div>

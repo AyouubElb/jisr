@@ -16,13 +16,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePendingGradingCount } from "@/lib/hooks/useAttempts";
+import { useUnmarkedAttendanceCount } from "@/lib/hooks/useAttendance";
 import type { UserRole } from "@/lib/types";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  badgeKey?: "pendingGrading";
+  badgeKey?: "pendingGrading" | "unmarkedAttendance";
 }
 
 const studentItems: NavItem[] = [
@@ -37,7 +38,7 @@ const instructorItems: NavItem[] = [
   { label: "Home", href: "/instructor", icon: LayoutDashboard },
   { label: "Courses", href: "/instructor/courses", icon: BookOpen },
   { label: "Grade", href: "/instructor/grading", icon: ClipboardCheck, badgeKey: "pendingGrading" },
-  { label: "Sessions", href: "/instructor/sessions", icon: Calendar },
+  { label: "Sessions", href: "/instructor/sessions", icon: Calendar, badgeKey: "unmarkedAttendance" },
   { label: "Students", href: "/instructor/students", icon: Users },
 ];
 
@@ -52,12 +53,13 @@ const adminItems: NavItem[] = [
 export function BottomNav({ role }: { role: UserRole }): React.JSX.Element {
   const pathname = usePathname();
   const { data: pendingGrading } = usePendingGradingCount();
+  const { data: unmarkedAttendance } = useUnmarkedAttendanceCount();
 
   const items =
     role === "admin" ? adminItems : role === "instructor" ? instructorItems : studentItems;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden border-t border-border bg-background/95 backdrop-blur-sm">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex lg:hidden border-t border-border bg-background/95 backdrop-blur-sm">
       {items.map((item) => {
         const isActive =
           item.href === "/instructor" || item.href === "/student" || item.href === "/admin"
@@ -66,8 +68,10 @@ export function BottomNav({ role }: { role: UserRole }): React.JSX.Element {
         const Icon = item.icon;
         const badge =
           item.badgeKey === "pendingGrading" && pendingGrading && pendingGrading > 0
-            ? pendingGrading
-            : null;
+            ? { count: pendingGrading, tone: "amber" as const }
+            : item.badgeKey === "unmarkedAttendance" && unmarkedAttendance && unmarkedAttendance > 0
+              ? { count: unmarkedAttendance, tone: "rose" as const }
+              : null;
 
         return (
           <Link
@@ -81,8 +85,12 @@ export function BottomNav({ role }: { role: UserRole }): React.JSX.Element {
             <div className="relative">
               <Icon className="h-5 w-5" />
               {badge !== null && (
-                <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
-                  {badge}
+                <span
+                  className={`absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white ${
+                    badge.tone === "rose" ? "bg-rose-500" : "bg-amber-500"
+                  }`}
+                >
+                  {badge.count}
                 </span>
               )}
             </div>

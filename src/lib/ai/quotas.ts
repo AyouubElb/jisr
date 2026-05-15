@@ -15,20 +15,19 @@ import {
   countGenerationsThisMonth,
   sumCostCentsThisMonth,
 } from "./telemetry";
+import { profilesApi } from "@/lib/api/profiles.api";
 
 // TODO: relocate to lib/services/billing/ during the next AI route refactor.
 // See docs/ARCHITECTURE.md — this enforces tier rules and belongs under services.
 
-/**
- * Resolve the user's tier. Today there is no `tier` column on `profiles` —
- * everyone falls back to DEFAULT_TIER (studio). When pricing ships, read
- * from profiles.tier or subscriptions and adjust here only.
- */
+// Reads profiles.tier; falls back to DEFAULT_TIER ("free") so a missing or null
+// tier fails closed — no AI access — rather than silently granting paid quotas.
 export const getUserTier = async (
-  _supabase: SupabaseClient<Database>,
-  _userId: string,
+  supabase: SupabaseClient<Database>,
+  userId: string,
 ): Promise<Tier> => {
-  return DEFAULT_TIER;
+  const tier = await profilesApi.getTier(supabase, userId);
+  return tier ?? DEFAULT_TIER;
 };
 
 /**

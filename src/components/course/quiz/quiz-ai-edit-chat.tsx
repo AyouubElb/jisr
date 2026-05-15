@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   Loader2,
@@ -100,10 +100,10 @@ function shortRef(id: string): string {
 }
 
 const EXAMPLES = [
-  "Rends Q3 plus facile",
-  "Ajoute une question vocale sur les voyages",
-  "Reformule toutes les questions au passé simple",
-  "Supprime les questions en double",
+  "Make Q3 easier",
+  "Add a voice question about travel",
+  "Rephrase all questions in past simple",
+  "Remove duplicate questions",
 ];
 
 export function QuizAIEditChat({
@@ -115,9 +115,15 @@ export function QuizAIEditChat({
   const [proposal, setProposal] = useState<PendingProposal | null>(null);
   // In-session conversation memory. Lost on refresh by design.
   const [history, setHistory] = useState<ChatTurn[]>([]);
+  const scrollBodyRef = useRef<HTMLDivElement>(null);
 
   const { mutate: propose, isPending: isProposing } = useProposeAIQuizEdit();
   const { mutate: apply, isPending: isApplying } = useApplyAIQuizEdit(quizId);
+
+  useEffect(() => {
+    const el = scrollBodyRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [history, proposal]);
 
   // Fetch the saved blocks from the same React Query cache the editor uses.
   // Apply invalidates this cache so before/after stays in sync.
@@ -294,18 +300,29 @@ export function QuizAIEditChat({
     ? proposal.included.filter(Boolean).length
     : 0;
 
+  // Quiz summary for the empty state.
+  const blockCount = blocksById.size;
+  const questionCount = useMemo(() => {
+    const QUESTION_TYPES = new Set(["mcq", "free_text", "voice", "fill_blank"]);
+    let n = 0;
+    blocksById.forEach((b) => {
+      if (QUESTION_TYPES.has(b.type)) n += 1;
+    });
+    return n;
+  }, [blocksById]);
+
   return (
-    <div className="flex h-full flex-col gap-3">
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b pb-3">
+    <div className="flex h-full flex-col">
+      {/* Sticky header — full-width, flush to card edges */}
+      <div className="flex shrink-0 items-center gap-2 border-b px-4 py-3">
         <Sparkles className="h-4 w-4 text-primary" />
-        <h3 className="flex-1 text-sm font-semibold">Assistant IA</h3>
+        <h3 className="flex-1 text-sm font-semibold">AI Assistant</h3>
         {history.length > 0 ? (
           <button
             type="button"
             onClick={onResetConversation}
             disabled={isProposing || isApplying}
-            title="Réinitialiser la conversation"
+            title="Reset conversation"
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -323,123 +340,132 @@ export function QuizAIEditChat({
         )}
       </div>
 
-      {/* Empty state — examples (only if no history AND nothing in flight) */}
-      {history.length === 0 && !proposal && !isProposing ? (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Demandez à l&apos;IA de modifier ce quiz. Vous validez chaque
-            changement avant qu&apos;il s&apos;applique.
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {EXAMPLES.map((ex) => (
-              <button
-                key={ex}
-                type="button"
-                onClick={() => setInstruction(ex)}
-                className="rounded-full border bg-background px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted"
-              >
-                {ex}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {/* History — chronological, oldest at top */}
-      {history.length > 0 ? (
-        <div className="space-y-2">
-          {history.map((turn, i) => (
-            <PastTurnCard key={i} turn={turn} blocksById={blocksById} />
-          ))}
-        </div>
-      ) : null}
-
-      {/* Proposal */}
-      {proposal ? (
-        <div className="space-y-3">
-          <Card>
-            <CardContent className="space-y-2 p-3">
-              <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <MessageSquare className="h-3.5 w-3.5" />
-                Résumé de l&apos;IA
-              </p>
-              <p className="text-sm">{proposal.summary}</p>
-            </CardContent>
-          </Card>
-
-          {proposal.changes.length === 0 ? (
-            <Card>
-              <CardContent className="p-4 text-center text-sm text-muted-foreground">
-                Aucun changement proposé.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {proposal.changes.map((change, idx) => (
-                <ChangeCard
-                  key={idx}
-                  change={change}
-                  included={proposal.included[idx]}
-                  onKeep={() => setInclusion(idx, true)}
-                  onIgnore={() => setInclusion(idx, false)}
-                  beforeBlock={
-                    "block_id" in change
-                      ? blocksById.get(change.block_id)
-                      : undefined
-                  }
-                />
+      {/* Scrollable body */}
+      <div
+        ref={scrollBodyRef}
+        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3"
+      >
+        {/* Empty state — examples (only if no history AND nothing in flight) */}
+        {history.length === 0 && !proposal && !isProposing ? (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Ask the AI to modify this quiz. You approve each change before it&apos;s applied.
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Current quiz: {blockCount} block{blockCount !== 1 ? "s" : ""} ·{" "}
+              {questionCount} question{questionCount !== 1 ? "s" : ""}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {EXAMPLES.map((ex) => (
+                <button
+                  key={ex}
+                  type="button"
+                  onClick={() => setInstruction(ex)}
+                  className="rounded-full border bg-background px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted"
+                >
+                  {ex}
+                </button>
               ))}
             </div>
-          )}
-
-          <div className="flex items-center gap-2 border-t pt-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onRejectAll}
-              disabled={isApplying}
-            >
-              <X className="mr-1 h-3.5 w-3.5" /> Rejeter tout
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={onAcceptAll}
-              disabled={isApplying || acceptedCount === 0}
-              className="ml-auto"
-            >
-              {isApplying ? (
-                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Check className="mr-1 h-3.5 w-3.5" />
-              )}
-              Accepter ({acceptedCount})
-            </Button>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {/* Input — always at bottom */}
-      <div className="mt-auto space-y-2 border-t pt-3">
+        {/* History — chronological, oldest at top */}
+        {history.length > 0 ? (
+          <div className="space-y-2">
+            {history.map((turn, i) => (
+              <PastTurnCard key={i} turn={turn} blocksById={blocksById} />
+            ))}
+          </div>
+        ) : null}
+
+        {/* Proposal */}
+        {proposal ? (
+          <div className="space-y-3">
+            <Card>
+              <CardContent className="space-y-2 p-3">
+                <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  AI summary
+                </p>
+                <p className="text-sm">{proposal.summary}</p>
+              </CardContent>
+            </Card>
+
+            {proposal.changes.length === 0 ? (
+              <Card>
+                <CardContent className="p-4 text-center text-sm text-muted-foreground">
+                  No changes proposed.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {proposal.changes.map((change, idx) => (
+                  <ChangeCard
+                    key={idx}
+                    change={change}
+                    included={proposal.included[idx]}
+                    onKeep={() => setInclusion(idx, true)}
+                    onIgnore={() => setInclusion(idx, false)}
+                    beforeBlock={
+                      "block_id" in change
+                        ? blocksById.get(change.block_id)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 border-t pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRejectAll}
+                disabled={isApplying}
+              >
+                <X className="mr-1 h-3.5 w-3.5" /> Reject all
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={onAcceptAll}
+                disabled={isApplying || acceptedCount === 0}
+                className="ml-auto"
+              >
+                {isApplying ? (
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="mr-1 h-3.5 w-3.5" />
+                )}
+                Accept ({acceptedCount})
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>{/* end scrollable body */}
+
+      {/* Sticky input area */}
+      <div className="shrink-0 space-y-2 border-t px-4 pb-4 pt-3">
         {isProposing ? (
           <div className="flex items-center gap-2 text-xs italic text-primary">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>L&apos;IA réfléchit…</span>
+            <span>AI is thinking…</span>
           </div>
         ) : null}
         <Textarea
           value={instruction}
           onChange={(e) => setInstruction(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="ex : rends Q3 plus facile, ajoute une question vocale…"
+          placeholder="e.g. make Q3 easier, add a voice question…"
           rows={3}
           className="resize-none text-sm"
           disabled={isProposing || isApplying}
         />
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] text-muted-foreground">
-            ⌘/Ctrl + Entrée pour envoyer
+            ⌘/Ctrl + Enter to send
           </p>
           <Button
             type="button"
@@ -447,7 +473,7 @@ export function QuizAIEditChat({
             onClick={onSubmit}
             disabled={!instruction.trim() || isProposing || isApplying}
           >
-            {isProposing ? "Réflexion…" : "Demander"}
+            {isProposing ? "Thinking…" : "Ask"}
           </Button>
         </div>
       </div>
@@ -494,7 +520,7 @@ function PastTurnCard({ turn, blocksById }: PastTurnCardProps): React.JSX.Elemen
           disabled={isReplyOnly}
         >
           <span className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-            Vous
+            You
           </span>
           <span className="flex-1 text-xs">{turn.prompt}</span>
           {!isReplyOnly ? (
@@ -507,7 +533,7 @@ function PastTurnCard({ turn, blocksById }: PastTurnCardProps): React.JSX.Elemen
         {isReplyOnly ? (
           <div className="flex items-start gap-2 pl-9">
             <span className="mt-0.5 text-[10px] uppercase tracking-wide text-primary">
-              IA
+              AI
             </span>
             <p className="flex-1 text-xs leading-relaxed">{turn.summary}</p>
           </div>
@@ -518,7 +544,7 @@ function PastTurnCard({ turn, blocksById }: PastTurnCardProps): React.JSX.Elemen
                 variant="secondary"
                 className="bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400"
               >
-                ✓ {acceptedCount} appliqué{acceptedCount > 1 ? "s" : ""}
+                ✓ {acceptedCount} applied
               </Badge>
             ) : null}
             {rejectedCount > 0 ? (
@@ -526,7 +552,7 @@ function PastTurnCard({ turn, blocksById }: PastTurnCardProps): React.JSX.Elemen
                 variant="secondary"
                 className="bg-muted text-muted-foreground hover:bg-muted"
               >
-                ✗ {rejectedCount} rejeté{rejectedCount > 1 ? "s" : ""}
+                ✗ {rejectedCount} rejected
               </Badge>
             ) : null}
           </div>
@@ -574,10 +600,10 @@ function PastChangeRow({
 }: PastChangeRowProps): React.JSX.Element {
   const label =
     change.kind === "delete_block"
-      ? "Supprimé"
+      ? "Removed"
       : change.kind === "add_block"
-      ? "Ajouté"
-      : "Modifié";
+      ? "Added"
+      : "Modified";
   const tone = accepted
     ? "text-emerald-700 dark:text-emerald-400"
     : "text-muted-foreground line-through";
@@ -592,10 +618,10 @@ function PastChangeRow({
           {label}
         </span>
         <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-          {blockNumber !== null ? `#${blockNumber}` : "nouveau"}
+          {blockNumber !== null ? `#${blockNumber}` : "new"}
         </span>
         <span className="ml-auto text-[10px] text-muted-foreground">
-          {accepted ? "✓ appliqué" : "✗ rejeté"}
+          {accepted ? "✓ applied" : "✗ rejected"}
         </span>
       </div>
       {change.kind === "delete_block" ? (
@@ -644,7 +670,7 @@ function ChangeCard({
       >
         <CardContent className="space-y-2 bg-destructive/5 p-3">
           <Header
-            label="SUPPRIMÉ"
+            label="REMOVED"
             tone="destructive"
             blockNumber={blockNumber}
             included={included}
@@ -665,7 +691,7 @@ function ChangeCard({
       >
         <CardContent className="space-y-2 bg-emerald-500/5 p-3">
           <Header
-            label="AJOUTÉ"
+            label="ADDED"
             tone="success"
             blockNumber={null}
             included={included}
@@ -684,23 +710,23 @@ function ChangeCard({
     <Card className={included ? "" : "opacity-50"}>
       <CardContent className="space-y-2 p-3">
         <Header
-          label="MODIFIÉ"
+          label="MODIFIED"
           tone="primary"
           blockNumber={blockNumber}
           included={included}
           onKeep={onKeep}
           onIgnore={onIgnore}
         />
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
           <div className="rounded border border-destructive/20 bg-destructive/5 p-2">
             <p className="mb-1 text-[10px] font-medium uppercase text-destructive">
-              Avant
+              Before
             </p>
             <DbBlockSummary block={beforeBlock} />
           </div>
           <div className="rounded border border-emerald-500/20 bg-emerald-500/5 p-2">
             <p className="mb-1 text-[10px] font-medium uppercase text-emerald-700">
-              Après
+              After
             </p>
             <AIBlockSummary block={change.new_block} />
           </div>
@@ -745,7 +771,7 @@ function Header({
         </span>
       ) : (
         <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-          nouveau
+          new
         </span>
       )}
       <div className="ml-auto inline-flex overflow-hidden rounded-md border">
@@ -759,7 +785,7 @@ function Header({
               : "inline-flex items-center gap-1 bg-background px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
           }
         >
-          <Check className="h-3 w-3" /> Garder
+          <Check className="h-3 w-3" /> Keep
         </button>
         <button
           type="button"
@@ -771,7 +797,7 @@ function Header({
               : "inline-flex items-center gap-1 border-l bg-background px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
           }
         >
-          <X className="h-3 w-3" /> Ignorer
+          <X className="h-3 w-3" /> Ignore
         </button>
       </div>
     </div>
@@ -800,16 +826,16 @@ function dbBlockToPreview(block: {
 
   if (block.type === "mcq" || block.type === "free_text") {
     return {
-      prompt: (c["prompt"] as string | undefined) ?? "(pas de texte)",
+      prompt: (c["prompt"] as string | undefined) ?? "(no text)",
       options: dbOptions(c["options"]),
     };
   }
   if (block.type === "voice") {
-    return { prompt: (c["prompt"] as string | undefined) ?? "(pas de texte)" };
+    return { prompt: (c["prompt"] as string | undefined) ?? "(no text)" };
   }
   if (block.type === "fill_blank") {
     return {
-      prompt: (c["sentence"] as string | undefined) ?? "(pas de texte)",
+      prompt: (c["sentence"] as string | undefined) ?? "(no text)",
       options: dbOptions(c["options"]),
     };
   }
@@ -821,11 +847,11 @@ function dbBlockToPreview(block: {
   }
   if (block.type === "section") {
     return {
-      prompt: (c["title"] as string | undefined) ?? "(section sans titre)",
+      prompt: (c["title"] as string | undefined) ?? "(untitled section)",
       description: c["description"] as string | undefined,
     };
   }
-  return { prompt: "(aperçu indisponible)" };
+  return { prompt: "(no preview)" };
 }
 
 function aiBlockToPreview(block: AIQuizBlock): BlockPreview {
@@ -858,14 +884,14 @@ function aiBlockToPreview(block: AIQuizBlock): BlockPreview {
   }
   if (block.type === "audio_passage") {
     return {
-      prompt: block.caption ?? "Passage audio",
+      prompt: block.caption ?? "Audio passage",
       passage: block.script,
-      description: "🔊 Audio sera généré à l'acceptation",
+      description: "🔊 Audio will be generated on acceptance",
     };
   }
   // section
   return {
-    prompt: block.title || "(section sans titre)",
+    prompt: block.title || "(untitled section)",
     description: block.description,
   };
 }
@@ -885,7 +911,7 @@ function ExpandablePassage({ text }: { text: string }): React.JSX.Element {
           onClick={() => setExpanded((v) => !v)}
           className="mt-1 text-xs font-medium text-primary hover:underline"
         >
-          {expanded ? "Réduire" : "Lire plus"}
+          {expanded ? "Show less" : "Read more"}
         </button>
       ) : null}
     </div>
@@ -927,7 +953,7 @@ function DbBlockSummary({
   block: { type: string; content: Record<string, unknown> | null } | undefined;
 }): React.JSX.Element {
   if (!block) {
-    return <p className="text-xs text-muted-foreground">(bloc introuvable)</p>;
+    return <p className="text-xs text-muted-foreground">(block not found)</p>;
   }
   return (
     <div className="space-y-1.5">

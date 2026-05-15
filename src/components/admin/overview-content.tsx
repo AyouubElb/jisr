@@ -14,12 +14,12 @@ export function AdminOverviewContent(): React.JSX.Element {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Vue d&apos;ensemble</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">Vue d&apos;ensemble</h1>
         <p className="text-muted-foreground">Etat de la plateforme en temps reel</p>
       </div>
 
       {/* ── STAT CARDS ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard
           label="Instructeurs"
           value={stats?.totalInstructors ?? 0}

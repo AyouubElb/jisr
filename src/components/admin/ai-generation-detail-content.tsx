@@ -116,7 +116,7 @@ export function AIGenerationDetailContent({
 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Évaluation de la génération</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">Évaluation de la génération</h1>
             <p className="text-sm text-muted-foreground">
               {format(new Date(gen.created_at), "PPPp", { locale: fr })}
             </p>
@@ -128,7 +128,7 @@ export function AIGenerationDetailContent({
       {/* ── TELEMETRY CARD ─────────────────────────────────────── */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <Stat
               icon={<Cpu className="h-4 w-4" />}
               label="Modèle"

@@ -21,7 +21,7 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "199 DH",
+    price: "200 DH",
     period: "/ mois",
     description: "Pour les instructeurs actifs avec une vraie classe.",
     features: [
@@ -61,8 +61,8 @@ export function PricingSection(): React.JSX.Element {
             Des tarifs simples, en dirhams
           </h2>
           <p className="mt-4 text-muted-foreground">
-            Programme fondateur : 99 DH/mois à vie pour les 10 premiers profs
-            (au lieu de 149 DH).
+            Programme fondateur : 1er mois gratuit puis 99 DH/mois à vie pour
+            les 10 premiers profs (au lieu de 200 DH).
           </p>
         </div>
 

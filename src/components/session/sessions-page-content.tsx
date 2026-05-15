@@ -10,13 +10,18 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Clock,
   ExternalLink,
   Video,
 } from "lucide-react";
-import { format, isPast } from "date-fns";
+import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { SessionWithCourse } from "@/lib/api/sessions.api";
+
+const hasEnded = (s: { scheduled_at: string; duration_minutes: number | null }): boolean =>
+  new Date(s.scheduled_at).getTime() + (s.duration_minutes ?? 0) * 60_000 <= Date.now();
+import { AttendanceDialog } from "@/components/course/session/attendance-dialog";
 
 const PAGE_SIZE = 8;
 
@@ -27,15 +32,23 @@ interface SessionsPageContentProps {
   isLoading: boolean;
   /** Show the "Rejoindre" button (student) or not (instructor may just view) */
   showJoinButton: boolean;
+  /** Instructor-only — past session IDs still needing attendance */
+  unmarkedSessionIds?: Set<string>;
 }
 
 export function SessionsPageContent({
   sessions,
   isLoading,
   showJoinButton,
+  unmarkedSessionIds,
 }: SessionsPageContentProps): React.JSX.Element {
   const [tab, setTab] = useState<TabValue>("all");
   const [page, setPage] = useState(0);
+  const [attendanceTarget, setAttendanceTarget] = useState<{
+    id: string;
+    title: string;
+    courseId: string;
+  } | null>(null);
 
   // Reset page when switching tabs
   const handleTabChange = (value: string): void => {
@@ -45,16 +58,34 @@ export function SessionsPageContent({
 
   const filtered = useMemo(() => {
     if (!sessions) return [];
-    if (tab === "upcoming") return sessions.filter((s) => !isPast(new Date(s.scheduled_at)));
-    if (tab === "past") return sessions.filter((s) => isPast(new Date(s.scheduled_at)));
+    if (tab === "upcoming") return sessions.filter((s) => !hasEnded(s));
+    if (tab === "past") return sessions.filter((s) => hasEnded(s));
     return sessions;
   }, [sessions, tab]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const upcomingCount = sessions?.filter((s) => !isPast(new Date(s.scheduled_at))).length ?? 0;
-  const pastCount = sessions?.filter((s) => isPast(new Date(s.scheduled_at))).length ?? 0;
+  const upcomingCount = sessions?.filter((s) => !hasEnded(s)).length ?? 0;
+  const pastCount = sessions?.filter((s) => hasEnded(s)).length ?? 0;
+
+  const t = showJoinButton
+    ? {
+        all: "Toutes",
+        upcoming: "A venir",
+        past: "Passees",
+        emptyAll: "Aucune session",
+        emptyUpcoming: "Aucune session a venir",
+        emptyPast: "Aucune session passee",
+      }
+    : {
+        all: "All",
+        upcoming: "Upcoming",
+        past: "Past",
+        emptyAll: "No sessions",
+        emptyUpcoming: "No upcoming sessions",
+        emptyPast: "No past sessions",
+      };
 
   if (isLoading) {
     return (
@@ -78,7 +109,7 @@ export function SessionsPageContent({
             value="all"
             className="gap-1.5 rounded-lg px-3 py-2 md:px-5 md:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
-            <span>Toutes</span>
+            <span>{t.all}</span>
             <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {sessions?.length ?? 0}
             </span>
@@ -87,7 +118,7 @@ export function SessionsPageContent({
             value="upcoming"
             className="gap-1.5 rounded-lg px-3 py-2 md:px-5 md:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
-            <span>A venir</span>
+            <span>{t.upcoming}</span>
             <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {upcomingCount}
             </span>
@@ -96,7 +127,7 @@ export function SessionsPageContent({
             value="past"
             className="gap-1.5 rounded-lg px-3 py-2 md:px-5 md:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
-            <span>Passees</span>
+            <span>{t.past}</span>
             <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {pastCount}
             </span>
@@ -111,21 +142,25 @@ export function SessionsPageContent({
             <Calendar className="h-10 w-10 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
               {tab === "upcoming"
-                ? "Aucune session a venir"
+                ? t.emptyUpcoming
                 : tab === "past"
-                  ? "Aucune session passee"
-                  : "Aucune session"}
+                  ? t.emptyPast
+                  : t.emptyAll}
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-2">
           {pageItems.map((session) => {
-            const past = isPast(new Date(session.scheduled_at));
+            const past = hasEnded(session);
+            const needsAttendance = !showJoinButton && past && !!unmarkedSessionIds?.has(session.id);
+            const endedLabel = showJoinButton ? "Terminee" : needsAttendance ? "Not marked" : "Ended";
+            const linkLabel = showJoinButton ? "Rejoindre" : "Link";
+            const dateLocale = showJoinButton ? fr : undefined;
             return (
               <div
                 key={session.id}
-                className="flex items-center gap-4 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/30"
+                className="flex items-center gap-4 rounded-lg border border-border bg-card px-3 py-3 transition-colors hover:bg-muted/30 md:px-4 md:py-4"
               >
                 {/* Icon */}
                 <div
@@ -143,8 +178,13 @@ export function SessionsPageContent({
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-medium">{session.title}</p>
                     {past && (
-                      <Badge variant="outline" className="shrink-0 text-[10px]">
-                        Terminee
+                      <Badge
+                        variant="outline"
+                        className={`shrink-0 text-[10px] ${
+                          needsAttendance ? "border-amber-300 bg-amber-50 text-amber-800" : ""
+                        }`}
+                      >
+                        {endedLabel}
                       </Badge>
                     )}
                   </div>
@@ -152,11 +192,11 @@ export function SessionsPageContent({
                     <span>{session.courses?.title}</span>
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {format(new Date(session.scheduled_at), "EEE d MMM yyyy", { locale: fr })}
+                      {format(new Date(session.scheduled_at), "EEE d MMM yyyy", { locale: dateLocale })}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {format(new Date(session.scheduled_at), "HH:mm", { locale: fr })}
+                      {format(new Date(session.scheduled_at), "HH:mm", { locale: dateLocale })}
                       {" · "}
                       {session.duration_minutes} min
                     </span>
@@ -172,7 +212,7 @@ export function SessionsPageContent({
                     className="shrink-0"
                   >
                     <Button size="sm" variant="outline" className="gap-1.5">
-                      Rejoindre
+                      {linkLabel}
                       <ExternalLink className="h-3 w-3" />
                     </Button>
                   </a>
@@ -186,9 +226,26 @@ export function SessionsPageContent({
                   >
                     <Button size="sm" variant="ghost" className="gap-1.5 text-xs text-muted-foreground">
                       <ExternalLink className="h-3 w-3" />
-                      Lien
+                      {linkLabel}
                     </Button>
                   </a>
+                )}
+                {needsAttendance && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1.5"
+                    onClick={() =>
+                      setAttendanceTarget({
+                        id: session.id,
+                        title: session.title,
+                        courseId: session.course_id,
+                      })
+                    }
+                  >
+                    <ClipboardCheck className="h-3.5 w-3.5" />
+                    Mark attendance
+                  </Button>
                 )}
               </div>
             );
@@ -200,7 +257,7 @@ export function SessionsPageContent({
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
           <p className="text-xs text-muted-foreground">
-            Page {page + 1} sur {totalPages}
+            Page {page + 1} {showJoinButton ? "sur" : "of"} {totalPages}
             {" · "}
             {filtered.length} session{filtered.length !== 1 ? "s" : ""}
           </p>
@@ -225,6 +282,16 @@ export function SessionsPageContent({
             </Button>
           </div>
         </div>
+      )}
+
+      {attendanceTarget && (
+        <AttendanceDialog
+          sessionId={attendanceTarget.id}
+          courseId={attendanceTarget.courseId}
+          sessionTitle={attendanceTarget.title}
+          open={!!attendanceTarget}
+          onOpenChange={(open) => { if (!open) setAttendanceTarget(null); }}
+        />
       )}
     </div>
   );

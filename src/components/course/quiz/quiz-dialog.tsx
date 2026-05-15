@@ -77,19 +77,18 @@ export function QuizDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nouveau quiz</DialogTitle>
+          <DialogTitle>New quiz</DialogTitle>
           <DialogDescription>
-            Donnez un titre a votre quiz. Vous pourrez ajouter les blocs et
-            questions sur la page suivante.
+            Give your quiz a title. You&apos;ll be able to add blocks and questions on the next page.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label>Titre</Label>
+            <Label>Title</Label>
             <Input
               autoFocus
-              placeholder="ex : Quiz - Present Simple"
+              placeholder="e.g. Quiz - Present Simple"
               {...form.register("title")}
             />
             {form.formState.errors.title && (
@@ -100,12 +99,12 @@ export function QuizDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Duree limite (minutes, optionnel)</Label>
+            <Label>Time limit (minutes, optional)</Label>
             <Input
               type="number"
               min={1}
               max={180}
-              placeholder="ex : 30"
+              placeholder="e.g. 30"
               {...form.register("time_limit_minutes", {
                 setValueAs: (v) => (v === "" || v === null ? null : Number(v)),
               })}
@@ -118,10 +117,10 @@ export function QuizDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Annuler
+              Cancel
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Creation..." : "Creer et continuer"}
+              {isPending ? "Creating..." : "Create and continue"}
             </Button>
           </DialogFooter>
         </form>

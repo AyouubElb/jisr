@@ -7,12 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useInstructorStudents, useRemoveStudent } from "@/lib/hooks/useEnrollments";
-import { CreateStudentDialog } from "@/components/course/create-student-dialog";
+import { CreateStudentDialog } from "@/components/course/students/create-student-dialog";
 import { useStudentEngagement } from "@/lib/hooks/useEngagement";
 import { LEVEL_BADGE_COLORS } from "@/lib/constants/levels";
 import {
   BookOpen,
   Calendar,
+  ChevronDown,
   Circle,
   ClipboardCheck,
   GraduationCap,
@@ -86,6 +87,16 @@ export default function InstructorStudentsPage(): React.JSX.Element {
     courseTitle: string;
   } | null>(null);
 
+  const [collapsedCourses, setCollapsedCourses] = useState<Set<string>>(new Set());
+  const toggleCourse = (courseId: string): void => {
+    setCollapsedCourses((prev) => {
+      const next = new Set(prev);
+      if (next.has(courseId)) next.delete(courseId);
+      else next.add(courseId);
+      return next;
+    });
+  };
+
   const totalStudents = courses
     ? new Set(courses.flatMap((c) => c.students.map((s) => s.studentId))).size
     : 0;
@@ -96,12 +107,12 @@ export default function InstructorStudentsPage(): React.JSX.Element {
     <>
       <div className="space-y-6">
         {/* Page header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-amber-950">Students</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-amber-950">Students</h1>
             <p className="text-muted-foreground">Overview of your students by course</p>
           </div>
-          <div className="self-start sm:self-auto">
+          <div className="self-start md:self-auto">
             <CreateStudentDialog />
           </div>
         </div>
@@ -175,16 +186,31 @@ export default function InstructorStudentsPage(): React.JSX.Element {
                   </Link>
                 </div>
               ) : (
-                courses.map((course) => (
-                  <div key={course.courseId} className="rounded-xl border bg-card">
-                    {/* Course header */}
-                    <div className="flex items-center justify-between border-b px-5 py-3">
+                courses.map((course) => {
+                  const isCollapsed = collapsedCourses.has(course.courseId);
+                  return (
+                  <div key={course.courseId} className="rounded-lg border bg-card">
+                    {/* Course header — click anywhere to toggle, except the title link */}
+                    <button
+                      type="button"
+                      onClick={() => toggleCourse(course.courseId)}
+                      aria-expanded={!isCollapsed}
+                      className={`flex w-full items-center justify-between px-3 py-3 text-left transition-colors hover:bg-muted/30 md:px-5 md:py-4 ${
+                        isCollapsed ? "" : "border-b"
+                      }`}
+                    >
                       <div className="flex items-center gap-3">
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+                            isCollapsed ? "-rotate-90" : ""
+                          }`}
+                        />
                         <Badge className={LEVEL_BADGE_COLORS[course.courseLevel as CEFRLevel]}>
                           {course.courseLevel}
                         </Badge>
                         <Link
                           href={`/instructor/courses/${course.courseId}`}
+                          onClick={(e) => e.stopPropagation()}
                           className="text-sm font-semibold hover:underline"
                         >
                           {course.courseTitle}
@@ -193,11 +219,11 @@ export default function InstructorStudentsPage(): React.JSX.Element {
                       <span className="text-xs text-muted-foreground">
                         {course.students.length} student{course.students.length !== 1 ? "s" : ""}
                       </span>
-                    </div>
+                    </button>
 
                     {/* Students */}
-                    {course.students.length === 0 ? (
-                      <div className="flex items-center gap-2 px-5 py-5 text-sm text-muted-foreground">
+                    {isCollapsed ? null : course.students.length === 0 ? (
+                      <div className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground md:px-5 md:py-5">
                         <Users className="h-4 w-4" />
                         No students enrolled
                       </div>
@@ -211,7 +237,7 @@ export default function InstructorStudentsPage(): React.JSX.Element {
                           return (
                             <div
                               key={student.enrollmentId}
-                              className={`flex items-center justify-between gap-2 px-4 py-2.5 transition-colors active:bg-muted/40 ${
+                              className={`flex items-center justify-between gap-2 px-3 py-3 transition-colors active:bg-muted/40 md:px-4 md:py-4 ${
                                 isActive
                                   ? "bg-primary/5 border-l-2 border-l-primary"
                                   : "hover:bg-muted/30"
@@ -260,7 +286,8 @@ export default function InstructorStudentsPage(): React.JSX.Element {
                       </div>
                     )}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -406,16 +433,16 @@ function StudentDetailPanel({
         {/* Metric cards — 2x2 bento grid */}
         <div className="grid grid-cols-2 gap-3">
           <MetricCard
-            label="Lessons completed"
-            value={`${completedCount} / ${data.totals.lessonCount}`}
-            pct={completionPct}
-            icon={<BookOpen className="h-3.5 w-3.5" />}
-          />
-          <MetricCard
             label="Quizzes taken"
             value={`${quizAttempted} / ${data.totals.quizCount}`}
             pct={quizParticipationPct}
             icon={<ClipboardCheck className="h-3.5 w-3.5" />}
+          />
+          <MetricCard
+            label="Lessons completed"
+            value={`${completedCount} / ${data.totals.lessonCount}`}
+            pct={completionPct}
+            icon={<BookOpen className="h-3.5 w-3.5" />}
           />
           <MetricCard
             label="Average score"

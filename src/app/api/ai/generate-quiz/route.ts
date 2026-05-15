@@ -19,6 +19,7 @@ import {
   QUIZ_GEN_MAX_DIRECT_QUESTIONS,
   QUIZ_GEN_MAX_PASSAGES_PER_TYPE,
 } from "@/lib/ai/constants";
+import { aiLimiter, enforceRateLimit } from "@/lib/services/rate-limit.service";
 
 // Vercel Hobby caps function execution at 60s.
 export const maxDuration = 60;
@@ -56,6 +57,9 @@ export async function POST(req: Request): Promise<Response> {
   if (authError || !user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
+
+  const limited = await enforceRateLimit(aiLimiter, user.id);
+  if (limited) return limited;
 
   let body: z.infer<typeof BodySchema>;
   try {

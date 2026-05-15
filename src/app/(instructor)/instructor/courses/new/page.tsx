@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { createCourseSchema, type CreateCourseInput } from "@/lib/schemas/course.schema";
 import { useCreateCourse } from "@/lib/hooks/useCourses";
-import { CEFR_LEVELS, LEVEL_LABELS } from "@/lib/constants/levels";
+import { CEFR_LEVELS, LEVEL_LABELS_EN } from "@/lib/constants/levels";
 import { createClient } from "@/lib/supabase/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -47,7 +47,7 @@ export default function NewCoursePage(): React.JSX.Element {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">New course</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">New course</h1>
           <p className="text-muted-foreground">Create a new course for your students</p>
         </div>
       </div>
@@ -98,7 +98,7 @@ export default function NewCoursePage(): React.JSX.Element {
                 <SelectContent>
                   {CEFR_LEVELS.map((level) => (
                     <SelectItem key={level} value={level}>
-                      {level} — {LEVEL_LABELS[level]}
+                      {level} — {LEVEL_LABELS_EN[level]}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Circle,
   Clock,
   History,
   RotateCcw,
@@ -26,8 +25,8 @@ import {
   CurriculumSidebar,
   CurriculumSidebarSkeleton,
 } from "@/components/layout/curriculum-sidebar";
-import { QuizTimer } from "@/components/course/quiz-timer";
-import { AudioRecorder } from "@/components/course/audio-recorder";
+import { QuizTimer } from "@/components/course/quiz/quiz-timer";
+import { AudioRecorder } from "@/components/course/shared/audio-recorder";
 import { useCourse } from "@/lib/hooks/useCourses";
 import { useMyCompletions } from "@/lib/hooks/useCompletions";
 import { useQuiz } from "@/lib/hooks/useQuizzes";
@@ -429,7 +428,7 @@ export default function StudentQuizPage(): React.JSX.Element {
           <>
             <span className="text-sm text-muted-foreground">
               {answeredCount} / {questionBlocks.length} question
-              {questionBlocks.length !== 1 ? "s" : ""} repondue
+              {questionBlocks.length !== 1 ? "s" : ""} répondue
               {answeredCount !== 1 ? "s" : ""}
             </span>
             <Button
@@ -459,11 +458,11 @@ export default function StudentQuizPage(): React.JSX.Element {
             {questionBlocks.length !== 1 ? "s" : ""}
           </span>
           <span>Note sur 100</span>
-          {attempts && attempts.length > 0 && (
+          {attempts && attempts.length > 0 && !activeAttempt && (
             <span className="flex items-center gap-1">
               <History className="h-3 w-3" />
               {attempts.length} tentative
-              {attempts.length !== 1 ? "s" : ""} precedente
+              {attempts.length !== 1 ? "s" : ""} précédente
               {attempts.length !== 1 ? "s" : ""}
             </span>
           )}
@@ -476,12 +475,6 @@ export default function StudentQuizPage(): React.JSX.Element {
         )}
       </div>
 
-      {/* Previous attempts — compact collapsible */}
-      {attempts && attempts.length > 0 && (
-        <PreviousAttempts attempts={attempts} />
-      )}
-
-      <Separator className="mb-6" />
 
       {/* Pre-start gate — show quiz intro + confirmation before creating the attempt */}
       {!activeAttempt ? (
@@ -495,17 +488,17 @@ export default function StudentQuizPage(): React.JSX.Element {
           <Card className="border-primary/20 bg-primary/5">
             <CardHeader>
               <CardTitle className="text-lg text-amber-950">
-                Pret a commencer ?
+                Prêt à commencer ?
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-amber-950">
-                Vous etes sur le point de commencer <strong>{quiz.title}</strong>.
-                Une fois demarre, le compte a rebours commence et le quiz doit
-                etre termine avant la fin du temps imparti.
+                Vous êtes sur le point de commencer <strong>{quiz.title}</strong>.
+                Une fois démarré, le compte à rebours commence et le quiz doit
+                être terminé avant la fin du temps imparti.
               </p>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <div className="rounded-md border border-border bg-background px-3 py-2">
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
                     Questions
@@ -548,8 +541,8 @@ export default function StudentQuizPage(): React.JSX.Element {
 
               {quiz.time_limit_minutes && (
                 <p className="text-xs text-muted-foreground">
-                  Lorsque le temps imparti est ecoule, le quiz sera
-                  automatiquement soumis avec les reponses enregistrees.
+                  Lorsque le temps imparti est écoulé, le quiz sera
+                  automatiquement soumis avec les réponses enregistrées.
                 </p>
               )}
 
@@ -566,7 +559,7 @@ export default function StudentQuizPage(): React.JSX.Element {
                         {exhausted
                           ? `Tentatives epuisees (${used} / ${cap}).`
                           : cap === 1
-                            ? "Une seule tentative autorisee."
+                            ? "Une seule tentative autorisée."
                             : `Tentative ${used + 1} sur ${cap} (${remaining} restante${remaining === 1 ? "" : "s"}).`}
                       </p>
                     )}
@@ -580,7 +573,7 @@ export default function StudentQuizPage(): React.JSX.Element {
                           handleStart();
                         }
                       }}
-                      className="w-full sm:w-auto"
+                      className="w-full md:w-auto"
                     >
                       {exhausted
                         ? "Tentatives epuisees"
@@ -629,8 +622,8 @@ export default function StudentQuizPage(): React.JSX.Element {
         title="Soumettre le quiz ?"
         description={
           answeredCount < questionBlocks.length
-            ? `Vous n'avez repondu qu'a ${answeredCount} question${answeredCount !== 1 ? "s" : ""} sur ${questionBlocks.length}. Voulez-vous vraiment soumettre ?`
-            : "Vos reponses seront enregistrees et notees."
+            ? `Vous n'avez répondu qu'à ${answeredCount} question${answeredCount !== 1 ? "s" : ""} sur ${questionBlocks.length}. Voulez-vous vraiment soumettre ?`
+            : "Vos réponses seront enregistrées et notées."
         }
         confirmLabel="Soumettre"
         cancelLabel="Continuer le quiz"
@@ -682,7 +675,7 @@ function PreviousAttempts({ attempts }: { attempts: StudentAttempt[] }): React.J
       >
         <History className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className="flex-1 text-muted-foreground">
-          {attempts.length} tentative{attempts.length !== 1 ? "s" : ""} precedente{attempts.length !== 1 ? "s" : ""}
+          {attempts.length} tentative{attempts.length !== 1 ? "s" : ""} précédente{attempts.length !== 1 ? "s" : ""}
           {best !== null && (
             <span className="ml-1.5 font-medium text-foreground">
               · meilleur score {best}%
@@ -1037,14 +1030,15 @@ function McqView({
       {prompt && <p className="text-sm font-medium text-amber-950">{prompt}</p>}
       {allowMultiple && (
         <p className="text-xs text-muted-foreground">
-          Plusieurs reponses possibles
+          Plusieurs réponses possibles
         </p>
       )}
       <div className="space-y-2">
-        {options.map((opt) => {
+        {options.map((opt, idx) => {
           const isSelected = allowMultiple
             ? currentSet.has(opt.id)
             : selectedId === opt.id;
+          const letter = String.fromCharCode(65 + idx);
           const handleClick = (): void => {
             if (allowMultiple) {
               const next = new Set(currentSet);
@@ -1066,11 +1060,15 @@ function McqView({
                   : "border-border hover:bg-muted/30"
               }`}
             >
-              {isSelected ? (
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
-              ) : (
-                <Circle className="h-4 w-4 shrink-0 text-muted-foreground/50" />
-              )}
+              <span
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-bold ${
+                  isSelected
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {letter}
+              </span>
               <span className="text-sm">{opt.label || "..."}</span>
             </button>
           );
@@ -1158,7 +1156,7 @@ function FreeTextView({
         rows={5}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Ecrivez votre reponse ici..."
+        placeholder="Écrivez votre réponse ici..."
         className="resize-none"
       />
       {minWords && (

@@ -1,19 +1,22 @@
 import Link from "next/link";
-import { GraduationCap } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { SmoothScrollLink } from "@/components/home/smooth-scroll-link";
-import { CONTACT_WHATSAPP_URL } from "@/lib/constants/contact";
 
 export function SiteHeader(): React.JSX.Element {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <GraduationCap className="h-5 w-5 text-primary-foreground" />
-          </span>
-          <span className="text-lg font-semibold tracking-tight text-amber-950">
+        <Link href="/" className="flex items-baseline gap-0.5">
+          <span className="text-xl font-bold tracking-tight text-amber-950">
             Jisr
+          </span>
+          <span
+            aria-hidden
+            className="text-base font-semibold text-primary"
+            style={{ lineHeight: 1 }}
+          >
+            ج
           </span>
         </Link>
 
@@ -22,10 +25,10 @@ export function SiteHeader(): React.JSX.Element {
             href="#fonctionnalites"
             className="hover:text-amber-950"
           >
-            Fonctionnalités
+            Les outils
           </SmoothScrollLink>
-          <SmoothScrollLink href="#tarifs" className="hover:text-amber-950">
-            Tarifs
+          <SmoothScrollLink href="#fondateur" className="hover:text-amber-950">
+            L&apos;offre fondateur
           </SmoothScrollLink>
           <SmoothScrollLink href="#faq" className="hover:text-amber-950">
             FAQ
@@ -39,14 +42,13 @@ export function SiteHeader(): React.JSX.Element {
           >
             Se connecter
           </Link>
-          <a
-            href={CONTACT_WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+          <SmoothScrollLink
+            href="#waitlist"
             className={buttonVariants({ size: "sm" })}
           >
-            Demander un accès
-          </a>
+            Rejoindre la liste
+            <ArrowRight className="h-4 w-4" />
+          </SmoothScrollLink>
         </div>
       </div>
     </header>

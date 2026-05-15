@@ -17,7 +17,7 @@ export function AppShell({ role, fullName, children }: AppShellProps): React.JSX
       <AppSidebar role={role} />
       <SidebarInset>
         <AppHeader fullName={fullName} role={role} />
-        <main className="min-w-0 flex-1 overflow-x-hidden p-6 pb-20 md:pb-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 pb-20 md:p-5 lg:p-6 lg:pb-6">{children}</main>
       </SidebarInset>
       <BottomNav role={role} />
     </SidebarProvider>

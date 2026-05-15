@@ -146,8 +146,8 @@ function AttemptRow({
       href={`/student/attempts/${attempt.attempt_id}`}
       className="block"
     >
-      <Card className="transition-colors hover:bg-muted/30">
-        <CardContent className="flex items-center gap-4 p-4">
+      <Card className="gap-0! py-0! transition-colors hover:bg-muted/30">
+        <CardContent className="flex items-center gap-4 px-3 py-3 md:px-4 md:py-4">
           <Badge className={LEVEL_BADGE_COLORS[attempt.course_level]}>
             {attempt.course_level}
           </Badge>

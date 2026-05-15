@@ -1,4 +1,4 @@
-import { BookOpen, GraduationCap, Sparkles, Users } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 export default function AuthLayout({
@@ -8,61 +8,59 @@ export default function AuthLayout({
 }): React.JSX.Element {
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-background">
-      {/* Left side: Branded visual panel */}
-      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-primary via-primary to-amber-600 p-12 text-stone-900">
-        {/* Decorative gradient blobs */}
-        <div className="pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -right-16 h-[28rem] w-[28rem] rounded-full bg-white/10 blur-3xl" />
-        <div className="pointer-events-none absolute top-1/3 right-1/4 h-48 w-48 rounded-full bg-amber-200/20 blur-2xl" />
+      {/* Left side: Branded cream panel */}
+      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-stone-100 p-12">
+        {/* Decorative oversized Arabic watermark */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -bottom-16 -right-8 select-none text-[20rem] font-bold leading-none text-amber-950/[0.04]"
+          style={{ fontFamily: "serif" }}
+        >
+          جسر
+        </span>
 
         {/* Logo */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm ring-1 ring-white/30">
-            <GraduationCap className="h-6 w-6" />
-          </div>
-          <span className="text-xl font-semibold tracking-tight">
-            English Learn
+        <Link
+          href="/"
+          aria-label="Retour à l'accueil Jisr"
+          className="relative z-10 inline-flex w-fit items-baseline gap-0.5 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          <span className="text-2xl font-bold tracking-tight text-amber-950">
+            Jisr
           </span>
-        </div>
+          <span
+            aria-hidden
+            className="text-lg font-semibold text-primary"
+            style={{ lineHeight: 1 }}
+          >
+            ج
+          </span>
+        </Link>
 
         {/* Main content */}
-        <div className="relative z-10 space-y-8">
+        <div className="relative z-10 space-y-10">
           <div className="space-y-4">
-            <h2 className="text-4xl font-bold leading-tight tracking-tight">
-              Maitrisez l&apos;anglais,
+            <h2 className="text-4xl font-bold leading-[1.1] tracking-tight text-amber-950">
+              L&apos;espace de travail
               <br />
-              un cours a la fois.
+              du prof d&apos;anglais.
             </h2>
-            <p className="max-w-md text-lg text-stone-800/80">
-              Rejoignez une plateforme d&apos;apprentissage moderne avec des
-              cours structures, des sessions en direct et un accompagnement
-              personnalise.
+            <p className="max-w-md text-base text-amber-950/70">
+              Vos cours, vos élèves, vos quiz, votre suivi — au même endroit.
             </p>
           </div>
 
-          {/* Feature highlights */}
-          <div className="space-y-4">
-            <FeatureItem
-              icon={<BookOpen className="h-5 w-5" />}
-              title="Cours par niveau CECRL"
-              description="De A1 a C2, progressez a votre rythme"
-            />
-            <FeatureItem
-              icon={<Users className="h-5 w-5" />}
-              title="Sessions en direct"
-              description="Pratiquez avec votre instructeur"
-            />
-            <FeatureItem
-              icon={<Sparkles className="h-5 w-5" />}
-              title="Ressources illimitees"
-              description="Acces aux supports et materiels"
-            />
+          {/* Feature highlights with left-rail tick mark */}
+          <div className="space-y-5">
+            <Bullet>Quiz générés en quelques secondes — audio compris.</Bullet>
+            <Bullet>Corrections automatiques. Vous validez en 2 minutes.</Bullet>
+            <Bullet>Alerte quand un élève décroche.</Bullet>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="relative z-10 text-sm text-stone-800/70">
-          &copy; {new Date().getFullYear()} English Learn. Tous droits reserves.
+        {/* Footer note */}
+        <div className="relative z-10 text-sm text-amber-950/60">
+          Étudiant ? Connectez-vous — votre instructeur vous a inscrit.
         </div>
       </div>
 
@@ -70,14 +68,22 @@ export default function AuthLayout({
       <div className="flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-md">
           {/* Mobile logo (only shown on small screens) */}
-          <div className="mb-8 flex items-center justify-center gap-3 lg:hidden">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <GraduationCap className="h-6 w-6" />
-            </div>
-            <span className="text-xl font-semibold tracking-tight">
-              English Learn
+          <Link
+            href="/"
+            aria-label="Retour à l'accueil Jisr"
+            className="mb-8 flex items-baseline justify-center gap-0.5 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 lg:hidden"
+          >
+            <span className="text-2xl font-bold tracking-tight text-amber-950">
+              Jisr
             </span>
-          </div>
+            <span
+              aria-hidden
+              className="text-lg font-semibold text-primary"
+              style={{ lineHeight: 1 }}
+            >
+              ج
+            </span>
+          </Link>
           {children}
         </div>
       </div>
@@ -85,24 +91,16 @@ export default function AuthLayout({
   );
 }
 
-function FeatureItem({
-  icon,
-  title,
-  description,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-}): React.JSX.Element {
+function Bullet({ children }: { children: ReactNode }): React.JSX.Element {
   return (
-    <div className="flex items-start gap-3">
-      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm ring-1 ring-white/20">
-        {icon}
-      </div>
-      <div>
-        <p className="font-semibold text-stone-900">{title}</p>
-        <p className="text-sm text-stone-800/75">{description}</p>
-      </div>
+    <div className="relative border-l-2 border-amber-950/15 pl-4">
+      <span
+        aria-hidden
+        className="absolute -left-[5px] top-1.5 h-2 w-2 rounded-full bg-primary"
+      />
+      <p className="text-sm font-medium text-amber-950 sm:text-base">
+        {children}
+      </p>
     </div>
   );
 }

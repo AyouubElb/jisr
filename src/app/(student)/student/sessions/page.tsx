@@ -12,7 +12,7 @@ export default function StudentSessionsPage(): React.JSX.Element {
       <div>
         <div className="flex items-center gap-2">
           <Calendar className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-2xl font-bold">Sessions en direct</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Sessions en direct</h1>
         </div>
         <p className="text-muted-foreground">
           Les sessions planifiees pour vos cours

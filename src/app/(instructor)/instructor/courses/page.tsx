@@ -17,7 +17,7 @@ export default function InstructorCoursesPage(): React.JSX.Element {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">My courses</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">My courses</h1>
           <p className="text-muted-foreground">Manage and organize your courses</p>
         </div>
         <Link href="/instructor/courses/new">

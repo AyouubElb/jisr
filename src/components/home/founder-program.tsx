@@ -4,7 +4,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { CONTACT_WHATSAPP_URL } from "@/lib/constants/contact";
 
 const benefits = [
-  "99 DH/mois à vie — jamais d'augmentation",
+  "1er mois entièrement gratuit, puis 99 DH/mois à vie — jamais d'augmentation",
   "Onboarding personnalisé — on migre votre première classe avec vous",
   "Vous façonnez le produit — vos demandes passent en priorité",
   "Accès direct au fondateur sur WhatsApp",

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { getMonthlyUsage, type MonthlyUsageSummary } from "@/lib/ai/quotas";
 
 export interface AdminStats {
   totalInstructors: number;
@@ -227,6 +228,11 @@ export const adminApi = {
       instructor_names: Array.from(enrollmentsByStudent.get(p.id)?.instructors ?? []),
       enrollments: enrollmentsByStudent.get(p.id)?.items ?? [],
     }));
+  },
+
+  instructorUsage: async (instructorId: string): Promise<MonthlyUsageSummary> => {
+    const supabase = createClient();
+    return getMonthlyUsage(supabase, instructorId);
   },
 
   updateInstructorTier: async (id: string, tier: "free" | "pro" | "studio"): Promise<void> => {

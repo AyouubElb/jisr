@@ -76,6 +76,8 @@ export const attendanceKeys = {
   all: ["session_attendance"] as const,
   bySession: (sessionId: string) => [...attendanceKeys.all, "session", sessionId] as const,
   byCourse: (courseId: string) => [...attendanceKeys.all, "course", courseId] as const,
+  unmarked: () => [...attendanceKeys.all, "unmarked"] as const,
+  unmarkedCount: () => [...attendanceKeys.all, "unmarked-count"] as const,
 };
 
 export const questionKeys = {
@@ -90,6 +92,8 @@ export const adminKeys = {
   recentInvites: () => [...adminKeys.all, "recent-invites"] as const,
   instructors: () => [...adminKeys.all, "instructors"] as const,
   students: () => [...adminKeys.all, "students"] as const,
+  instructorUsage: (id: string) =>
+    [...adminKeys.all, "instructor-usage", id] as const,
 };
 
 export const aiAdminKeys = {

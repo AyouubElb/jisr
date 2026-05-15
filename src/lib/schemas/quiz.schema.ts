@@ -161,7 +161,7 @@ export const BLOCK_TYPES = [
   "voice",
 ] as const;
 
-export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
+export const BLOCK_TYPE_LABELS_FR: Record<BlockType, string> = {
   section: "Section",
   text: "Texte / Passage",
   audio: "Audio",
@@ -171,6 +171,19 @@ export const BLOCK_TYPE_LABELS: Record<BlockType, string> = {
   free_text: "Reponse ecrite",
   voice: "Reponse vocale",
 };
+
+export const BLOCK_TYPE_LABELS_EN: Record<BlockType, string> = {
+  section: "Section",
+  text: "Text / Passage",
+  audio: "Audio",
+  image: "Image",
+  mcq: "MCQ",
+  fill_blank: "Fill-in-the-blank",
+  free_text: "Written response",
+  voice: "Voice response",
+};
+
+export const BLOCK_TYPE_LABELS = BLOCK_TYPE_LABELS_FR;
 
 export const createQuizSchema = z.object({
   title: z.string().min(3, "Le titre doit contenir au moins 3 caracteres"),

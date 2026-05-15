@@ -74,7 +74,7 @@ export function QuestionThreadDialog({
         }
       }}
     >
-      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] overflow-hidden md:max-w-2xl">
         {isLoading || !thread ? (
           <div className="space-y-3">
             <Skeleton className="h-6 w-2/3" />

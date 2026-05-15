@@ -31,6 +31,16 @@ export const useAdminStudents = () => {
   });
 };
 
+// Fetches only when `enabled` flips true (on dropdown open) to avoid N+1.
+export const useAdminInstructorUsage = (id: string, enabled: boolean) => {
+  return useQuery({
+    queryKey: adminKeys.instructorUsage(id),
+    queryFn: () => adminApi.instructorUsage(id),
+    enabled: enabled && Boolean(id),
+    staleTime: 30_000,
+  });
+};
+
 export const useUpdateInstructorTier = () => {
   const queryClient = useQueryClient();
   return useMutation({

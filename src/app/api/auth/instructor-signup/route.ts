@@ -1,8 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { instructorSignupSchema } from "@/lib/schemas/auth.schema";
+import {
+  enforceRateLimit,
+  getClientIp,
+  signupLimiter,
+} from "@/lib/services/rate-limit.service";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = await enforceRateLimit(signupLimiter, getClientIp(request));
+  if (limited) return limited;
+
   const body = await request.json().catch(() => null);
   const parsed = instructorSignupSchema.safeParse(body);
   if (!parsed.success) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,14 +9,21 @@ import { useMyCourses } from "@/lib/hooks/useCourses";
 import { useUpcomingSessions } from "@/lib/hooks/useSessions";
 import { useInstructorStudents } from "@/lib/hooks/useEnrollments";
 import { useRecentActivity } from "@/lib/hooks/useEngagement";
+import { useUnmarkedSessions } from "@/lib/hooks/useAttendance";
+import { usePendingGradingCount } from "@/lib/hooks/useAttempts";
+import { useProfile } from "@/lib/hooks/useAuth";
+import { AttendanceDialog } from "@/components/course/session/attendance-dialog";
 import { LEVEL_BADGE_COLORS } from "@/lib/constants/levels";
 import {
   AlertTriangle,
+  ArrowRight,
   BookOpen,
   Calendar,
   CheckCircle2,
   ClipboardCheck,
   Circle,
+  FileText,
+  ListChecks,
   Plus,
   Users,
 } from "lucide-react";
@@ -85,6 +93,17 @@ export default function InstructorDashboardPage(): React.JSX.Element {
   const { data: sessions, isLoading: sessionsLoading } = useUpcomingSessions();
   const { data: enrollmentData, isLoading: enrollmentsLoading } = useInstructorStudents();
   const { data: activity, isLoading: activityLoading } = useRecentActivity();
+  const { data: unmarked } = useUnmarkedSessions();
+  const { data: profile } = useProfile();
+  const { data: pendingGradingCount } = usePendingGradingCount();
+  const [attendanceTarget, setAttendanceTarget] = useState<{
+    id: string;
+    title: string;
+    courseId: string;
+  } | null>(null);
+
+  const firstName = profile?.full_name?.split(" ")[0];
+  const pendingCount = pendingGradingCount ?? 0;
 
   const publishedCount = courses?.filter((c) => c.is_published).length ?? 0;
   const draftCount = courses?.filter((c) => !c.is_published).length ?? 0;
@@ -93,21 +112,31 @@ export default function InstructorDashboardPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-amber-950">Dashboard</h1>
-          <p className="text-muted-foreground">Manage your courses and track your students</p>
-        </div>
-        <Link href="/instructor/courses/new" className="self-start sm:self-auto">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New course
-          </Button>
+      {/* ── GREETING ───────────────────────────────────────────── */}
+      {pendingCount > 0 ? (
+        <Link href="/instructor/grading" className="group block">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-amber-950">
+            Hi {firstName ?? "there"}
+          </h1>
+          <p className="text-muted-foreground">
+            You have{" "}
+            <span className="font-semibold text-primary underline-offset-4 group-hover:underline">
+              {pendingCount} submission{pendingCount !== 1 ? "s" : ""} to grade
+            </span>
+            <ArrowRight className="ml-1 inline h-3.5 w-3.5 text-primary transition-transform group-hover:translate-x-0.5" />
+          </p>
         </Link>
-      </div>
+      ) : (
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-amber-950">
+            Hi {firstName ?? "there"}
+          </h1>
+          <p className="text-muted-foreground">All caught up — no pending submissions</p>
+        </div>
+      )}
 
       {/* ── STAT CARDS ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard
           label="Published courses"
           value={publishedCount}
@@ -125,6 +154,7 @@ export default function InstructorDashboardPage(): React.JSX.Element {
           value={totalStudents}
           icon={<Users className="h-4 w-4" />}
           loading={enrollmentsLoading}
+          variant="hero"
         />
         <StatCard
           label="Upcoming sessions"
@@ -134,10 +164,102 @@ export default function InstructorDashboardPage(): React.JSX.Element {
         />
       </div>
 
-      {/* ── BENTO GRID: at-risk (tall left) + activity feed (right) ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        {/* At-risk — spans 2 cols */}
-        <Card className="lg:col-span-2">
+      {/* ── ATTENDANCE NUDGE ───────────────────────────────────── */}
+      {unmarked && unmarked.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ClipboardCheck className="h-4 w-4 text-amber-700" />
+                <CardTitle className="text-base text-amber-900">
+                  {unmarked.length} session{unmarked.length !== 1 ? "s" : ""} need attendance
+                </CardTitle>
+              </div>
+              {unmarked.length > 3 && (
+                <Link
+                  href="/instructor/sessions?tab=past"
+                  className="text-xs text-amber-800 hover:underline"
+                >
+                  View all
+                </Link>
+              )}
+            </div>
+            <CardDescription className="text-amber-800/80">
+              Past sessions still missing a presence list
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {unmarked.slice(0, 3).map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-card p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{s.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {s.courseTitle}
+                      {" · "}
+                      {format(new Date(s.scheduledAt), "EEE MMM d 'at' HH:mm", { locale: enUS })}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1.5"
+                    onClick={() =>
+                      setAttendanceTarget({ id: s.id, title: s.title, courseId: s.courseId })
+                    }
+                  >
+                    <ClipboardCheck className="h-3.5 w-3.5" />
+                    Mark
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── QUICK ACTIONS ROW ─────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Quick actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <Link href="/instructor/courses/new" className="block">
+              <Button variant="outline" className="w-full justify-start">
+                <Plus className="mr-2 h-4 w-4" />
+                New course
+              </Button>
+            </Link>
+            <Link href="/instructor/courses" className="block">
+              <Button variant="outline" className="w-full justify-start">
+                <FileText className="mr-2 h-4 w-4" />
+                New lesson
+              </Button>
+            </Link>
+            <Link href="/instructor/courses" className="block">
+              <Button variant="outline" className="w-full justify-start">
+                <ListChecks className="mr-2 h-4 w-4" />
+                New quiz
+              </Button>
+            </Link>
+            <Link href="/instructor/sessions" className="block">
+              <Button variant="outline" className="w-full justify-start">
+                <Calendar className="mr-2 h-4 w-4" />
+                Schedule session
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── BENTO GRID: at-risk + activity feed ─────────────── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* At-risk */}
+        <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -203,23 +325,13 @@ export default function InstructorDashboardPage(): React.JSX.Element {
           </CardContent>
         </Card>
 
-        {/* Activity feed — spans 3 cols */}
-        <Card className="lg:col-span-3">
+        {/* Activity feed */}
+        <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Recent activity</CardTitle>
-                <CardDescription>
-                  Latest actions from your students
-                </CardDescription>
-              </div>
-              <Link
-                href="/instructor/activite"
-                className="text-xs text-primary hover:underline"
-              >
-                View all
-              </Link>
-            </div>
+            <CardTitle className="text-base">Recent activity</CardTitle>
+            <CardDescription>
+              Latest actions from your students
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {activityLoading ? (
@@ -236,8 +348,8 @@ export default function InstructorDashboardPage(): React.JSX.Element {
                 </p>
               </div>
             ) : (
-              <div className="space-y-1">
-                {activity.slice(0, 5).map((item) => (
+              <div className="max-h-[320px] space-y-1 overflow-y-auto pr-1">
+                {activity.map((item) => (
                   <div
                     key={`${item.type}-${item.id}`}
                     className="flex items-start gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted/30"
@@ -388,6 +500,16 @@ export default function InstructorDashboardPage(): React.JSX.Element {
           </CardContent>
         </Card>
       </div>
+
+      {attendanceTarget && (
+        <AttendanceDialog
+          sessionId={attendanceTarget.id}
+          courseId={attendanceTarget.courseId}
+          sessionTitle={attendanceTarget.title}
+          open={!!attendanceTarget}
+          onOpenChange={(open) => { if (!open) setAttendanceTarget(null); }}
+        />
+      )}
     </div>
   );
 }
@@ -397,23 +519,28 @@ function StatCard({
   value,
   icon,
   loading,
+  variant,
 }: {
   label: string;
   value: number;
   icon: React.ReactNode;
   loading: boolean;
+  variant?: "hero";
 }): React.JSX.Element {
+  const isHero = variant === "hero";
   return (
-    <Card>
+    <Card className={isHero ? "bg-primary/8 ring-1 ring-primary/20" : undefined}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium">{label}</CardTitle>
-        <span className="text-muted-foreground">{icon}</span>
+        <CardTitle className={`text-sm font-medium ${isHero ? "text-amber-950" : ""}`}>
+          {label}
+        </CardTitle>
+        <span className={isHero ? "text-primary" : "text-muted-foreground"}>{icon}</span>
       </CardHeader>
       <CardContent>
         {loading ? (
           <Skeleton className="h-8 w-16" />
         ) : (
-          <p className="text-2xl font-bold">{value}</p>
+          <p className={`text-2xl font-bold ${isHero ? "text-amber-950" : ""}`}>{value}</p>
         )}
       </CardContent>
     </Card>

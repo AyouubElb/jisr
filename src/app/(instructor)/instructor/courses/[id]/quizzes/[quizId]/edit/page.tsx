@@ -30,11 +30,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSidebar } from "@/components/ui/sidebar";
-import { QuizAIEditChat } from "@/components/course/quiz-ai-edit-chat";
+import { QuizAIEditChat } from "@/components/course/quiz/quiz-ai-edit-chat";
 import {
   BlockWrapper,
   SectionBlockEditor,
@@ -45,13 +44,13 @@ import {
   AudioBlockEditor,
   ImageBlockEditor,
   VoiceBlockEditor,
-} from "@/components/course/quiz-block-editor";
+} from "@/components/course/quiz/quiz-block-editor";
 import {
   createQuizSchema,
   blockContentSchemas,
   type CreateQuizInput,
   type BlockType,
-  BLOCK_TYPE_LABELS,
+  BLOCK_TYPE_LABELS_EN,
 } from "@/lib/schemas/quiz.schema";
 import {
   useQuiz,
@@ -511,13 +510,13 @@ export default function QuizEditPage(): React.JSX.Element {
     if (block.type === "text") return "Passage";
     if (block.type === "audio") return (c.caption as string) || "Audio";
     if (block.type === "image") return (c.alt as string) || "Image";
-    return BLOCK_TYPE_LABELS[block.type];
+    return BLOCK_TYPE_LABELS_EN[block.type];
   };
 
   // ── Loading ──────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] flex-col gap-4 p-4 sm:p-6">
+      <div className="flex h-[calc(100vh-4rem-72px)] flex-col gap-4 lg:h-[calc(100vh-4rem)]">
         <Skeleton className="h-14 w-full rounded-xl" />
         <div className="grid flex-1 gap-4 lg:grid-cols-4">
           <Skeleton className="h-full rounded-xl lg:col-span-1" />
@@ -542,68 +541,16 @@ export default function QuizEditPage(): React.JSX.Element {
   return (
     <form
       onSubmit={form.handleSubmit(onSave)}
-      className="flex h-[calc(100vh-4rem)] flex-col gap-3 p-3 sm:gap-4 sm:p-4 lg:p-6"
+      className="flex h-[calc(100vh-4rem-72px)] flex-col gap-3 md:gap-4 lg:h-[calc(100vh-4rem)]"
     >
-      {/* ── Top bar ────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 sm:px-4 sm:py-3">
-        <Link href={`/instructor/courses/${courseId}`}>
-          <Button type="button" variant="ghost" size="icon" className="shrink-0">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <ClipboardList className="h-5 w-5 shrink-0 text-violet-600" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-amber-950 sm:text-base">
-            {form.watch("title") || quiz.title}
-          </p>
-          <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
-            <span>
-              {blocks.length} block{blocks.length !== 1 ? "s" : ""}
-            </span>
-            <span>·</span>
-            <span>
-              {questionCount} question{questionCount !== 1 ? "s" : ""}
-            </span>
-            <span>·</span>
-            <span>Weight: {totalWeight}</span>
-          </div>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            if (isMobile) setSidebarOpenMobile(false);
-            else setSidebarOpen(false);
-            setAiChatOpen(true);
-          }}
-          disabled={isSaving || isDeleting}
-          className="gap-1.5"
-        >
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span className="hidden sm:inline">AI assistant</span>
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setDeleteConfirmOpen(true)}
-          disabled={isSaving || isDeleting}
-          className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-        >
-          <Trash2 className="h-4 w-4" />
-          <span className="hidden sm:inline">Delete</span>
-        </Button>
-        {/* autosave status indicators disabled — re-enable with autosave hook */}
-        {/* {autosaveStatus === "saving-db" && (
-          <span className="hidden text-xs text-muted-foreground sm:inline">Sauvegarde...</span>
-        )}
-        {autosaveStatus === "saved" && (
-          <span className="hidden text-xs text-green-600 sm:inline">Sauvegardé</span>
-        )} */}
-        <Button type="submit" disabled={isSaving || isDeleting} className="gap-1.5">
-          <Save className="h-4 w-4" />
-          {isSaving ? "Saving..." : "Save"}
-        </Button>
-      </div>
+      {/* Mobile/tablet back link — desktop uses the arrow inside the blocks card */}
+      <Link
+        href={`/instructor/courses/${courseId}`}
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground lg:hidden"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to course
+      </Link>
 
       {/* ── Restore banner disabled — re-enable with autosave hook ─ */}
       {/* {pendingRestore && (
@@ -629,12 +576,12 @@ export default function QuizEditPage(): React.JSX.Element {
       />
 
       {/* ── Content area: bento grid + chat panel ─────────────── */}
-      <div className="flex min-h-0 flex-1 gap-3 sm:gap-4">
+      <div className="flex min-h-0 flex-1 gap-3 md:gap-4">
 
       {/* ── Bento grid ────────────────────────────────────────── */}
-      <div className="grid min-h-0 flex-1 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className="grid min-h-0 flex-1 gap-3 md:gap-4 lg:grid-cols-4">
         {/* ── Left column: plan (TOC) + add-block + settings ── */}
-        <div className="flex min-h-0 flex-col gap-3 sm:gap-4 lg:col-span-1">
+        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto md:gap-4 lg:col-span-1">
 
           {/* Plan / TOC — accordion; flex-1 only when open so it doesn't steal height */}
           <div
@@ -745,7 +692,7 @@ export default function QuizEditPage(): React.JSX.Element {
                         className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-left text-xs font-medium text-amber-950 transition-colors hover:border-violet-500/50 hover:bg-violet-50"
                       >
                         <Icon className="h-3.5 w-3.5 shrink-0 text-violet-600" />
-                        <span className="truncate">{BLOCK_TYPE_LABELS[type]}</span>
+                        <span className="truncate">{BLOCK_TYPE_LABELS_EN[type]}</span>
                       </button>
                     );
                   })}
@@ -857,22 +804,76 @@ export default function QuizEditPage(): React.JSX.Element {
         </div>
 
         {/* ── Right column: blocks list (scrollable) ──────────── */}
-        <div className="flex min-h-0 flex-col rounded-xl border border-border bg-card shadow-sm lg:col-span-3">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div className="flex items-center gap-2">
-              <ListChecks className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-amber-950">
-                Quiz blocks
-              </h2>
+        <div className="flex h-full min-h-0 flex-col rounded-xl border border-border bg-card shadow-sm lg:col-span-3">
+          {/* Blocks card header: back · icon · inline title + breadcrumb · actions */}
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2 md:px-4 md:py-3">
+            <Link href={`/instructor/courses/${courseId}`} className="hidden lg:block">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
+                title="Back to course"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <ClipboardList className="h-5 w-5 shrink-0 text-violet-600" />
+            <div className="min-w-0 flex-1">
+              <Input
+                {...form.register("title")}
+                placeholder="Quiz title"
+                aria-label="Quiz title"
+                className="h-auto truncate border-0 bg-transparent px-0 py-0 text-sm font-semibold text-amber-950 shadow-none focus-visible:ring-0 sm:text-base"
+              />
+              <div
+                className={`hidden items-center gap-2 text-xs text-muted-foreground ${
+                  aiChatOpen ? "xl:flex" : "md:flex"
+                }`}
+              >
+                <span>
+                  {blocks.length} block{blocks.length !== 1 ? "s" : ""}
+                </span>
+                <span>·</span>
+                <span>
+                  {questionCount} question{questionCount !== 1 ? "s" : ""}
+                </span>
+                <span>·</span>
+                <span>Weight: {totalWeight}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Badge variant="outline" className="text-[10px]">
-                {blocks.length} block{blocks.length !== 1 ? "s" : ""}
-              </Badge>
-              <Badge variant="outline" className="text-[10px]">
-                Weight: {totalWeight}
-              </Badge>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (isMobile) setSidebarOpenMobile(false);
+                else setSidebarOpen(false);
+                setAiChatOpen(true);
+              }}
+              disabled={isSaving || isDeleting}
+              className="gap-1.5"
+            >
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="hidden md:inline">AI assistant</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteConfirmOpen(true)}
+              disabled={isSaving || isDeleting}
+              className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="hidden md:inline">Delete</span>
+            </Button>
+            <Button type="submit" size="sm" disabled={isSaving || isDeleting} className="gap-1.5">
+              <Save className="h-4 w-4" />
+              <span className="hidden md:inline">
+                {isSaving ? "Saving..." : "Save"}
+              </span>
+            </Button>
           </div>
 
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">

@@ -62,9 +62,32 @@ export function AppHeader({ fullName, role }: AppHeaderProps): React.JSX.Element
     router.refresh();
   };
 
+  const homeHref =
+    role === "instructor"
+      ? "/instructor"
+      : role === "student"
+        ? "/student"
+        : "/admin";
+
   return (
     <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
-      <SidebarTrigger className="hidden md:flex" />
+      <SidebarTrigger className="hidden lg:flex" />
+      <Link
+        href={homeHref}
+        className="flex items-baseline gap-0.5 lg:hidden"
+        aria-label="Jisr"
+      >
+        <span className="text-xl font-bold tracking-tight text-amber-950">
+          Jisr
+        </span>
+        <span
+          aria-hidden
+          className="text-base font-semibold text-primary"
+          style={{ lineHeight: 1 }}
+        >
+          ج
+        </span>
+      </Link>
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Avatar className="h-8 w-8">

@@ -86,10 +86,9 @@ export function LessonDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nouvelle lecon</DialogTitle>
+          <DialogTitle>New lesson</DialogTitle>
           <DialogDescription>
-            Donnez un titre a votre lecon. Vous pourrez rediger le contenu sur
-            la page suivante.
+            Give your lesson a title. You&apos;ll be able to write the content on the next page.
           </DialogDescription>
         </DialogHeader>
 
@@ -99,11 +98,11 @@ export function LessonDialog({
           className="space-y-4 py-2"
         >
           <div className="space-y-2">
-            <Label htmlFor="lesson-title">Titre</Label>
+            <Label htmlFor="lesson-title">Title</Label>
             <Input
               id="lesson-title"
               autoFocus
-              placeholder="ex : Present Simple"
+              placeholder="e.g. Present Simple"
               {...form.register("title")}
             />
             {form.formState.errors.title && (
@@ -124,12 +123,12 @@ export function LessonDialog({
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selectionner un type" />
+                <SelectValue placeholder="Select a type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="grammar">Grammaire</SelectItem>
-                <SelectItem value="vocabulary">Vocabulaire</SelectItem>
-                <SelectItem value="resource">Ressource</SelectItem>
+                <SelectItem value="grammar">Grammar</SelectItem>
+                <SelectItem value="vocabulary">Vocabulary</SelectItem>
+                <SelectItem value="resource">Resource</SelectItem>
               </SelectContent>
             </Select>
             {form.formState.errors.type && (
@@ -146,10 +145,10 @@ export function LessonDialog({
             variant="outline"
             onClick={() => onOpenChange(false)}
           >
-            Annuler
+            Cancel
           </Button>
           <Button type="submit" form="lesson-create-form" disabled={isPending}>
-            {isPending ? "Creation..." : "Continuer"}
+            {isPending ? "Creating..." : "Continue"}
           </Button>
         </DialogFooter>
       </DialogContent>

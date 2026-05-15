@@ -82,7 +82,7 @@ export default function InstructorSettingsPage(): React.JSX.Element {
     <div className="flex flex-col items-center">
       <div className="w-full max-w-xl space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-amber-950">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-amber-950">
             Settings
           </h1>
           <p className="text-muted-foreground">

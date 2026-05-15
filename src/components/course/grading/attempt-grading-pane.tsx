@@ -125,7 +125,7 @@ export function AttemptGradingPane({
       <SheetContent className="w-full overflow-y-auto !max-w-full md:!max-w-md lg:!max-w-lg">
         {!attempt ? (
           <div className="p-6 text-sm text-muted-foreground">
-            Aucune tentative selectionnee.
+            No attempt selected.
           </div>
         ) : (
           <>
@@ -168,13 +168,13 @@ export function AttemptGradingPane({
                   onClick={() => onOpenChange(false)}
                   disabled={isPending}
                 >
-                  Annuler
+                  Cancel
                 </Button>
                 <Button type="button" onClick={handleSave} disabled={isPending}>
                   {isPending && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  Enregistrer les notes
+                  Save grades
                 </Button>
               </div>
             </div>

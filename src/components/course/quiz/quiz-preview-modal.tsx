@@ -37,7 +37,7 @@ export function QuizPreviewModal({
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="flex max-h-[90vh] sm:max-w-2xl lg:max-w-4xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent className="flex max-h-[90vh] md:max-w-2xl lg:max-w-4xl flex-col gap-0 overflow-hidden p-0">
         {isLoading || !quiz ? (
           <div className="space-y-4 p-6">
             <Skeleton className="h-8 w-2/3" />

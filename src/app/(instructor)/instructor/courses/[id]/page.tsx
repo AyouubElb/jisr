@@ -22,15 +22,15 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { LessonDialog } from "@/components/course/lesson-dialog";
-import { QuizDialog } from "@/components/course/quiz-dialog";
-import { QuizAIGenerateDialog } from "@/components/course/quiz-ai-generate-dialog";
-import { QuizPreviewModal } from "@/components/course/quiz-preview-modal";
-import { SectionDialog } from "@/components/course/section-dialog";
-import { SessionDialog } from "@/components/course/session-dialog";
-import { AddStudentDialog } from "@/components/course/add-student-dialog";
-import { AttendanceDialog } from "@/components/course/attendance-dialog";
-import { QuestionsPanel } from "@/components/course/questions-panel";
+import { LessonDialog } from "@/components/course/lesson/lesson-dialog";
+import { QuizDialog } from "@/components/course/quiz/quiz-dialog";
+import { QuizAIGenerateDialog } from "@/components/course/quiz/quiz-ai-generate-dialog";
+import { QuizPreviewModal } from "@/components/course/quiz/quiz-preview-modal";
+import { SectionDialog } from "@/components/course/shared/section-dialog";
+import { SessionDialog } from "@/components/course/session/session-dialog";
+import { AddStudentDialog } from "@/components/course/students/add-student-dialog";
+import { AttendanceDialog } from "@/components/course/session/attendance-dialog";
+import { QuestionsPanel } from "@/components/course/questions/questions-panel";
 import { useCourseQuestions } from "@/lib/hooks/useQuestions";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -48,7 +48,7 @@ import {
 } from "@/lib/hooks/useEnrollments";
 import {
   CEFR_LEVELS,
-  LEVEL_LABELS,
+  LEVEL_LABELS_EN,
   LEVEL_BADGE_COLORS,
 } from "@/lib/constants/levels";
 import {
@@ -106,6 +106,8 @@ type AIQuizDialogState =
   | { sectionId: string; lessons: Pick<Lesson, "id" | "title" | "type">[] }
   | null;
 
+type TabValue = "content" | "sessions" | "students" | "questions" | "settings";
+
 export default function InstructorCourseDetailPage(): React.JSX.Element {
   const params = useParams();
   const router = useRouter();
@@ -125,6 +127,20 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
   const { data: questions } = useCourseQuestions(courseId);
   const openQuestionsCount =
     questions?.filter((q) => q.status === "open").length ?? 0;
+
+  const [activeTab, setActiveTab] = useState<TabValue>("content");
+  const COURSE_TABS: Array<{
+    value: TabValue;
+    label: string;
+    Icon: React.ComponentType<{ className?: string }>;
+    count: number | null;
+  }> = [
+    { value: "content", label: "Content", Icon: BookOpen, count: sections?.length ?? 0 },
+    { value: "sessions", label: "Sessions", Icon: Calendar, count: course?.live_sessions?.length ?? 0 },
+    { value: "students", label: "Students", Icon: Users, count: enrollments?.length ?? 0 },
+    { value: "questions", label: "Questions", Icon: MessageCircle, count: openQuestionsCount },
+    { value: "settings", label: "Settings", Icon: Settings, count: null },
+  ];
 
   const [lessonDialog, setLessonDialog] = useState<LessonDialogState>(null);
   const [quizDialog, setQuizDialog] = useState<QuizDialogState>(null);
@@ -227,7 +243,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
   return (
     <div className="space-y-6">
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="flex items-start gap-3">
           <Link href="/instructor/courses">
             <Button variant="ghost" size="icon" className="mt-0.5 shrink-0">
@@ -236,11 +252,11 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
           </Link>
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight text-amber-950">
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-amber-950">
                 {course.title}
               </h1>
               <Badge className={LEVEL_BADGE_COLORS[course.level as CEFRLevel]}>
-                {course.level} — {LEVEL_LABELS[course.level as CEFRLevel]}
+                {course.level} — {LEVEL_LABELS_EN[course.level as CEFRLevel]}
               </Badge>
               <Badge
                 variant={course.is_published ? "default" : "secondary"}
@@ -278,60 +294,85 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
       </div>
 
       {/* ── Tabs ───────────────────────────────────────────────────── */}
-      <Tabs defaultValue="content">
-        <TabsList className="w-full justify-start gap-1 rounded-xl border border-border bg-muted/40 p-2">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
+        {/* Mobile (<md): single Select picker — 5 icon-only tabs were unreadable */}
+        <div className="md:hidden">
+          <Select value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
+            <SelectTrigger className="h-11 w-full gap-2 rounded-xl border-border bg-card text-sm font-medium text-amber-950 shadow-sm [&>span]:flex [&>span]:items-center [&>span]:gap-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COURSE_TABS.map(({ value, label, Icon, count }) => (
+                <SelectItem key={value} value={value} className="gap-2">
+                  <span className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    <span>{label}</span>
+                    {count !== null && (
+                      <span className="ml-auto rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        {count}
+                      </span>
+                    )}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop (md+): pill tray */}
+        <TabsList className="hidden md:flex w-full justify-start gap-1 rounded-xl border border-border bg-muted/40 p-2">
           <TabsTrigger
             value="content"
-            className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+            className="gap-1.5 rounded-lg px-4 py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <BookOpen className="h-4 w-4" />
-            <span className="hidden md:inline">Content</span>
+            <span>Content</span>
             <span className="hidden lg:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {sections?.length ?? 0}
             </span>
           </TabsTrigger>
           <TabsTrigger
             value="sessions"
-            className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+            className="gap-1.5 rounded-lg px-4 py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <Calendar className="h-4 w-4" />
-            <span className="hidden md:inline">Sessions</span>
+            <span>Sessions</span>
             <span className="hidden lg:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {course.live_sessions?.length ?? 0}
             </span>
           </TabsTrigger>
           <TabsTrigger
             value="students"
-            className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+            className="gap-1.5 rounded-lg px-4 py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <Users className="h-4 w-4" />
-            <span className="hidden md:inline">Students</span>
+            <span>Students</span>
             <span className="hidden lg:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {enrollments?.length ?? 0}
             </span>
           </TabsTrigger>
           <TabsTrigger
             value="questions"
-            className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+            className="gap-1.5 rounded-lg px-4 py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <MessageCircle className="h-4 w-4" />
-            <span className="hidden md:inline">Questions</span>
+            <span>Questions</span>
             <span className="hidden lg:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               {openQuestionsCount}
             </span>
           </TabsTrigger>
           <TabsTrigger
             value="settings"
-            className="gap-1.5 rounded-lg px-2 py-2 md:px-4 md:py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
+            className="gap-1.5 rounded-lg px-4 py-3 lg:px-5 lg:py-4 data-[state=active]:bg-background data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-border/60"
           >
             <Settings className="h-4 w-4" />
-            <span className="hidden md:inline">Settings</span>
+            <span>Settings</span>
           </TabsTrigger>
         </TabsList>
 
         {/* ── CONTENT (Sections → Lessons + Quizzes) ─────────────── */}
         <TabsContent value="content" className="mt-4 space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-lg font-semibold text-amber-950">Course content</p>
               <p className="text-sm text-muted-foreground">
@@ -490,7 +531,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
 
         {/* ── SESSIONS ─────────────────────────────────────────────── */}
         <TabsContent value="sessions" className="mt-4 space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-lg font-semibold text-amber-950">Live sessions</p>
               <p className="text-sm text-muted-foreground">
@@ -621,7 +662,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
             </div>
           )}
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-lg font-semibold text-amber-950">Enrolled students</p>
               <p className="text-sm text-muted-foreground">
@@ -776,7 +817,7 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                     <SelectContent>
                       {CEFR_LEVELS.map((level) => (
                         <SelectItem key={level} value={level}>
-                          {level} — {LEVEL_LABELS[level]}
+                          {level} — {LEVEL_LABELS_EN[level]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -892,7 +933,7 @@ function SectionCard({
             {section.lessons?.length ?? 0} lesson{(section.lessons?.length ?? 0) !== 1 ? "s" : ""} · {section.quizzes?.length ?? 0} quiz{(section.quizzes?.length ?? 0) !== 1 ? "zes" : ""}
           </p>
         </div>
-        <div className="hidden sm:flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="hidden md:flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="ghost"
             size="sm"
@@ -900,7 +941,7 @@ function SectionCard({
             onClick={onAddLesson}
           >
             <BookOpen className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Lesson</span>
+            <span>Lesson</span>
           </Button>
           <Button
             variant="ghost"
@@ -909,7 +950,7 @@ function SectionCard({
             onClick={onAddQuiz}
           >
             <ClipboardList className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Quiz</span>
+            <span>Quiz</span>
           </Button>
           <Button
             variant="ghost"
@@ -924,7 +965,7 @@ function SectionCard({
             }
           >
             <Sparkles className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">AI quiz</span>
+            <span>AI quiz</span>
           </Button>
           <Button
             variant="ghost"
@@ -975,7 +1016,7 @@ function SectionCard({
                             {lessonTypeLabel(lesson.type)}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-0.5 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1024,7 +1065,7 @@ function SectionCard({
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-0.5 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
                         <Button
                           variant="ghost"
                           size="icon"

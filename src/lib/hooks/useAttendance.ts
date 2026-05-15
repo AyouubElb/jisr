@@ -21,10 +21,30 @@ export function useSaveAttendance(sessionId: string) {
       attendanceApi.saveBatch(sessionId, rows),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: attendanceKeys.bySession(sessionId) });
-      toast.success("Presence enregistree");
+      queryClient.invalidateQueries({ queryKey: attendanceKeys.unmarked() });
+      queryClient.invalidateQueries({ queryKey: attendanceKeys.unmarkedCount() });
+      toast.success("Attendance saved");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
+  });
+}
+
+/** Past sessions across the instructor's courses still needing attendance */
+export function useUnmarkedSessions() {
+  return useQuery({
+    queryKey: attendanceKeys.unmarked(),
+    queryFn: () => attendanceApi.unmarkedForInstructor(),
+  });
+}
+
+/** Sidebar badge — count of unmarked past sessions. Refetches every 5 min
+ *  in the background; React Query also refetches on tab focus by default. */
+export function useUnmarkedAttendanceCount() {
+  return useQuery({
+    queryKey: attendanceKeys.unmarkedCount(),
+    queryFn: () => attendanceApi.unmarkedCount(),
+    refetchInterval: 5 * 60_000,
   });
 }

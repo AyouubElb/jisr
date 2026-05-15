@@ -31,7 +31,7 @@ export default function StudentDashboardPage(): React.JSX.Element {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-amber-950">Tableau de bord</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-amber-950">Tableau de bord</h1>
           <p className="text-sm text-muted-foreground">Bienvenue ! Suivez vos cours et sessions</p>
         </div>
         {/* Stat chips — desktop only */}
@@ -51,9 +51,9 @@ export default function StudentDashboardPage(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Hero — mobile only, next session within 24h */}
+      {/* Hero — next session within 24h, shown on all breakpoints */}
       {!sessionsLoading && isNextWithin24h && nextSession && (
-        <div className="md:hidden rounded-xl border border-primary/25 bg-primary/10 p-5">
+        <div className="rounded-xl border border-primary/25 bg-primary/10 p-5">
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-primary">
             Prochaine session
           </p>

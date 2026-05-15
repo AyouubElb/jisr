@@ -11,7 +11,7 @@ import { useMyEnrollments } from "@/lib/hooks/useEnrollments";
 import { useMyCompletions } from "@/lib/hooks/useCompletions";
 import { useProfile } from "@/lib/hooks/useAuth";
 import { useCourseQuestions } from "@/lib/hooks/useQuestions";
-import { QuestionsPanel } from "@/components/course/questions-panel";
+import { QuestionsPanel } from "@/components/course/questions/questions-panel";
 import { LEVEL_BADGE_COLORS, LEVEL_LABELS } from "@/lib/constants/levels";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -114,7 +114,7 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-amber-950">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-amber-950">
             {course.title}
           </h1>
           <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -157,7 +157,7 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
             >
               <BookOpen className="h-4 w-4" />
               <span>Contenu</span>
-              <span className="hidden sm:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+              <span className="hidden md:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                 {course.sections?.length ?? 0}
               </span>
             </TabsTrigger>
@@ -167,7 +167,7 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
             >
               <Calendar className="h-4 w-4" />
               <span>Sessions</span>
-              <span className="hidden sm:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+              <span className="hidden md:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                 {course.live_sessions?.length ?? 0}
               </span>
             </TabsTrigger>
@@ -177,7 +177,7 @@ export default function StudentCourseDetailPage(): React.JSX.Element {
             >
               <MessageCircle className="h-4 w-4" />
               <span>Questions</span>
-              <span className="hidden sm:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+              <span className="hidden md:inline ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
                 {openQuestionsCount}
               </span>
             </TabsTrigger>

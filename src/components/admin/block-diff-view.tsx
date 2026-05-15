@@ -200,7 +200,7 @@ function DiffEntryCard({ entry }: { entry: DiffEntry }): React.JSX.Element {
             <Pencil className="h-3 w-3" /> MODIFIÉ #{entry.live.order + 1}
           </Badge>
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
           <div className="rounded border border-destructive/20 bg-destructive/5 p-2">
             <p className="mb-1 text-[10px] font-medium uppercase text-destructive">
               Original IA

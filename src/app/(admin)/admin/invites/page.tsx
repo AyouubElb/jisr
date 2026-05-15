@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { requireAdmin } from "@/lib/supabase/guards";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createInviteSchema } from "@/lib/schemas/auth.schema";
-import { CreateInviteForm } from "./create-invite-form";
+import { CreateInviteDialog } from "./create-invite-dialog";
 import { InvitesTable } from "./invites-table";
 
 async function createInviteAction(formData: FormData): Promise<void> {
@@ -48,8 +48,7 @@ export default async function AdminInvitesPage(): Promise<React.JSX.Element> {
   const { data: invites } = await supabase
     .from("invites")
     .select("*")
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .order("created_at", { ascending: false });
 
   const headerList = await headers();
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost:3000";
@@ -57,15 +56,16 @@ export default async function AdminInvitesPage(): Promise<React.JSX.Element> {
   const origin = `${protocol}://${host}`;
 
   return (
-    <div className="space-y-8 max-w-5xl">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Invitations</h1>
-        <p className="text-muted-foreground">
-          Generez un lien d&apos;invitation a envoyer par WhatsApp ou e-mail.
-        </p>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Invitations</h1>
+          <p className="text-muted-foreground">
+            Generez un lien d&apos;invitation a envoyer par WhatsApp ou e-mail.
+          </p>
+        </div>
+        <CreateInviteDialog action={createInviteAction} />
       </div>
-
-      <CreateInviteForm action={createInviteAction} />
 
       <InvitesTable invites={invites ?? []} origin={origin} />
     </div>

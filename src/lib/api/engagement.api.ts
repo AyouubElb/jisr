@@ -62,14 +62,14 @@ export const engagementApi = {
         .select("id, completed_at, student_id, profiles(full_name), lessons!inner(title, section_id, sections!inner(course_id, courses!inner(id, title, instructor_id)))")
         .eq("lessons.sections.courses.instructor_id", user.id)
         .order("completed_at", { ascending: false })
-        .limit(10),
+        .limit(20),
       supabase
         .from("student_attempts")
         .select("id, submitted_at, student_id, status, profiles!student_attempts_student_id_fkey(full_name), quizzes!inner(title, section_id, sections!inner(course_id, courses!inner(id, title, instructor_id)))")
         .eq("quizzes.sections.courses.instructor_id", user.id)
         .not("submitted_at", "is", null)
         .order("submitted_at", { ascending: false })
-        .limit(10),
+        .limit(20),
     ]);
 
     if (completionsRes.error) throw completionsRes.error;
@@ -119,7 +119,7 @@ export const engagementApi = {
 
     return items
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, 10);
+      .slice(0, 20);
   },
   /** Engagement overview for one student inside one course (instructor view) */
   studentOverview: async (

@@ -68,7 +68,7 @@ export function ViewerShell({
         <Link href={exitHref}>
           <Button variant="ghost" size="sm" className="shrink-0 gap-1.5 text-muted-foreground">
             <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Retour au cours</span>
+            <span className="hidden md:inline">Retour au cours</span>
           </Button>
         </Link>
       </header>

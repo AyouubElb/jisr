@@ -27,12 +27,12 @@ export function StudentsContent(): React.JSX.Element {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Etudiants</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">Etudiants</h1>
         <p className="text-muted-foreground">Tous les etudiants sur la plateforme</p>
       </div>
 
       {/* ── STAT CARDS ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <div className="col-span-2 flex flex-col justify-between rounded-xl border bg-primary p-5 text-primary-foreground">
           <div className="flex items-start justify-between">
             <p className="text-sm font-medium opacity-80">Etudiants</p>
@@ -155,11 +155,11 @@ function StudentRow({ student }: { student: AdminStudent }): React.JSX.Element {
         </button>
 
         {student.level ? (
-          <Badge className={`shrink-0 hidden sm:inline-flex ${LEVEL_BADGE_COLORS[student.level as CEFRLevel] ?? ""}`}>
+          <Badge className={`shrink-0 hidden md:inline-flex ${LEVEL_BADGE_COLORS[student.level as CEFRLevel] ?? ""}`}>
             {student.level}
           </Badge>
         ) : (
-          <span className="hidden sm:inline-block shrink-0 text-xs text-muted-foreground">—</span>
+          <span className="hidden md:inline-block shrink-0 text-xs text-muted-foreground">—</span>
         )}
 
         <div className="shrink-0 text-right">

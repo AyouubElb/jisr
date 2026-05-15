@@ -27,6 +27,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { UserRole } from "@/lib/types";
 import { usePendingGradingCount } from "@/lib/hooks/useAttempts";
+import { useUnmarkedAttendanceCount } from "@/lib/hooks/useAttendance";
 
 interface AppSidebarProps {
   role: UserRole;
@@ -36,7 +37,7 @@ interface NavItem {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  badgeKey?: "pendingGrading";
+  badgeKey?: "pendingGrading" | "unmarkedAttendance";
 }
 
 const studentNav: NavItem[] = [
@@ -51,7 +52,7 @@ const instructorNav: NavItem[] = [
   { title: "Dashboard", href: "/instructor", icon: LayoutDashboard },
   { title: "My courses", href: "/instructor/courses", icon: BookOpen },
   { title: "To grade", href: "/instructor/grading", icon: ClipboardCheck, badgeKey: "pendingGrading" },
-  { title: "Live sessions", href: "/instructor/sessions", icon: Calendar },
+  { title: "Live sessions", href: "/instructor/sessions", icon: Calendar, badgeKey: "unmarkedAttendance" },
   { title: "Students", href: "/instructor/students", icon: Users },
   { title: "Settings", href: "/instructor/settings", icon: Settings },
 ];
@@ -68,21 +69,34 @@ export function AppSidebar({ role }: AppSidebarProps): React.JSX.Element {
   const pathname = usePathname();
   const navItems = role === "admin" ? adminNav : role === "instructor" ? instructorNav : studentNav;
   const { data: pendingGrading } = usePendingGradingCount();
+  const { data: unmarkedAttendance } = useUnmarkedAttendanceCount();
+  const homeHref =
+    role === "instructor" ? "/instructor" : role === "student" ? "/student" : "/admin";
 
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-2 py-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary">
-            <GraduationCap className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold">English Learn</span>
-            <span className="text-xs text-muted-foreground">
-              {role === "admin" ? "Administrator" : role === "instructor" ? "Instructor" : "Etudiant"}
+        <Link
+          href={homeHref}
+          aria-label="Jisr"
+          className="flex items-center gap-3 px-2 py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+        >
+          <span className="flex items-baseline gap-0.5">
+            <span className="text-2xl font-bold tracking-tight text-amber-950 leading-none">
+              Jisr
             </span>
-          </div>
-        </div>
+            <span
+              aria-hidden
+              className="text-lg font-semibold text-primary"
+              style={{ lineHeight: 1 }}
+            >
+              ج
+            </span>
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {role === "admin" ? "Administrator" : role === "instructor" ? "Instructor" : "Etudiant"}
+          </span>
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -97,8 +111,10 @@ export function AppSidebar({ role }: AppSidebarProps): React.JSX.Element {
                 const Icon = item.icon;
                 const badge =
                   item.badgeKey === "pendingGrading" && pendingGrading && pendingGrading > 0
-                    ? pendingGrading
-                    : null;
+                    ? { count: pendingGrading, tone: "amber" as const }
+                    : item.badgeKey === "unmarkedAttendance" && unmarkedAttendance && unmarkedAttendance > 0
+                      ? { count: unmarkedAttendance, tone: "rose" as const }
+                      : null;
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
@@ -108,8 +124,12 @@ export function AppSidebar({ role }: AppSidebarProps): React.JSX.Element {
                           <Icon className="h-4 w-4" />
                           <span>{item.title}</span>
                           {badge !== null && (
-                            <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-semibold text-white">
-                              {badge}
+                            <span
+                              className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold text-white ${
+                                badge.tone === "rose" ? "bg-rose-500" : "bg-amber-500"
+                              }`}
+                            >
+                              {badge.count}
                             </span>
                           )}
                         </Link>

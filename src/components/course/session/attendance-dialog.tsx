@@ -11,8 +11,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Check, X, Users } from "lucide-react";
-import { useSessionAttendance, useSaveAttendance } from "@/lib/hooks/useAttendance";
+import { AlertTriangle, Check, X, Users } from "lucide-react";
+import {
+  useSessionAttendance,
+  useSaveAttendance,
+} from "@/lib/hooks/useAttendance";
 
 interface AttendanceDialogProps {
   sessionId: string;
@@ -93,11 +96,12 @@ function AttendanceDialogBody({
 
   return (
     <>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Presence — {sessionTitle}</DialogTitle>
+          <DialogTitle>Attendance — {sessionTitle}</DialogTitle>
           <DialogDescription>
-            Cochez les etudiants qui ont assiste a la session
+            Everyone is marked present by default. Uncheck anyone who
+            didn&apos;t attend.
           </DialogDescription>
         </DialogHeader>
 
@@ -110,21 +114,23 @@ function AttendanceDialogBody({
         ) : !rows?.length ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center">
             <Users className="h-10 w-10 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Aucun etudiant inscrit</p>
+            <p className="text-sm text-muted-foreground">
+              No students enrolled
+            </p>
           </div>
         ) : (
           <>
             {/* Bulk toggles */}
             <div className="flex items-center justify-between border-b border-border pb-3">
               <p className="text-sm text-muted-foreground">
-                {presentCount} / {totalCount} presents
+                {presentCount} / {totalCount} present
               </p>
               <div className="flex gap-1">
                 <Button variant="ghost" size="sm" onClick={() => setAll(true)}>
-                  Tous presents
+                  All present
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setAll(false)}>
-                  Aucun
+                  None
                 </Button>
               </div>
             </div>
@@ -148,7 +154,17 @@ function AttendanceDialogBody({
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
                         {row.fullName.charAt(0).toUpperCase()}
                       </div>
-                      <span className="truncate text-sm font-medium">{row.fullName}</span>
+                      <div className="min-w-0">
+                        <span className="block truncate text-sm font-medium">
+                          {row.fullName}
+                        </span>
+                        {row.recentAbsentStreak && (
+                          <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-amber-700">
+                            <AlertTriangle className="h-3 w-3" />
+                            Missed last 2 sessions
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div
                       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
@@ -157,7 +173,11 @@ function AttendanceDialogBody({
                           : "border border-border bg-background text-muted-foreground"
                       }`}
                     >
-                      {isPresent ? <Check className="h-4 w-4" /> : <X className="h-3 w-3" />}
+                      {isPresent ? (
+                        <Check className="h-4 w-4" />
+                      ) : (
+                        <X className="h-3 w-3" />
+                      )}
                     </div>
                   </button>
                 );
@@ -168,10 +188,10 @@ function AttendanceDialogBody({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            Annuler
+            Cancel
           </Button>
           <Button onClick={handleSave} disabled={isSaving || !rows?.length}>
-            {isSaving ? "Enregistrement..." : "Enregistrer"}
+            {isSaving ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>

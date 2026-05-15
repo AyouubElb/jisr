@@ -14,6 +14,7 @@ import {
   AIQuotaExceededError,
 } from "@/lib/ai/types";
 import { aiQuizChangeWireSchema } from "@/lib/ai/schemas/quiz-edit.schema";
+import { aiLimiter, enforceRateLimit } from "@/lib/services/rate-limit.service";
 
 // ── Body schemas ───────────────────────────────────────────────────────
 const ProposeBody = z.object({
@@ -59,6 +60,9 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     if (body.action === "propose") {
+      const limited = await enforceRateLimit(aiLimiter, user.id);
+      if (limited) return limited;
+
       const result = await proposeQuizEdit(supabase, user.id, {
         quizId: body.quizId,
         instruction: body.instruction,

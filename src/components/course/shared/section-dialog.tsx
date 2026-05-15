@@ -62,16 +62,16 @@ export function SectionDialog({
       <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nouvelle section</DialogTitle>
+          <DialogTitle>New section</DialogTitle>
           <DialogDescription>
-            Les sections organisent vos lecons et exercices
+            Sections organize your lessons and exercises
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label>Titre de la section</Label>
+            <Label>Section title</Label>
             <Input
-              placeholder="ex : Unit 1 — Present Tenses"
+              placeholder="e.g. Unit 1 — Present Tenses"
               {...form.register("title")}
             />
             {form.formState.errors.title && (
@@ -81,7 +81,7 @@ export function SectionDialog({
             )}
           </div>
           <Button type="submit" disabled={isPending} className="w-full">
-            {isPending ? "Ajout en cours..." : "Ajouter la section"}
+            {isPending ? "Adding..." : "Add section"}
           </Button>
         </form>
       </DialogContent>

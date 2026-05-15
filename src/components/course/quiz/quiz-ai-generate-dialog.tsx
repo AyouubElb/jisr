@@ -179,24 +179,24 @@ function QuizAIGenerateDialogBody({
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
-          Générer un quiz avec l&apos;IA
+          Generate a quiz with AI
         </DialogTitle>
         <DialogDescription>
-          Brouillon créé pour révision avant publication.
+          Draft created for review before publishing.
         </DialogDescription>
       </DialogHeader>
 
       {/* ── BENTO: 3 equal columns, each one card ──────────────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
-        {/* COL 1 — Leçons */}
+        {/* COL 1 — Lessons */}
         <Card>
           <CardContent className="flex flex-col gap-3 p-4">
             <SectionTitle icon={<BookOpen className="h-4 w-4" />}>
-              Leçons sources
+              Source lessons
             </SectionTitle>
             {lessons.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Ajoutez au moins une leçon à cette section avant de générer.
+                Add at least one lesson to this section before generating.
               </p>
             ) : (
               <>
@@ -232,64 +232,63 @@ function QuizAIGenerateDialogBody({
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  {selectedLessonIds.length} sélectionnée
-                  {selectedLessonIds.length > 1 ? "s" : ""} — max {QUIZ_GEN_MAX_LESSONS}
+                  {selectedLessonIds.length} selected — max {QUIZ_GEN_MAX_LESSONS}
                 </p>
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* COL 2 — Tout le mix (questions directes + passages) */}
+        {/* COL 2 — Full mix (direct questions + passages) */}
         <Card>
           <CardContent className="flex flex-col gap-4 p-4">
-            {/* Section: questions directes */}
+            {/* Section: direct questions */}
             <div className="space-y-3">
               <SectionTitle icon={<ListChecks className="h-4 w-4" />}>
-                Questions directes
+                Direct questions
               </SectionTitle>
               <div className="grid grid-cols-2 gap-3">
                 <MixField
-                  label="QCM"
-                  hint="incl. Vrai/Faux"
+                  label="MCQ"
+                  hint="incl. True/False"
                   value={mix.mcq}
                   onChange={(v) => setMix((m) => ({ ...m, mcq: v }))}
                 />
                 <MixField
-                  label="Texte à trous"
+                  label="Fill-in-the-blank"
                   value={mix.fill_blank}
                   onChange={(v) => setMix((m) => ({ ...m, fill_blank: v }))}
                 />
                 <MixField
-                  label="Réponse écrite"
+                  label="Written response"
                   value={mix.free_text}
                   onChange={(v) => setMix((m) => ({ ...m, free_text: v }))}
                 />
                 <MixField
-                  label="Réponse vocale"
-                  hint="audio enregistré"
+                  label="Voice response"
+                  hint="audio recording"
                   value={mix.voice_response}
                   onChange={(v) => setMix((m) => ({ ...m, voice_response: v }))}
                 />
               </div>
               {!directInRange ? (
                 <p className="text-xs text-destructive">
-                  Le total direct doit être entre 0 et {QUIZ_GEN_MAX_DIRECT_QUESTIONS} (actuel : {directQs}).
+                  Direct total must be between 0 and {QUIZ_GEN_MAX_DIRECT_QUESTIONS} (current: {directQs}).
                 </p>
               ) : null}
               {!hasAtLeastOneBlock ? (
                 <p className="text-xs text-destructive">
-                  Le quiz doit contenir au moins un bloc.
+                  The quiz must contain at least one block.
                 </p>
               ) : null}
             </div>
 
             <div className="border-t" />
 
-            {/* Section: passage texte */}
+            {/* Section: text passage */}
             <div className="space-y-3">
               <SectionTitle icon={<Layers className="h-4 w-4" />}>
-                Passage texte
+                Text passage
               </SectionTitle>
               <div className="grid grid-cols-3 gap-3">
                 <PassageField
@@ -304,7 +303,7 @@ function QuizAIGenerateDialogBody({
                   }
                 />
                 <PassageQuestionField
-                  label="QCM"
+                  label="MCQ"
                   disabled={mix.text_passage === 0}
                   value={passageQs.text.mcq}
                   onChange={(v) =>
@@ -312,7 +311,7 @@ function QuizAIGenerateDialogBody({
                   }
                 />
                 <PassageQuestionField
-                  label="À trous"
+                  label="Fill-in"
                   disabled={mix.text_passage === 0}
                   value={passageQs.text.fill_blank}
                   onChange={(v) =>
@@ -324,10 +323,10 @@ function QuizAIGenerateDialogBody({
 
             <div className="border-t" />
 
-            {/* Section: passage audio */}
+            {/* Section: audio passage */}
             <div className="space-y-3">
               <SectionTitle icon={<Headphones className="h-4 w-4" />}>
-                Passage audio
+                Audio passage
               </SectionTitle>
               <div className="grid grid-cols-3 gap-3">
                 <PassageField
@@ -342,7 +341,7 @@ function QuizAIGenerateDialogBody({
                   }
                 />
                 <PassageQuestionField
-                  label="QCM"
+                  label="MCQ"
                   disabled={mix.audio_passage === 0}
                   value={passageQs.audio.mcq}
                   onChange={(v) =>
@@ -350,7 +349,7 @@ function QuizAIGenerateDialogBody({
                   }
                 />
                 <PassageQuestionField
-                  label="À trous"
+                  label="Fill-in"
                   disabled={mix.audio_passage === 0}
                   value={passageQs.audio.fill_blank}
                   onChange={(v) =>
@@ -362,17 +361,17 @@ function QuizAIGenerateDialogBody({
           </CardContent>
         </Card>
 
-        {/* COL 3 — Instructions complémentaires */}
+        {/* COL 3 — Extra instructions */}
         <Card>
           <CardContent className="flex flex-col gap-3 p-4">
             <SectionTitle icon={<Compass className="h-4 w-4" />}>
-              Instructions complémentaires
+              Extra instructions
             </SectionTitle>
             <p className="text-xs text-muted-foreground">
-              Précisez le thème, contexte, contraintes (optionnel).
+              Specify the theme, context, or constraints (optional).
             </p>
             <Textarea
-              placeholder="ex : 3 questions sur le past perfect dans des situations de voyage. Inclure une comparaison avec le past simple."
+              placeholder="e.g. 3 questions on past perfect in travel situations. Include a comparison with past simple."
               maxLength={500}
               value={focusTopic}
               onChange={(e) => setFocusTopic(e.target.value)}
@@ -390,25 +389,24 @@ function QuizAIGenerateDialogBody({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Le quiz aura
+              The quiz will have
             </p>
             <p className="text-2xl font-bold leading-tight">
               {grandTotal}{" "}
               <span className="text-sm font-medium text-muted-foreground">
-                bloc{grandTotal > 1 ? "s" : ""}
+                block{grandTotal > 1 ? "s" : ""}
               </span>
             </p>
           </div>
           <p className="text-xs text-muted-foreground">
-            {directQs} question{directQs > 1 ? "s" : ""} directe
-            {directQs > 1 ? "s" : ""}
+            {directQs} direct question{directQs > 1 ? "s" : ""}
             {derivedMCQs > 0
-              ? ` + ${derivedMCQs} question${derivedMCQs > 1 ? "s" : ""} de passage`
+              ? ` + ${derivedMCQs} passage question${derivedMCQs > 1 ? "s" : ""}`
               : ""}
             {usesAnyPassage
-              ? ` + ${mix.audio_passage + mix.text_passage} passage${
+              ? ` + ${mix.audio_passage + mix.text_passage} parent passage${
                   mix.audio_passage + mix.text_passage > 1 ? "s" : ""
-                } parent${mix.audio_passage + mix.text_passage > 1 ? "s" : ""}`
+                }`
               : ""}
           </p>
         </div>
@@ -416,8 +414,8 @@ function QuizAIGenerateDialogBody({
 
       {isHeavyConfig ? (
         <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          Cette configuration peut être lente (jusqu&apos;à une minute). Si la
-          génération échoue, réduisez le nombre de blocs ou retirez les passages.
+          This configuration may be slow (up to a minute). If generation fails,
+          reduce the number of blocks or remove passages.
         </p>
       ) : null}
 
@@ -428,10 +426,10 @@ function QuizAIGenerateDialogBody({
           onClick={onClose}
           disabled={isPending}
         >
-          Annuler
+          Cancel
         </Button>
         <Button type="button" onClick={onSubmit} disabled={!canSubmit}>
-          {isPending ? "Génération..." : "Générer le brouillon"}
+          {isPending ? "Generating..." : "Generate draft"}
         </Button>
       </DialogFooter>
     </DialogContent>

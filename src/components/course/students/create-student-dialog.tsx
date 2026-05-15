@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Copy, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { CEFR_LEVELS, LEVEL_LABELS } from "@/lib/constants/levels";
+import { CEFR_LEVELS, LEVEL_LABELS_EN } from "@/lib/constants/levels";
 
 export function CreateStudentDialog(): React.JSX.Element {
   const [open, setOpen] = useState(false);
@@ -58,7 +58,7 @@ export function CreateStudentDialog(): React.JSX.Element {
   const copyPassword = async (): Promise<void> => {
     if (!generatedPassword) return;
     await navigator.clipboard.writeText(generatedPassword);
-    toast.success("Mot de passe copie");
+    toast.success("Password copied");
   };
 
   return (
@@ -66,14 +66,14 @@ export function CreateStudentDialog(): React.JSX.Element {
       <DialogTrigger render={
         <Button>
           <UserPlus className="mr-2 h-4 w-4" />
-          Ajouter un etudiant
+          Add student
         </Button>
       } />
 
       <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>
-            {generatedPassword ? "Compte cree" : "Ajouter un etudiant"}
+            {generatedPassword ? "Account created" : "Add student"}
           </DialogTitle>
         </DialogHeader>
 
@@ -81,7 +81,7 @@ export function CreateStudentDialog(): React.JSX.Element {
           // ── Success: show generated password once ──────────────
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Compte cree. Partagez ce mot de passe temporaire via WhatsApp — il ne sera plus visible apres fermeture.
+              Account created. Share this temporary password via WhatsApp — it won&apos;t be visible again after closing.
             </p>
             <div className="flex items-center gap-2 rounded-lg border bg-muted px-3 py-2.5">
               <code className="flex-1 font-mono text-base font-semibold tracking-widest">
@@ -89,18 +89,18 @@ export function CreateStudentDialog(): React.JSX.Element {
               </code>
               <Button type="button" variant="outline" size="sm" onClick={copyPassword}>
                 <Copy className="h-3.5 w-3.5" />
-                Copier
+                Copy
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              L&apos;etudiant peut changer ce mot de passe depuis son profil apres connexion.
+              The student can change this password from their profile after signing in.
             </p>
           </div>
         ) : (
           // ── Form ────────────────────────────────────────────────
           <form id="create-student-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="cs-full_name">Nom complet</Label>
+              <Label htmlFor="cs-full_name">Full name</Label>
               <Input
                 id="cs-full_name"
                 placeholder="Fatima Benali"
@@ -113,7 +113,7 @@ export function CreateStudentDialog(): React.JSX.Element {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="cs-email">Adresse e-mail</Label>
+              <Label htmlFor="cs-email">Email address</Label>
               <Input
                 id="cs-email"
                 type="email"
@@ -128,33 +128,33 @@ export function CreateStudentDialog(): React.JSX.Element {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="cs-level">Niveau</Label>
+                <Label htmlFor="cs-level">Level</Label>
                 <select
                   id="cs-level"
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   {...form.register("level")}
                 >
-                  <option value="">— Optionnel —</option>
+                  <option value="">— Optional —</option>
                   {CEFR_LEVELS.map((l) => (
-                    <option key={l} value={l}>{l} — {LEVEL_LABELS[l]}</option>
+                    <option key={l} value={l}>{l} — {LEVEL_LABELS_EN[l]}</option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="cs-course">Inscrire dans</Label>
+                <Label htmlFor="cs-course">Enroll in</Label>
                 <select
                   id="cs-course"
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   {...form.register("course_id")}
                 >
-                  <option value="">— Optionnel —</option>
+                  <option value="">— Optional —</option>
                   {publishedCourses.map((c) => (
                     <option key={c.id} value={c.id}>{c.title}</option>
                   ))}
                 </select>
                 {publishedCourses.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Publiez un cours d&apos;abord</p>
+                  <p className="text-xs text-muted-foreground">Publish a course first</p>
                 )}
               </div>
             </div>
@@ -163,12 +163,12 @@ export function CreateStudentDialog(): React.JSX.Element {
 
         <DialogFooter>
           {generatedPassword ? (
-            <DialogClose render={<Button>Fermer</Button>} />
+            <DialogClose render={<Button>Close</Button>} />
           ) : (
             <>
-              <DialogClose render={<Button variant="outline" disabled={isPending}>Annuler</Button>} />
+              <DialogClose render={<Button variant="outline" disabled={isPending}>Cancel</Button>} />
               <Button type="submit" form="create-student-form" disabled={isPending}>
-                {isPending ? "Creation..." : "Creer le compte"}
+                {isPending ? "Creating..." : "Create account"}
               </Button>
             </>
           )}

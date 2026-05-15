@@ -48,16 +48,16 @@ export default function StudentCoursesPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Mes cours</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Mes cours</h1>
           <p className="text-muted-foreground">Les cours auxquels vous etes inscrit</p>
         </div>
         <Select
           value={levelFilter ?? "all"}
           onValueChange={(v) => setLevelFilter(v === "all" ? undefined : v as CEFRLevel)}
         >
-          <SelectTrigger className="w-full sm:w-48">
+          <SelectTrigger className="w-full md:w-48">
             <SelectValue placeholder="Filtrer par niveau" />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>

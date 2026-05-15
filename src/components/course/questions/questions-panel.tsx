@@ -42,7 +42,7 @@ export function QuestionsPanel({
 
   return (
     <div className="min-w-0 space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <p className="text-lg font-semibold text-amber-950">Questions</p>
           <p className="text-sm text-muted-foreground">

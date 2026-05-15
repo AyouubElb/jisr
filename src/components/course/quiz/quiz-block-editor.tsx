@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import {
-  BLOCK_TYPE_LABELS,
+  BLOCK_TYPE_LABELS_EN,
   type BlockType,
   type McqOption,
 } from "@/lib/schemas/quiz.schema";
@@ -70,7 +70,7 @@ export function BlockWrapper({
       <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2">
         <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {BLOCK_TYPE_LABELS[type]}
+          {BLOCK_TYPE_LABELS_EN[type]}
         </span>
         <span className="text-xs text-muted-foreground">#{index + 1}</span>
 
@@ -95,7 +95,7 @@ export function BlockWrapper({
             size="icon"
             className="h-7 w-7"
             disabled={index === 0}
-            title="Monter tout en haut"
+            title="Move to top"
             onClick={onMoveToTop}
           >
             <ChevronsUp className="h-3.5 w-3.5" />
@@ -123,7 +123,7 @@ export function BlockWrapper({
             size="icon"
             className="h-7 w-7"
             disabled={index === total - 1}
-            title="Descendre tout en bas"
+            title="Move to bottom"
             onClick={onMoveToBottom}
           >
             <ChevronsDown className="h-3.5 w-3.5" />
@@ -132,7 +132,7 @@ export function BlockWrapper({
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            title="Dupliquer le bloc"
+            title="Duplicate block"
             onClick={onDuplicate}
           >
             <Copy className="h-3.5 w-3.5" />
@@ -172,11 +172,11 @@ export function TextBlockEditor({
 }: TextBlockEditorProps): React.JSX.Element {
   return (
     <div className="space-y-2">
-      <Label>Contenu du passage</Label>
+      <Label>Passage content</Label>
       <RichTextEditor
         content={content.html ?? ""}
         onChange={(html) => onChange({ html })}
-        placeholder="Ecrivez un passage, des instructions..."
+        placeholder="Write a passage, instructions..."
       />
     </div>
   );
@@ -198,19 +198,19 @@ export function SectionBlockEditor({
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <Label>Titre de la section</Label>
+        <Label>Section title</Label>
         <Input
           value={title}
           onChange={(e) => onChange({ title: e.target.value, description })}
-          placeholder="ex : Partie 1 — Vocabulaire"
+          placeholder="e.g. Part 1 — Vocabulary"
         />
       </div>
       <div className="space-y-2">
-        <Label>Description (optionnel)</Label>
+        <Label>Description (optional)</Label>
         <Input
           value={description}
           onChange={(e) => onChange({ title, description: e.target.value })}
-          placeholder="Consignes ou contexte pour cette section"
+          placeholder="Instructions or context for this section"
         />
       </div>
     </div>
@@ -346,10 +346,10 @@ export function McqBlockEditor({
           <Label>Options</Label>
           <span className="text-xs text-muted-foreground">
             {allowMultiple
-              ? `${correctCount} bonne${correctCount !== 1 ? "s" : ""} reponse${correctCount !== 1 ? "s" : ""}`
+              ? `${correctCount} correct answer${correctCount !== 1 ? "s" : ""}`
               : correctCount === 1
-                ? "1 bonne reponse"
-                : "Aucune bonne reponse selectionnee"}
+                ? "1 correct answer"
+                : "No correct answer selected"}
           </span>
         </div>
         {options.map((opt, idx) => (
@@ -365,7 +365,7 @@ export function McqBlockEditor({
               }`}
               onClick={() => toggleCorrect(idx)}
               title={
-                opt.is_correct ? "Reponse correcte" : "Marquer comme correcte"
+                opt.is_correct ? "Correct answer" : "Mark as correct"
               }
             >
               {opt.is_correct && <Check className="h-3 w-3" strokeWidth={3} />}
@@ -397,7 +397,7 @@ export function McqBlockEditor({
             className="gap-1.5"
           >
             <Plus className="h-3.5 w-3.5" />
-            Ajouter une option
+            Add option
           </Button>
         )}
       </div>
@@ -456,24 +456,24 @@ export function FillBlankBlockEditor({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Phrase (utilisez ___ pour le trou)</Label>
+        <Label>Sentence (use ___ for the blank)</Label>
         <Input
           value={sentence}
           onChange={(e) => emit({ sentence: e.target.value })}
-          placeholder="ex : The cat ___ on the mat yesterday."
+          placeholder="e.g. The cat ___ on the mat yesterday."
         />
         <p className="text-xs text-muted-foreground">
-          Utilisez trois tirets bas ___ pour indiquer le trou a remplir
+          Use three underscores ___ to mark the blank to fill
         </p>
       </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label>Choix de mots</Label>
+          <Label>Word choices</Label>
           <span className="text-xs text-muted-foreground">
             {correctCount === 1
-              ? "1 bonne reponse"
-              : "Aucune bonne reponse selectionnee"}
+              ? "1 correct answer"
+              : "No correct answer selected"}
           </span>
         </div>
         {options.map((opt, idx) => (
@@ -486,7 +486,7 @@ export function FillBlankBlockEditor({
                   : "border-muted-foreground/30 hover:border-primary/50"
               }`}
               onClick={() => toggleCorrect(idx)}
-              title={opt.is_correct ? "Bonne reponse" : "Marquer comme correcte"}
+              title={opt.is_correct ? "Correct answer" : "Mark as correct"}
             >
               {opt.is_correct && <Check className="h-3 w-3" strokeWidth={3} />}
             </button>
@@ -494,7 +494,7 @@ export function FillBlankBlockEditor({
               className="flex-1"
               value={opt.label}
               onChange={(e) => updateOption(idx, { label: e.target.value })}
-              placeholder={`Choix ${idx + 1}`}
+              placeholder={`Choice ${idx + 1}`}
             />
             <Button
               variant="ghost"
@@ -514,7 +514,7 @@ export function FillBlankBlockEditor({
           className="gap-1.5"
         >
           <Plus className="h-3.5 w-3.5" />
-          Ajouter un choix
+          Add choice
         </Button>
       </div>
     </div>
@@ -555,7 +555,7 @@ export function FreeTextBlockEditor({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Consigne</Label>
+        <Label>Instruction</Label>
         <Input
           value={prompt}
           onChange={(e) => emit({ prompt: e.target.value })}
@@ -564,7 +564,7 @@ export function FreeTextBlockEditor({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Minimum de mots (optionnel)</Label>
+          <Label>Minimum words (optional)</Label>
           <Input
             type="number"
             min={0}
@@ -576,7 +576,7 @@ export function FreeTextBlockEditor({
           />
         </div>
         <div className="space-y-2">
-          <Label>Maximum de mots (optionnel)</Label>
+          <Label>Maximum words (optional)</Label>
           <Input
             type="number"
             min={0}
@@ -589,7 +589,7 @@ export function FreeTextBlockEditor({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Cette question sera corrigee manuellement par l&apos;instructeur.
+        This question will be graded manually by the instructor.
       </p>
     </div>
   );
@@ -654,7 +654,7 @@ export function AudioBlockEditor({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Fichier audio</Label>
+        <Label>Audio file</Label>
         {storagePath ? (
           <div className="space-y-2">
             {signedUrl && (
@@ -675,7 +675,7 @@ export function AudioBlockEditor({
                 disabled={isUploading}
                 onClick={() => inputRef.current?.click()}
               >
-                Remplacer
+                Replace
               </Button>
             </div>
           </div>
@@ -691,12 +691,12 @@ export function AudioBlockEditor({
             {isUploading ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Envoi en cours...
+                Uploading...
               </>
             ) : (
               <>
                 <Upload className="h-3.5 w-3.5" />
-                Choisir un fichier audio
+                Choose an audio file
               </>
             )}
           </Button>
@@ -711,13 +711,13 @@ export function AudioBlockEditor({
       </div>
 
       <div className="space-y-2">
-        <Label>Legende (optionnel)</Label>
+        <Label>Caption (optional)</Label>
         <Input
           value={content.caption ?? ""}
           onChange={(e) =>
             onChange({ audio_url: storagePath, caption: e.target.value })
           }
-          placeholder="ex : Ecoutez le dialogue et repondez aux questions"
+          placeholder="e.g. Listen to the dialogue and answer the questions"
         />
       </div>
     </div>
@@ -808,7 +808,7 @@ export function ImageBlockEditor({
                 disabled={isUploading}
                 onClick={() => inputRef.current?.click()}
               >
-                Remplacer
+                Replace
               </Button>
             </div>
           </div>
@@ -824,12 +824,12 @@ export function ImageBlockEditor({
             {isUploading ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Envoi en cours...
+                Uploading...
               </>
             ) : (
               <>
                 <Upload className="h-3.5 w-3.5" />
-                Choisir une image
+                Choose an image
               </>
             )}
           </Button>
@@ -844,13 +844,13 @@ export function ImageBlockEditor({
       </div>
 
       <div className="space-y-2">
-        <Label>Texte alternatif (optionnel)</Label>
+        <Label>Alt text (optional)</Label>
         <Input
           value={content.alt ?? ""}
           onChange={(e) =>
             onChange({ image_url: storagePath, alt: e.target.value })
           }
-          placeholder="ex : Image d'un dialogue dans un restaurant"
+          placeholder="e.g. Image of a dialogue in a restaurant"
         />
       </div>
     </div>
@@ -874,7 +874,7 @@ export function VoiceBlockEditor({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Consigne</Label>
+        <Label>Instruction</Label>
         <Input
           value={prompt}
           onChange={(e) =>
@@ -883,11 +883,11 @@ export function VoiceBlockEditor({
               max_duration_seconds: maxDuration,
             })
           }
-          placeholder="ex : Presentez-vous en 1 minute"
+          placeholder="e.g. Introduce yourself in 1 minute"
         />
       </div>
       <div className="space-y-2">
-        <Label>Duree maximum (secondes)</Label>
+        <Label>Maximum duration (seconds)</Label>
         <Input
           type="number"
           min={10}

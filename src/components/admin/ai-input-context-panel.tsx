@@ -129,7 +129,7 @@ function QuizGenContext({
           ) : null}
         </div>
 
-        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <ContextRow
             icon={<School className="h-4 w-4" />}
             label="Cours"
@@ -222,7 +222,7 @@ function ContextRow({
   wide?: boolean;
 }): React.JSX.Element {
   return (
-    <div className={wide ? "sm:col-span-2" : ""}>
+    <div className={wide ? "md:col-span-2" : ""}>
       <dt className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {icon}
         {label}

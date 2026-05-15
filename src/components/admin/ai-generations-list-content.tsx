@@ -102,14 +102,14 @@ export function AIGenerationsListContent(): React.JSX.Element {
   return (
     <div className="w-full min-w-0 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Générations IA</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">Générations IA</h1>
         <p className="text-muted-foreground">
           Évaluation et suivi qualité des sorties IA
         </p>
       </div>
 
       {/* ── STAT CARDS ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <div className="col-span-2 flex flex-col justify-between rounded-xl border bg-primary p-5 text-primary-foreground">
           <div className="flex items-start justify-between">
             <p className="text-sm font-medium opacity-80">Générations</p>
@@ -401,7 +401,7 @@ function GenerationRow({
         </p>
       </div>
 
-      <div className="hidden shrink-0 items-center gap-2 sm:flex">
+      <div className="hidden shrink-0 items-center gap-2 md:flex">
         {instr ? (
           <Badge variant={instr.variant} className="text-[10px]">
             {instr.label}
