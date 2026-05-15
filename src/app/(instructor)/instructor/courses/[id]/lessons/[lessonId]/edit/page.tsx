@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
-import { FileUpload } from "@/components/course/file-upload";
+import { FileUpload } from "@/components/course/shared/file-upload";
 import { useSidebar } from "@/components/ui/sidebar";
 import { LessonAIEditChat } from "@/components/course/lesson/lesson-ai-edit-chat";
 import { LessonAIGenerateDialog } from "@/components/course/lesson/lesson-ai-generate-dialog";
@@ -200,11 +200,11 @@ export default function LessonEditPage(): React.JSX.Element {
   // ── Loading ──────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] flex-col gap-4 p-4 sm:p-6">
+      <div className="flex h-[calc(100vh-4rem-72px)] flex-col gap-4 lg:h-[calc(100vh-4rem)]">
         <Skeleton className="h-14 w-full rounded-xl" />
-        <div className="grid flex-1 gap-4 lg:grid-cols-4">
-          <Skeleton className="h-full rounded-xl lg:col-span-1" />
-          <Skeleton className="h-full rounded-xl lg:col-span-3" />
+        <div className="grid flex-1 gap-4 lg:grid-cols-[280px_1fr]">
+          <Skeleton className="h-full rounded-xl" />
+          <Skeleton className="h-full rounded-xl" />
         </div>
       </div>
     );
@@ -225,135 +225,42 @@ export default function LessonEditPage(): React.JSX.Element {
   return (
     <form
       onSubmit={form.handleSubmit(onSave)}
-      className="flex h-[calc(100vh-4rem)] flex-col gap-3 p-3 sm:gap-4 sm:p-4 lg:p-6"
+      className="flex h-[calc(100vh-4rem-72px)] flex-col gap-3 md:gap-4 lg:h-[calc(100vh-4rem)]"
     >
-      {/* ── Top bar ──────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 sm:px-4 sm:py-3">
-        <Link href={`/instructor/courses/${courseId}`}>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            title="Back to course"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <BookOpen className="h-5 w-5 shrink-0 text-primary/70" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-amber-950 sm:text-base">
-            {title || lesson.title}
-          </p>
-          <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
-            {sectionTitle && (
-              <>
-                <span className="truncate">{sectionTitle}</span>
-                <span>·</span>
-              </>
-            )}
-            <span>{LESSON_TYPE_LABEL[type]}</span>
-            <span>·</span>
-            <span>
-              {wordCount} word{wordCount !== 1 ? "s" : ""}
-            </span>
-          </div>
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".docx"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={isImporting}
-          onClick={() => fileInputRef.current?.click()}
-          className="gap-1.5"
-          title="Import from a Word file (.docx)"
-        >
-          {isImporting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Upload className="h-4 w-4" />
-          )}
-          <span className="hidden sm:inline">
-            {isImporting ? "Importing..." : "Import Word"}
-          </span>
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            if (hasContent) {
-              if (isMobile) setSidebarOpenMobile(false);
-              else setSidebarOpen(false);
-              setAiChatOpen(true);
-            } else {
-              setAiGenerateOpen(true);
-            }
-          }}
-          disabled={isSaving}
-          className="gap-1.5"
-          title={
-            hasContent
-              ? "Open the AI assistant to edit the lesson"
-              : "Generate the lesson with AI"
-          }
-        >
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span className="hidden sm:inline">
-            {hasContent ? "AI assistant" : "Generate (AI)"}
-          </span>
-        </Button>
-        {/*
-          Autosave status disabled. To re-enable, bring back:
-          autosaveStatus === "saving-db" && (<span ...>Sauvegarde...</span>)
-          autosaveStatus === "saved"     && (<span ...>Sauvegardé</span>)
-        */}
-        <Button type="submit" disabled={isSaving} className="gap-1.5">
-          <Save className="h-4 w-4" />
-          {isSaving ? "Saving..." : "Save"}
-        </Button>
-      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".docx"
+        className="hidden"
+        onChange={handleFileChange}
+      />
 
-      {/*
-        Restore banner disabled — autosave is off. To re-enable, restore the
-        useAutosave hook above and bring back this block:
-
-        pendingRestore && (
-          <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
-            <span className="flex-1">Un brouillon non enregistré a été trouvé. Voulez-vous le restaurer ?</span>
-            <button type="button" onClick={onAcceptRestore} className="font-medium underline underline-offset-2 hover:text-amber-700">
-              Restaurer
-            </button>
-            <button type="button" onClick={discardRestore} className="text-amber-600 hover:text-amber-800">
-              Ignorer
-            </button>
-          </div>
-        )
-      */}
+      {/* Mobile/tablet back link — desktop uses the arrow inside the editor card */}
+      <Link
+        href={`/instructor/courses/${courseId}`}
+        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground lg:hidden"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to course
+      </Link>
 
       {/* ── Content area: bento grid + chat panel ───────────── */}
-      <div className="flex min-h-0 flex-1 gap-3 sm:gap-4">
+      <div className="flex min-h-0 flex-1 gap-3 md:gap-4">
 
-      {/* ── Bento grid ───────────────────────────────────────── */}
-      <div className="grid min-h-0 flex-1 gap-3 sm:gap-4 lg:grid-cols-4">
+      {/* ── Bento grid: fixed settings, editor absorbs the rest ─── */}
+      <div className="grid min-h-0 flex-1 gap-3 md:gap-4 lg:grid-cols-[280px_1fr]">
         {/* ── Left column: settings + documents ─────────────── */}
-        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto sm:gap-4 lg:col-span-1">
+        <div className="grid min-h-0 grid-cols-1 gap-3 overflow-y-auto md:gap-4 md:grid-cols-6 lg:flex lg:flex-col">
           {/* Settings card */}
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-4 md:self-start">
             <div className="mb-3 flex items-center gap-2">
               <Pencil className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-amber-950">
                 Settings
               </h2>
             </div>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
+            <div className="grid grid-cols-3 gap-3 lg:grid-cols-1">
+              <div className="space-y-1.5 col-span-2 lg:col-span-1">
                 <Label className="text-xs">Title</Label>
                 <Input
                   placeholder="e.g. Present Simple"
@@ -365,7 +272,7 @@ export default function LessonEditPage(): React.JSX.Element {
                   </p>
                 )}
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 col-span-1">
                 <Label className="text-xs">Type</Label>
                 <Select
                   value={type ?? ""}
@@ -394,7 +301,7 @@ export default function LessonEditPage(): React.JSX.Element {
           </div>
 
           {/* Documents card */}
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm md:col-span-2 md:self-start">
             <div className="mb-3 flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-amber-950">
@@ -406,16 +313,98 @@ export default function LessonEditPage(): React.JSX.Element {
         </div>
 
         {/* ── Right column: rich text editor ─────────────────── */}
-        <div className="flex min-h-0 flex-col rounded-xl border border-border bg-card shadow-sm lg:col-span-3">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-amber-950">
-                Lesson content
-              </h2>
+        <div className="flex min-h-0 flex-col rounded-xl border border-border bg-card shadow-sm">
+          {/* Editor header: back · book · inline title + breadcrumb · actions */}
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2 md:px-4 md:py-3">
+            <Link href={`/instructor/courses/${courseId}`} className="hidden lg:block">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
+                title="Back to course"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <BookOpen className="h-5 w-5 shrink-0 text-primary/70" />
+            <div className="min-w-0 flex-1">
+              <Input
+                {...form.register("title")}
+                placeholder="Lesson title"
+                aria-label="Lesson title"
+                className="h-auto truncate border-0 bg-transparent px-0 py-0 text-sm font-semibold text-amber-950 shadow-none focus-visible:ring-0 sm:text-base"
+              />
+              <div
+                className={`hidden items-center gap-2 text-xs text-muted-foreground ${
+                  aiChatOpen ? "xl:flex" : "md:flex"
+                }`}
+              >
+                {sectionTitle && (
+                  <>
+                    <span className="truncate">{sectionTitle}</span>
+                    <span>·</span>
+                  </>
+                )}
+                <span>{LESSON_TYPE_LABEL[type]}</span>
+                <span>·</span>
+                <span>
+                  {wordCount} word{wordCount !== 1 ? "s" : ""}
+                </span>
+              </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isImporting}
+              onClick={() => fileInputRef.current?.click()}
+              className="gap-1.5"
+              title="Import from a Word file (.docx)"
+            >
+              {isImporting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
+              <span className="hidden md:inline">
+                {isImporting ? "Importing..." : "Import Word"}
+              </span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (hasContent) {
+                  if (isMobile) setSidebarOpenMobile(false);
+                  else setSidebarOpen(false);
+                  setAiChatOpen(true);
+                } else {
+                  setAiGenerateOpen(true);
+                }
+              }}
+              disabled={isSaving}
+              className="gap-1.5"
+              title={
+                hasContent
+                  ? "Open the AI assistant to edit the lesson"
+                  : "Generate the lesson with AI"
+              }
+            >
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="hidden md:inline">
+                {hasContent ? "AI assistant" : "Generate (AI)"}
+              </span>
+            </Button>
+            <Button type="submit" size="sm" disabled={isSaving} className="gap-1.5">
+              <Save className="h-4 w-4" />
+              <span className="hidden md:inline">
+                {isSaving ? "Saving..." : "Save"}
+              </span>
+            </Button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 px-4 pt-4 pb-4">
             {formHydrated ? (
               <RichTextEditor
                 content={content}
@@ -423,7 +412,7 @@ export default function LessonEditPage(): React.JSX.Element {
                   form.setValue("content", html, { shouldDirty: true })
                 }
                 placeholder="Start writing your lesson here..."
-                className="min-h-full"
+                className="h-full"
                 diffContent={aiProposal?.diffHtml ?? null}
               />
             ) : (
