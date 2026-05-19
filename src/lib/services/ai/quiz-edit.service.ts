@@ -403,13 +403,65 @@ export const applyQuizEdit = async (
   // Re-validate ids server-side (client could have tampered).
   const { data: blocks, error: blocksError } = await supabase
     .from("quiz_blocks")
-    .select("id, order")
+    .select("id, type, order, content")
     .eq("quiz_id", input.quizId)
     .order("order", { ascending: true });
   if (blocksError) throw new Error(blocksError.message);
 
   const orderById = new Map((blocks ?? []).map((b) => [b.id, b.order]));
-  const maxOrder = (blocks ?? []).reduce((m, b) => Math.max(m, b.order), -1);
+  const typeById = new Map((blocks ?? []).map((b) => [b.id, b.type]));
+  let maxOrder = (blocks ?? []).reduce((m, b) => Math.max(m, b.order), -1);
+
+  // For each parent passage/audio, the highest `order` of any block already
+  // linked to it. Used to slot a newly added child right after the parent's
+  // existing children instead of dumping it at the bottom of the quiz.
+  const lastChildOrderByParent = new Map<string, number>();
+  for (const b of blocks ?? []) {
+    const c = (b.content ?? {}) as Record<string, unknown>;
+    const parentId =
+      typeof c.passage_block_id === "string"
+        ? c.passage_block_id
+        : typeof c.audio_block_id === "string"
+          ? c.audio_block_id
+          : null;
+    if (parentId) {
+      const prev = lastChildOrderByParent.get(parentId) ?? -1;
+      if (b.order > prev) lastChildOrderByParent.set(parentId, b.order);
+    }
+  }
+
+  // Resolve an LLM-supplied links_to_block_id into the DB column it maps to.
+  // Returns the field-name + parent-id, or null if the id is missing /
+  // unknown / points at a block that isn't a passage or audio.
+  const resolveLink = (
+    id: string | undefined,
+  ): { field: "passage_block_id" | "audio_block_id"; parentId: string } | null => {
+    if (!id) return null;
+    const t = typeById.get(id);
+    if (t === "text") return { field: "passage_block_id", parentId: id };
+    if (t === "audio") return { field: "audio_block_id", parentId: id };
+    return null;
+  };
+
+  // Shift every block at or after `fromOrder` down by 1 to make room for an
+  // insert at that order. Sequential UPDATEs from the highest order down so
+  // we never collide with a UNIQUE(quiz_id, order) constraint mid-shift.
+  // PostgREST treats `order` as the URL sort keyword, so combining
+  // .gte("order", ...) + .order("order", ...) builds a malformed query.
+  // We already have all blocks in memory via `orderById` — filter + sort
+  // client-side and only UPDATE the rows that need it.
+  const shiftOrdersDown = async (fromOrder: number): Promise<void> => {
+    const toShift = Array.from(orderById.entries())
+      .filter(([, ord]) => ord >= fromOrder)
+      .sort((a, b) => b[1] - a[1]);
+    for (const [id, ord] of toShift) {
+      const { error: updErr } = await supabase
+        .from("quiz_blocks")
+        .update({ order: ord + 1 })
+        .eq("id", id);
+      if (updErr) throw updErr;
+    }
+  };
 
   let applied = 0;
   let nextOrder = maxOrder + 1;
@@ -531,22 +583,80 @@ export const applyQuizEdit = async (
           }
 
           nextOrder = audioOrder + 1 + questions.length;
+          maxOrder = nextOrder - 1;
+          // Register the new audio parent + any children in the local maps so
+          // a later linked-add in the same batch can target this audio.
+          orderById.set(parentRow.id, audioOrder);
+          typeById.set(parentRow.id, "audio");
+          if (questions.length > 0) {
+            lastChildOrderByParent.set(
+              parentRow.id,
+              audioOrder + questions.length,
+            );
+          }
           applied += 1;
           continue;
         }
 
         const shape = aiBlockToDbShape(change.block);
-        const { error } = await supabase.from("quiz_blocks").insert({
-          quiz_id: input.quizId,
-          type: shape.type,
-          content: shape.content,
-          weight: shape.weight,
-          model_answer: shape.model_answer ?? null,
-          grading_notes: shape.grading_notes ?? null,
-          order: nextOrder,
-        });
+        // Resolve link to existing passage / audio so the new mcq / fill_blank
+        // stays grouped under its parent.
+        let content = shape.content;
+        let link: ReturnType<typeof resolveLink> = null;
+        if (change.block.type === "mcq" || change.block.type === "fill_blank") {
+          link = resolveLink(change.block.links_to_block_id);
+          if (link) {
+            content = { ...content, [link.field]: link.parentId };
+          }
+        }
+
+        // Linked → slot right after the parent's last existing child, then
+        // shift everything after that position down by one. Unlinked → keep
+        // the legacy append behavior.
+        let insertOrder: number;
+        if (link) {
+          const parentOrder = orderById.get(link.parentId) ?? 0;
+          const lastChildOrder = lastChildOrderByParent.get(link.parentId);
+          insertOrder =
+            (lastChildOrder !== undefined ? lastChildOrder : parentOrder) + 1;
+          if (insertOrder <= maxOrder) {
+            await shiftOrdersDown(insertOrder);
+            // Reflect the shift in the in-memory map so later iterations
+            // computing positions see the updated state.
+            for (const [id, ord] of orderById.entries()) {
+              if (ord >= insertOrder) orderById.set(id, ord + 1);
+            }
+            for (const [pid, ord] of lastChildOrderByParent.entries()) {
+              if (ord >= insertOrder) lastChildOrderByParent.set(pid, ord + 1);
+            }
+            maxOrder += 1;
+            nextOrder += 1;
+          }
+          lastChildOrderByParent.set(link.parentId, insertOrder);
+        } else {
+          insertOrder = nextOrder;
+          nextOrder += 1;
+        }
+
+        const { data: insertedRow, error } = await supabase
+          .from("quiz_blocks")
+          .insert({
+            quiz_id: input.quizId,
+            type: shape.type,
+            content,
+            weight: shape.weight,
+            model_answer: shape.model_answer ?? null,
+            grading_notes: shape.grading_notes ?? null,
+            order: insertOrder,
+          })
+          .select("id")
+          .single();
         if (error) throw error;
-        nextOrder += 1;
+        if (insertedRow) {
+          orderById.set(insertedRow.id, insertOrder);
+          typeById.set(insertedRow.id, shape.type);
+        }
+        if (insertOrder > maxOrder) maxOrder = insertOrder;
         applied += 1;
       }
     } catch (err) {
@@ -674,12 +784,19 @@ const aiBlockToDbShape = (b: AIQuizBlock): QuizBlockShape => {
 function previewContent(content: unknown, type?: string): string {
   if (!content || typeof content !== "object") return "";
   const c = content as Record<string, unknown>;
-  // Send full stripped text for passages so the model can ground MCQs on it.
   if (type === "text" && typeof c.html === "string") {
     return stripHtml(c.html).slice(0, 1500);
   }
   if (type === "section" && typeof c.title === "string") return c.title;
-  return JSON.stringify(content).slice(0, 200);
+  // Prefix the parent link so it survives the 200-char truncation below.
+  const linkedTo =
+    typeof c.passage_block_id === "string"
+      ? c.passage_block_id
+      : typeof c.audio_block_id === "string"
+        ? c.audio_block_id
+        : null;
+  const json = JSON.stringify(content).slice(0, 200);
+  return linkedTo ? `linked_to=${linkedTo} ${json}` : json;
 }
 
 function stripHtml(html: string): string {
