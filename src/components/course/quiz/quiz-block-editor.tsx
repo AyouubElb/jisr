@@ -36,6 +36,8 @@ interface BlockWrapperProps {
   total: number;
   points: number | null;
   error?: string;
+  /** When set on a passage/audio block, shows a "N questions" badge in the header. */
+  childCount?: number;
   onMoveToTop: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -52,6 +54,7 @@ export function BlockWrapper({
   total,
   points,
   error,
+  childCount,
   onMoveToTop,
   onMoveUp,
   onMoveDown,
@@ -73,6 +76,11 @@ export function BlockWrapper({
           {BLOCK_TYPE_LABELS_EN[type]}
         </span>
         <span className="text-xs text-muted-foreground">#{index + 1}</span>
+        {childCount && childCount > 0 ? (
+          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-900">
+            {childCount} {childCount === 1 ? "question" : "questions"}
+          </span>
+        ) : null}
 
         <div className="ml-auto flex items-center gap-1">
           {isQuestion && (

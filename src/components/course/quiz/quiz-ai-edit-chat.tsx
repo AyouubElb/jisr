@@ -27,6 +27,8 @@ interface QuizAIEditChatProps {
   onClose?: () => void;
   /** Editor uses this to rehydrate its local block state after apply. */
   onApplied?: () => void;
+  /** Persist pending manual edits before each AI turn. No-op when nothing changed. */
+  onPreSubmitSave?: () => Promise<void>;
 }
 
 interface PendingProposal {
@@ -110,11 +112,14 @@ export function QuizAIEditChat({
   quizId,
   onClose,
   onApplied,
+  onPreSubmitSave,
 }: QuizAIEditChatProps): React.JSX.Element {
   const [instruction, setInstruction] = useState("");
   const [proposal, setProposal] = useState<PendingProposal | null>(null);
   // In-session conversation memory. Lost on refresh by design.
   const [history, setHistory] = useState<ChatTurn[]>([]);
+  // "saving" → pre-AI persist of manual edits; "thinking" → LLM call.
+  const [aiPhase, setAiPhase] = useState<"idle" | "saving" | "thinking">("idle");
   const scrollBodyRef = useRef<HTMLDivElement>(null);
 
   const { mutate: propose, isPending: isProposing } = useProposeAIQuizEdit();
@@ -145,9 +150,9 @@ export function QuizAIEditChat({
     return map;
   }, [quiz]);
 
-  const onSubmit = (): void => {
+  const onSubmit = async (): Promise<void> => {
     const trimmed = instruction.trim();
-    if (!trimmed || isProposing) return;
+    if (!trimmed || isProposing || aiPhase !== "idle") return;
     const formattedHistory = formatHistory(history);
     if (formattedHistory) {
       console.groupCollapsed(
@@ -158,6 +163,20 @@ export function QuizAIEditChat({
     } else {
       console.log("[AI quiz edit] chat history sent: (empty — first turn)");
     }
+
+    // Persist pending manual edits so the AI reads the right state.
+    if (onPreSubmitSave) {
+      setAiPhase("saving");
+      try {
+        await onPreSubmitSave();
+      } catch (err) {
+        setAiPhase("idle");
+        console.error("[AI quiz edit] pre-submit save failed", err);
+        return;
+      }
+    }
+
+    setAiPhase("thinking");
     propose(
       {
         quizId,
@@ -190,6 +209,9 @@ export function QuizAIEditChat({
             changes: res.changes,
             included: res.changes.map(() => true),
           });
+        },
+        onSettled: () => {
+          setAiPhase("idle");
         },
       },
     );
@@ -321,7 +343,7 @@ export function QuizAIEditChat({
           <button
             type="button"
             onClick={onResetConversation}
-            disabled={isProposing || isApplying}
+            disabled={aiPhase !== "idle" || isProposing || isApplying}
             title="Reset conversation"
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
           >
@@ -346,7 +368,7 @@ export function QuizAIEditChat({
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3"
       >
         {/* Empty state — examples (only if no history AND nothing in flight) */}
-        {history.length === 0 && !proposal && !isProposing ? (
+        {history.length === 0 && !proposal && !isProposing && aiPhase === "idle" ? (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">
               Ask the AI to modify this quiz. You approve each change before it&apos;s applied.
@@ -448,10 +470,14 @@ export function QuizAIEditChat({
 
       {/* Sticky input area */}
       <div className="shrink-0 space-y-2 border-t px-4 pb-4 pt-3">
-        {isProposing ? (
+        {aiPhase !== "idle" || isProposing ? (
           <div className="flex items-center gap-2 text-xs italic text-primary">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>AI is thinking…</span>
+            <span>
+              {aiPhase === "saving"
+                ? "Saving your changes…"
+                : "AI is thinking…"}
+            </span>
           </div>
         ) : null}
         <Textarea
@@ -461,7 +487,7 @@ export function QuizAIEditChat({
           placeholder="e.g. make Q3 easier, add a voice question…"
           rows={3}
           className="resize-none text-sm"
-          disabled={isProposing || isApplying}
+          disabled={aiPhase !== "idle" || isProposing || isApplying}
         />
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] text-muted-foreground">
@@ -471,9 +497,15 @@ export function QuizAIEditChat({
             type="button"
             size="sm"
             onClick={onSubmit}
-            disabled={!instruction.trim() || isProposing || isApplying}
+            disabled={
+              !instruction.trim() || aiPhase !== "idle" || isProposing || isApplying
+            }
           >
-            {isProposing ? "Thinking…" : "Ask"}
+            {aiPhase === "saving"
+              ? "Saving…"
+              : aiPhase === "thinking" || isProposing
+                ? "Thinking…"
+                : "Ask"}
           </Button>
         </div>
       </div>

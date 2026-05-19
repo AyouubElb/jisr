@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -15,7 +15,7 @@ import {
   HelpCircle,
   ImageIcon,
   ListChecks,
-  Map,
+  Map as MapIcon,
   Music,
   Pencil,
   Plus,
@@ -34,6 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useSidebar } from "@/components/ui/sidebar";
 import { QuizAIEditChat } from "@/components/course/quiz/quiz-ai-edit-chat";
+import { PassageTemplateForm } from "@/components/course/quiz/passage-template-form";
 import {
   BlockWrapper,
   SectionBlockEditor,
@@ -129,7 +130,7 @@ function createEmptyBlock(type: BlockType, order: number): LocalBlock {
     type === "voice";
 
   return {
-    clientId: `block-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    clientId: crypto.randomUUID(),
     type,
     content: defaults[type],
     points: isQuestion ? 1 : null,
@@ -154,7 +155,11 @@ export default function QuizEditPage(): React.JSX.Element {
   const { setOpen: setSidebarOpen, setOpenMobile: setSidebarOpenMobile, isMobile } = useSidebar();
   const { data: quiz, isLoading } = useQuiz(quizId);
   const { mutate: updateQuiz, isPending: isUpdatingQuiz } = useUpdateQuiz(courseId);
-  const { mutate: saveBlocks, isPending: isSavingBlocks } = useSaveQuizBlocks(courseId);
+  const {
+    mutate: saveBlocks,
+    mutateAsync: saveBlocksAsync,
+    isPending: isSavingBlocks,
+  } = useSaveQuizBlocks(courseId);
   const { mutate: deleteQuiz, isPending: isDeleting } = useDeleteQuiz(courseId);
   const { mutate: resolveGeneration } = useResolveAIGeneration();
 
@@ -217,33 +222,184 @@ export default function QuizEditPage(): React.JSX.Element {
   }, [quiz?.id, pendingRehydrate, quiz?.quiz_blocks]);
 
   // ── Block ops ────────────────────────────────────────────────────
+  // Scrollable container for the block list. Manual "add" handlers call
+  // scrollBlocksToBottom after the state update so the new block is visible.
+  const blocksListRef = useRef<HTMLDivElement>(null);
+  const scrollBlocksToBottom = (): void => {
+    requestAnimationFrame(() => {
+      const el = blocksListRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  };
+
   const addBlock = (type: BlockType): void => {
     setBlocks((prev) => [...prev, createEmptyBlock(type, prev.length)]);
+    scrollBlocksToBottom();
+  };
+
+  // Span [start, end] of a parent + its immediately-following linked children.
+  // Lone block / non-parent returns [idx, idx]. Detached strays stay outside.
+  const groupSpanAt = (
+    arr: LocalBlock[],
+    idx: number,
+  ): { start: number; end: number } => {
+    if (idx < 0 || idx >= arr.length) return { start: idx, end: idx };
+    const b = arr[idx]!;
+    if (b.type !== "text" && b.type !== "audio") return { start: idx, end: idx };
+    let end = idx;
+    for (let i = idx + 1; i < arr.length; i++) {
+      const c = arr[i]!.content as Record<string, unknown> | null;
+      const parentRef =
+        c && typeof c.passage_block_id === "string"
+          ? c.passage_block_id
+          : c && typeof c.audio_block_id === "string"
+            ? c.audio_block_id
+            : null;
+      if (parentRef === b.clientId) end = i;
+      else break;
+    }
+    return { start: idx, end };
+  };
+
+  // Parent index for a linked-child if its parent sits earlier. Otherwise -1.
+  const parentIndexOf = (arr: LocalBlock[], childIdx: number): number => {
+    const b = arr[childIdx];
+    if (!b) return -1;
+    const c = b.content as Record<string, unknown> | null;
+    const parentId =
+      c && typeof c.passage_block_id === "string"
+        ? c.passage_block_id
+        : c && typeof c.audio_block_id === "string"
+          ? c.audio_block_id
+          : null;
+    if (!parentId) return -1;
+    for (let i = 0; i < childIdx; i++) {
+      if (arr[i]!.clientId === parentId) return i;
+    }
+    return -1;
   };
 
   const moveBlockToTop = (clientId: string): void => {
     setBlocks((prev) => {
       const idx = prev.findIndex((b) => b.clientId === clientId);
       if (idx <= 0) return prev;
-      const block = prev[idx]!;
-      return [block, ...prev.filter((_, i) => i !== idx)];
+      // Child: clamp to first child slot inside its own group.
+      const parentIdx = parentIndexOf(prev, idx);
+      if (parentIdx !== -1) {
+        const firstChildIdx = parentIdx + 1;
+        if (idx === firstChildIdx) return prev;
+        const block = prev[idx]!;
+        const without = prev.filter((_, i) => i !== idx);
+        return [
+          ...without.slice(0, firstChildIdx),
+          block,
+          ...without.slice(firstChildIdx),
+        ].map((b, i) => ({ ...b, order: i }));
+      }
+      // Parent / standalone: move whole unit to the top.
+      const span = groupSpanAt(prev, idx);
+      if (span.start === 0) return prev;
+      const unit = prev.slice(span.start, span.end + 1);
+      const before = prev.slice(0, span.start);
+      const after = prev.slice(span.end + 1);
+      return [...unit, ...before, ...after].map((b, i) => ({ ...b, order: i }));
     });
   };
 
   const moveBlockToBottom = (clientId: string): void => {
     setBlocks((prev) => {
       const idx = prev.findIndex((b) => b.clientId === clientId);
-      if (idx === prev.length - 1) return prev;
-      const block = prev[idx]!;
-      return [...prev.filter((_, i) => i !== idx), block];
+      if (idx === -1 || idx === prev.length - 1) return prev;
+      // Child: clamp to last child slot inside its own group.
+      const parentIdx = parentIndexOf(prev, idx);
+      if (parentIdx !== -1) {
+        const groupEnd = groupSpanAt(prev, parentIdx).end;
+        if (idx === groupEnd) return prev;
+        const block = prev[idx]!;
+        const without = prev.filter((_, i) => i !== idx);
+        // After splice, target index is groupEnd (idx shifted down by 1).
+        return [
+          ...without.slice(0, groupEnd),
+          block,
+          ...without.slice(groupEnd),
+        ].map((b, i) => ({ ...b, order: i }));
+      }
+      // Parent / standalone: move whole unit to the bottom.
+      const span = groupSpanAt(prev, idx);
+      if (span.end === prev.length - 1) return prev;
+      const unit = prev.slice(span.start, span.end + 1);
+      const before = prev.slice(0, span.start);
+      const after = prev.slice(span.end + 1);
+      return [...before, ...after, ...unit].map((b, i) => ({ ...b, order: i }));
     });
+  };
+
+  // Build a passage + N empty linked children. Children carry passage_block_id
+  // (text parent) or audio_block_id (audio parent) so the link is set from
+  // creation, not after.
+  const addPassageWithQuestions = (cfg: {
+    passageKind: "text" | "audio";
+    mcqCount: number;
+    fillBlankCount: number;
+    caption: string;
+  }): void => {
+    setBlocks((prev) => {
+      const parentId = crypto.randomUUID();
+      const parentType: BlockType = cfg.passageKind;
+      const parentContent: Record<string, unknown> =
+        parentType === "text"
+          ? { html: "" }
+          : { audio_url: "", caption: cfg.caption || "" };
+      if (parentType === "text" && cfg.caption) {
+        parentContent.caption = cfg.caption;
+      }
+
+      const linkField =
+        parentType === "text" ? "passage_block_id" : "audio_block_id";
+
+      const makeChild = (childType: "mcq" | "fill_blank"): LocalBlock => {
+        const childContent: Record<string, unknown> =
+          childType === "mcq"
+            ? { prompt: "", options: [], allow_multiple: false }
+            : { sentence: "", accepted_answers: [""], case_sensitive: false };
+        childContent[linkField] = parentId;
+        return {
+          clientId: crypto.randomUUID(),
+          type: childType,
+          content: childContent,
+          points: 1,
+          order: 0,
+        };
+      };
+
+      const children: LocalBlock[] = [
+        ...Array.from({ length: cfg.mcqCount }, () => makeChild("mcq")),
+        ...Array.from({ length: cfg.fillBlankCount }, () =>
+          makeChild("fill_blank"),
+        ),
+      ];
+
+      const parent: LocalBlock = {
+        clientId: parentId,
+        type: parentType,
+        content: parentContent,
+        points: null,
+        order: 0,
+      };
+
+      return [...prev, parent, ...children].map((b, i) => ({
+        ...b,
+        order: i,
+      }));
+    });
+    scrollBlocksToBottom();
   };
 
   const addVraiFauxBlock = (): void => {
     setBlocks((prev) => [
       ...prev,
       {
-        clientId: `block-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        clientId: crypto.randomUUID(),
         type: "mcq",
         content: {
           prompt: "",
@@ -257,14 +413,106 @@ export default function QuizEditPage(): React.JSX.Element {
         order: prev.length,
       },
     ]);
+    scrollBlocksToBottom();
+  };
+
+  // When a parent passage/audio with linked children is being removed, hold
+  // the pending delete here so we can show a confirm dialog first. Standalone
+  // blocks and parents with zero children go through immediately.
+  const [pendingParentDelete, setPendingParentDelete] = useState<{
+    clientId: string;
+    childCount: number;
+  } | null>(null);
+
+  const performRemoveBlock = (clientId: string): void => {
+    setBlocks((prev) => {
+      // Cascade: also drop every block linked back to clientId.
+      return prev
+        .filter((b) => {
+          if (b.clientId === clientId) return false;
+          const c = b.content as Record<string, unknown> | null;
+          const parentId =
+            c && typeof c.passage_block_id === "string"
+              ? c.passage_block_id
+              : c && typeof c.audio_block_id === "string"
+                ? c.audio_block_id
+                : null;
+          return parentId !== clientId;
+        })
+        .map((b, i) => ({ ...b, order: i }));
+    });
   };
 
   const removeBlock = (clientId: string): void => {
-    setBlocks((prev) =>
-      prev
-        .filter((b) => b.clientId !== clientId)
-        .map((b, i) => ({ ...b, order: i })),
+    const target = blocks.find((b) => b.clientId === clientId);
+    if (!target) return;
+    const isParent = target.type === "text" || target.type === "audio";
+    if (isParent) {
+      const childCount = blocks.filter((b) => {
+        const c = b.content as Record<string, unknown> | null;
+        const parentId =
+          c && typeof c.passage_block_id === "string"
+            ? c.passage_block_id
+            : c && typeof c.audio_block_id === "string"
+              ? c.audio_block_id
+              : null;
+        return parentId === clientId;
+      }).length;
+      if (childCount > 0) {
+        setPendingParentDelete({ clientId, childCount });
+        return;
+      }
+    }
+    performRemoveBlock(clientId);
+  };
+
+  // Stable fingerprint of a block list for cheap dirty checks. Includes the
+  // fields the AI / save round-trip cares about; ignores transient UI fields.
+  const fingerprintBlocks = (
+    list: Array<{
+      clientId?: string;
+      id?: string;
+      type: string;
+      order: number;
+      weight?: number | null;
+      points?: number | null;
+      content: Record<string, unknown> | null;
+    }>,
+  ): string =>
+    JSON.stringify(
+      list
+        .slice()
+        .sort((a, b) => a.order - b.order)
+        .map((b) => ({
+          id: b.clientId ?? b.id,
+          type: b.type,
+          order: b.order,
+          weight: b.weight ?? b.points ?? null,
+          content: b.content ?? {},
+        })),
     );
+
+  // Pre-AI save: persist pending manual edits so the AI's read of the DB
+  // matches what the user sees on screen. No-op when nothing has changed
+  // since the last hydrate.
+  const preAISubmitSave = async (): Promise<void> => {
+    if (blocks.length === 0 && (quiz?.quiz_blocks ?? []).length === 0) return;
+    const dbBlocks = (quiz?.quiz_blocks ?? []).map((b) => ({
+      id: b.id,
+      type: b.type as string,
+      order: b.order,
+      weight: b.weight,
+      content: b.content as Record<string, unknown> | null,
+    }));
+    if (fingerprintBlocks(blocks) === fingerprintBlocks(dbBlocks)) return;
+    const blockInserts = blocks.map((b) => ({
+      id: b.clientId,
+      type: b.type,
+      content: b.content,
+      weight: b.points,
+      order: b.order,
+    }));
+    await saveBlocksAsync({ quizId, blocks: blockInserts, silent: true });
   };
 
   const duplicateBlock = (clientId: string): void => {
@@ -273,7 +521,7 @@ export default function QuizEditPage(): React.JSX.Element {
       if (idx === -1) return prev;
       const source = prev[idx];
       const cloned: LocalBlock = {
-        clientId: `block-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        clientId: crypto.randomUUID(),
         type: source.type,
         content: cloneBlockContent(source.type, source.content),
         points: source.points,
@@ -292,11 +540,46 @@ export default function QuizEditPage(): React.JSX.Element {
     setBlocks((prev) => {
       const idx = prev.findIndex((b) => b.clientId === clientId);
       if (idx === -1) return prev;
-      const target = direction === "up" ? idx - 1 : idx + 1;
-      if (target < 0 || target >= prev.length) return prev;
-      const next = [...prev];
-      [next[idx], next[target]] = [next[target], next[idx]];
-      return next.map((b, i) => ({ ...b, order: i }));
+
+      // Child: shuffle only with adjacent sibling inside the same group.
+      const parentIdx = parentIndexOf(prev, idx);
+      if (parentIdx !== -1) {
+        const groupEnd = groupSpanAt(prev, parentIdx).end;
+        const target = direction === "up" ? idx - 1 : idx + 1;
+        // Stay strictly between firstChild (parentIdx + 1) and groupEnd.
+        if (target <= parentIdx || target > groupEnd) return prev;
+        const next = [...prev];
+        [next[idx], next[target]] = [next[target]!, next[idx]!];
+        return next.map((b, i) => ({ ...b, order: i }));
+      }
+
+      // Parent / standalone: swap whole units (jumps over a neighbor group).
+      const unit = groupSpanAt(prev, idx);
+      if (direction === "up") {
+        if (unit.start === 0) return prev;
+        const neighborEnd = unit.start - 1;
+        // If the upper neighbor is itself a child, walk back to its parent.
+        const neighborParentIdx = parentIndexOf(prev, neighborEnd);
+        const neighborStart =
+          neighborParentIdx !== -1 ? neighborParentIdx : neighborEnd;
+        const before = prev.slice(0, neighborStart);
+        const neighborSlice = prev.slice(neighborStart, neighborEnd + 1);
+        const unitSlice = prev.slice(unit.start, unit.end + 1);
+        const after = prev.slice(unit.end + 1);
+        return [...before, ...unitSlice, ...neighborSlice, ...after].map(
+          (b, i) => ({ ...b, order: i }),
+        );
+      }
+      if (unit.end === prev.length - 1) return prev;
+      const neighborStart = unit.end + 1;
+      const neighbor = groupSpanAt(prev, neighborStart);
+      const before = prev.slice(0, unit.start);
+      const unitSlice = prev.slice(unit.start, unit.end + 1);
+      const neighborSlice = prev.slice(neighbor.start, neighbor.end + 1);
+      const after = prev.slice(neighbor.end + 1);
+      return [...before, ...neighborSlice, ...unitSlice, ...after].map(
+        (b, i) => ({ ...b, order: i }),
+      );
     });
   };
 
@@ -321,6 +604,33 @@ export default function QuizEditPage(): React.JSX.Element {
     );
   };
 
+  // Parent ↔ children link map. A block is a "linked child" when its content
+  // carries passage_block_id or audio_block_id pointing at another block in
+  // the current list. Used to indent + rail-mark children, and to badge
+  // parents with their child count.
+  const { linkedParentByChild, childCountByParent } = useMemo(() => {
+    const validIds = new Set(blocks.map((b) => b.clientId));
+    const parentByChild = new Map<string, string>();
+    const countByParent = new Map<string, number>();
+    for (const b of blocks) {
+      const c = b.content as Record<string, unknown> | null | undefined;
+      const parentId =
+        c && typeof c.passage_block_id === "string"
+          ? c.passage_block_id
+          : c && typeof c.audio_block_id === "string"
+            ? c.audio_block_id
+            : null;
+      if (parentId && validIds.has(parentId)) {
+        parentByChild.set(b.clientId, parentId);
+        countByParent.set(parentId, (countByParent.get(parentId) ?? 0) + 1);
+      }
+    }
+    return {
+      linkedParentByChild: parentByChild,
+      childCountByParent: countByParent,
+    };
+  }, [blocks]);
+
   // ── Save ─────────────────────────────────────────────────────────
   const onSave = (values: Record<string, unknown>): void => {
     const data = values as unknown as CreateQuizInput;
@@ -342,16 +652,35 @@ export default function QuizEditPage(): React.JSX.Element {
     if (Object.keys(errors).length > 0) return;
 
     const blockInserts = blocks.map((b) => ({
+      id: b.clientId,
       type: b.type,
       content: b.content,
       weight: b.points,
       order: b.order,
     }));
 
+    // Skip the block save round-trip when the local list matches the DB
+    // (e.g. last action was an AI edit that already wrote the DB).
+    const dbBlocksFingerprint = fingerprintBlocks(
+      (quiz?.quiz_blocks ?? []).map((b) => ({
+        id: b.id,
+        type: b.type as string,
+        order: b.order,
+        weight: b.weight,
+        content: b.content as Record<string, unknown> | null,
+      })),
+    );
+    const blocksDirty = fingerprintBlocks(blocks) !== dbBlocksFingerprint;
+
     updateQuiz(
       { id: quizId, updates: data },
       {
         onSuccess: () => {
+          if (!blocksDirty) {
+            resolveGeneration({ quizId, action: "save" });
+            router.push(`/instructor/courses/${courseId}`);
+            return;
+          }
           saveBlocks(
             { quizId, blocks: blockInserts },
             {
@@ -575,6 +904,26 @@ export default function QuizEditPage(): React.JSX.Element {
         isPending={isDeleting}
       />
 
+      <ConfirmDialog
+        open={pendingParentDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingParentDelete(null);
+        }}
+        title="Delete passage and its questions?"
+        description={
+          pendingParentDelete
+            ? `This passage has ${pendingParentDelete.childCount} linked ${pendingParentDelete.childCount === 1 ? "question" : "questions"}. They will also be deleted.`
+            : ""
+        }
+        confirmLabel="Delete all"
+        onConfirm={() => {
+          if (pendingParentDelete) {
+            performRemoveBlock(pendingParentDelete.clientId);
+            setPendingParentDelete(null);
+          }
+        }}
+      />
+
       {/* ── Content area: bento grid + chat panel ─────────────── */}
       <div className="flex min-h-0 flex-1 gap-3 md:gap-4">
 
@@ -596,7 +945,7 @@ export default function QuizEditPage(): React.JSX.Element {
               className="shrink-0 border-b border-border px-4 py-3 text-left"
             >
               <div className="flex items-center gap-2">
-                <Map className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <MapIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <h2 className="flex-1 text-sm font-semibold text-amber-950">Plan</h2>
                 {openPanels.has("plan") ? (
                   <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -697,8 +1046,8 @@ export default function QuizEditPage(): React.JSX.Element {
                     );
                   })}
                 </div>
-                <div className="mt-2 border-t border-border pt-2">
-                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="mt-2 space-y-2 border-t border-border pt-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Templates
                   </p>
                   <button
@@ -709,6 +1058,7 @@ export default function QuizEditPage(): React.JSX.Element {
                     <ToggleLeft className="h-3.5 w-3.5 shrink-0 text-violet-600" />
                     <span>True / False</span>
                   </button>
+                  <PassageTemplateForm onAdd={addPassageWithQuestions} />
                 </div>
               </div>
             )}
@@ -876,7 +1226,10 @@ export default function QuizEditPage(): React.JSX.Element {
             </Button>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+          <div
+            ref={blocksListRef}
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4"
+          >
             {blocks.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border py-12 text-center">
                 <ClipboardList className="h-8 w-8 text-muted-foreground/50" />
@@ -888,26 +1241,41 @@ export default function QuizEditPage(): React.JSX.Element {
                 </p>
               </div>
             ) : (
-              blocks.map((block, idx) => (
-                <div key={block.clientId} id={`block-${block.clientId}`}>
-                <BlockWrapper
-                  type={block.type}
-                  index={idx}
-                  total={blocks.length}
-                  points={block.points}
-                  error={blockErrors[block.clientId]}
-                  onMoveToTop={() => moveBlockToTop(block.clientId)}
-                  onMoveUp={() => moveBlock(block.clientId, "up")}
-                  onMoveDown={() => moveBlock(block.clientId, "down")}
-                  onMoveToBottom={() => moveBlockToBottom(block.clientId)}
-                  onDuplicate={() => duplicateBlock(block.clientId)}
-                  onRemove={() => removeBlock(block.clientId)}
-                  onPointsChange={(p) => updateBlockPoints(block.clientId, p)}
-                >
-                  {renderBlockEditor(block)}
-                </BlockWrapper>
-                </div>
-              ))
+              blocks.map((block, idx) => {
+                const isLinkedChild = linkedParentByChild.has(block.clientId);
+                const childCount = childCountByParent.get(block.clientId);
+                return (
+                  <div
+                    key={block.clientId}
+                    id={`block-${block.clientId}`}
+                    className={
+                      isLinkedChild
+                        ? "ml-6 border-l-4 border-amber-400 pl-3"
+                        : undefined
+                    }
+                  >
+                    <BlockWrapper
+                      type={block.type}
+                      index={idx}
+                      total={blocks.length}
+                      points={block.points}
+                      error={blockErrors[block.clientId]}
+                      childCount={childCount}
+                      onMoveToTop={() => moveBlockToTop(block.clientId)}
+                      onMoveUp={() => moveBlock(block.clientId, "up")}
+                      onMoveDown={() => moveBlock(block.clientId, "down")}
+                      onMoveToBottom={() => moveBlockToBottom(block.clientId)}
+                      onDuplicate={() => duplicateBlock(block.clientId)}
+                      onRemove={() => removeBlock(block.clientId)}
+                      onPointsChange={(p) =>
+                        updateBlockPoints(block.clientId, p)
+                      }
+                    >
+                      {renderBlockEditor(block)}
+                    </BlockWrapper>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
@@ -921,6 +1289,7 @@ export default function QuizEditPage(): React.JSX.Element {
               quizId={quizId}
               onClose={() => setAiChatOpen(false)}
               onApplied={() => setPendingRehydrate(true)}
+              onPreSubmitSave={preAISubmitSave}
             />
           </div>
         </div>
