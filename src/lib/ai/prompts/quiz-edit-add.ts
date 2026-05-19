@@ -1,4 +1,6 @@
 import { CEFR_RUBRIC } from "./cefr-rubric";
+import { BLOCK_QUALITY_RULES } from "./quiz-pedagogy";
+import { USER_FACING_REPLY_RULES } from "./user-facing-reply";
 
 export interface QuizEditAddContext {
   courseTitle: string;
@@ -63,6 +65,19 @@ Other rules:
 - Match the course CEFR level. Distractors must reflect real, plausible learner errors at this level.
 - "reasons" array MUST have the same length as "blocks". One short French sentence per block.
 - Do NOT copy example sentences from the lesson content verbatim.
+
+${USER_FACING_REPLY_RULES}
+
+LINKING TO AN EXISTING PASSAGE OR AUDIO (CRITICAL):
+- When the new mcq / fill_blank you emit is testing comprehension of an EXISTING text_passage or audio_passage that is already in the quiz, set "links_to_block_id" to that parent's id (the id is shown in the existing-blocks list, e.g. "id=abc-123 type=text").
+- In the existing-blocks list, each mcq / fill_blank that is ALREADY linked to a passage / audio shows it as "linked_to=<parent-id>" in its preview. Use this to see which existing questions already belong to which parent — useful when the user asks "ajoute UNE question de plus au passage Ahmed" so you can copy the right parent id.
+- "links_to_block_id" is OPTIONAL — only set it when the question is genuinely ABOUT that parent. A general grammar mcq that happens to follow a passage is NOT linked to it.
+- The id MUST be one of the ids in the existing-blocks list. NEVER invent an id.
+- If there is only ONE passage / audio in the quiz and the user said "sur le passage" / "sur l'audio", link to it.
+- If there are MANY passages / audios, pick the one the user named (by topic, character, or position). If genuinely ambiguous, leave "links_to_block_id" out — the server will leave the link empty.
+- "links_to_block_id" applies ONLY to standalone mcq and fill_blank blocks you emit. NEVER set it on free_text, voice_response, section, text_passage, or audio_passage.
+
+${BLOCK_QUALITY_RULES}
 
 EXACT BLOCK SHAPES (copy these field names exactly):
 
@@ -170,10 +185,10 @@ BAD — title with full sentence/paragraph (titles are short labels):
   { "type": "section", "title": "In this section we will study how to use the past simple tense in everyday situations..." }
 BAD — added when not asked. Only emit a section block when the user explicitly asks for a header/divider/section.
 
-SCENARIO — "MCQ about an existing text passage":
-The quiz already contains a text passage block. The user wants to add ONE OR MORE comprehension questions about it.
+SCENARIO — "MCQ about an existing text passage" (single passage in quiz):
+The quiz already contains ONE text passage block with id "abc-111". The user wants to add ONE OR MORE comprehension questions about it.
 
-GOOD output (single standalone mcq block):
+GOOD output (single standalone mcq block, LINKED via links_to_block_id):
 {
   "reasons": ["Question MCQ de compréhension sur le passage existant."],
   "blocks": [
@@ -182,7 +197,8 @@ GOOD output (single standalone mcq block):
       "question": "According to the passage, where does Ali live?",
       "options": ["Marrakech", "Casablanca", "Rabat", "Fes"],
       "correct_index": 0,
-      "explanation": "Le passage dit : 'I live in Marrakech.'"
+      "explanation": "Le passage dit : 'I live in Marrakech.'",
+      "links_to_block_id": "abc-111"
     }
   ]
 }
@@ -199,7 +215,66 @@ BAD output (NEVER do this — adds a new passage instead of an mcq):
   ]
 }
 
-→ When the sub_instruction mentions "MCQ about the passage" / "qcm sur le passage", emit a STANDALONE "mcq" block referring back to the passage's content. The passage is ALREADY in the quiz — do not duplicate it.
+BAD output (forgot links_to_block_id — the new mcq will float free at the bottom of the quiz, disconnected from its passage):
+{
+  "blocks": [
+    {
+      "type": "mcq",
+      "question": "According to the passage, where does Ali live?",
+      "options": ["Marrakech", "Casablanca", "Rabat", "Fes"],
+      "correct_index": 0
+      ← links_to_block_id MISSING
+    }
+  ]
+}
+
+→ When the sub_instruction mentions "MCQ about the passage" / "qcm sur le passage", emit a STANDALONE "mcq" block AND set "links_to_block_id" to the passage id. The passage is ALREADY in the quiz — do not duplicate it.
+
+SCENARIO — "MCQ about an existing passage" (TWO or more passages in quiz):
+The quiz contains TWO text passages:
+- id "p-fatima", about Fatima's meals
+- id "p-ahmed", about Ahmed's career
+User: "ajoute un qcm sur le passage de Fatima"
+
+GOOD output (pick the right passage by topic):
+{
+  "blocks": [
+    {
+      "type": "mcq",
+      "question": "What does Fatima eat for breakfast?",
+      "options": ["Bread and eggs", "Fish and rice", "Tea only", "Nothing"],
+      "correct_index": 0,
+      "links_to_block_id": "p-fatima"
+    }
+  ]
+}
+
+BAD — linked to the wrong passage:
+{
+  "blocks": [
+    {
+      "type": "mcq",
+      "question": "What does Fatima eat for breakfast?",
+      "links_to_block_id": "p-ahmed"  ← WRONG: question is about Fatima, not Ahmed
+    }
+  ]
+}
+
+BAD — invented an id that is not in the existing-blocks list:
+{
+  "blocks": [
+    {
+      "type": "mcq",
+      "question": "What does Fatima eat for breakfast?",
+      "links_to_block_id": "p-fatima-2"  ← WRONG: not in the input list
+    }
+  ]
+}
+
+→ When there are many passages and the user names one (by topic, character, or position), match the topic of the new question to the right passage's id. If genuinely ambiguous, OMIT the field.
+
+SCENARIO — "MCQ about an existing audio":
+Same rules as the text-passage scenarios above, but link to the audio block's id instead. The existing-blocks list shows audio blocks with "type=audio". Use that id in "links_to_block_id".
 
 PEDAGOGICAL ORDER — examples for a multi-block add:
 

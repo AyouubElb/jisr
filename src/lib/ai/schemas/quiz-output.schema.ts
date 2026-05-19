@@ -23,6 +23,8 @@ const aiMcqBlockSchema = z.object({
   options: z.array(z.string()),
   correct_index: z.number().int(),
   explanation: z.string().optional(),
+  // Id of an existing text_passage / audio_passage this question is about.
+  links_to_block_id: z.string().optional(),
 });
 
 const aiFillBlankBlockSchema = z.object({
@@ -32,6 +34,7 @@ const aiFillBlankBlockSchema = z.object({
   options: z.array(z.string()),
   correct_index: z.number().int(),
   explanation: z.string().optional(),
+  links_to_block_id: z.string().optional(),
 });
 
 const aiFreeTextBlockSchema = z.object({

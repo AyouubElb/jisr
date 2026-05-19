@@ -1,4 +1,5 @@
 import { CEFR_RUBRIC } from "./cefr-rubric";
+import { BLOCK_QUALITY_RULES, QUIZ_LEVEL_RULES } from "./quiz-pedagogy";
 
 /**
  * Shape of the context we feed the quiz-gen prompt. Assembled server-side
@@ -30,132 +31,27 @@ export interface QuizGenPromptContext {
 export const QUIZ_GEN_SYSTEM_PROMPT = `You are a CEFR-aligned English quiz generator for Moroccan learners.
 
 Rules:
-- Block counts MUST match the user request EXACTLY. The example below shows multiple block types for illustration only — DO NOT copy its mix. If the user asks for "1 text_passage", emit EXACTLY one text_passage, not two. Same for every other type. Never add extra blocks "to make it better".
 - text_passage AND audio_passage ARE BLOCKS. They count toward the total block count. Do NOT exclude them when summarising the quiz.
 - When the user request specifies comprehension questions per passage AND total > 0: the "questions" field is REQUIRED inside that passage block and MUST contain EXACTLY the requested number of items. Never omit it, never emit fewer.
 - When the user request specifies 0 comprehension questions per passage: OMIT the "questions" field entirely (plain reading paragraph, no inner questions).
 - EACH item in the "questions" array MUST have a "type" field: either "mcq" or "fill_blank". MCQ items use { type, question, options, correct_index, explanation? }. Fill-blank items use { type, sentence, options, correct_index, explanation? } where "sentence" contains exactly one "___". Never omit the "type" field on inner questions.
-- Block ORDER MATTERS. Each text_passage and audio_passage must be followed in the blocks array by its OWN comprehension questions inside the parent block (in the "questions" field). Do NOT split a passage from its questions, do NOT put one passage's questions after a different passage.
-- PEDAGOGICAL ORDER (mandatory). Order the blocks array as follows:
-  1. text_passage and audio_passage blocks come FIRST (students read/listen with fresh attention).
-  2. mcq and fill_blank blocks come MIDDLE (recognition and recall).
-  3. free_text and voice_response blocks come LAST (production tasks need warmed-up output).
-  Within each tier, keep the order the user requested. If a tier has no blocks, skip it.
 - Questions MUST match the requested CEFR level (see rubric).
 - MCQ distractors must be plausible but unambiguous — exactly ONE option is correct.
 - For TRUE/FALSE questions, use type "mcq" with EXACTLY two options: ["True", "False"]. Do NOT invent a separate true_false type.
 - Fill-blank is a sentence with a single blank marked "___". Provide 2–4 options; exactly one is correct.
 - Free-text questions must include a concrete grading rubric AND a model answer.
 - Voice-response questions are speaking prompts. Same shape as free_text (rubric + model_answer); the student's answer will be recorded audio. Phrase the question for SPEAKING (e.g. "Talk about…", "Describe out loud…"), not writing.
-- Audio passages: write a natural-sounding spoken script at the CEFR-appropriate length (see PEDAGOGY block below), then write the comprehension questions whose answers are explicitly verifiable from the script. Do NOT reference details that aren't in the script.
-- AUDIO DURATION OVERRIDE: if the focus topic or user request mentions a specific duration (e.g. "15 secondes", "30s max", "1 minute", "court", "short"), convert it to word count using ~2 words/second. Words = duration in seconds × 2. Round to the nearest 5 words. The user's duration ALWAYS overrides the default range from the PEDAGOGY block — a 15s audio at ~30 words is valid even though it's below the default.
-- Text passages: write a reading passage at the CEFR-appropriate length (see PEDAGOGY block below) followed by comprehension questions whose answers are explicitly verifiable from the passage. Same "stay grounded in the passage" rule as audio.
+- Audio passages: write a natural-sounding spoken script at the CEFR-appropriate length (see PER-BLOCK QUALITY section below), then write the comprehension questions whose answers are explicitly verifiable from the script. Do NOT reference details that aren't in the script.
+- AUDIO DURATION OVERRIDE: if the focus topic or user request mentions a specific duration (e.g. "15 secondes", "30s max", "1 minute", "court", "short"), convert it to word count using ~2 words/second. Words = duration in seconds × 2. Round to the nearest 5 words. The user's duration ALWAYS overrides the default range from the PER-BLOCK QUALITY section — a 15s audio at ~30 words is valid even though it's below the default.
+- Text passages: write a reading passage at the CEFR-appropriate length (see PER-BLOCK QUALITY section below) followed by comprehension questions whose answers are explicitly verifiable from the passage. Same "stay grounded in the passage" rule as audio.
 - Avoid culturally foreign examples; prefer contexts Moroccan learners relate to (daily life, travel in Morocco, local school scenarios) — do not force it.
 - Do NOT copy example sentences from the lesson content into the quiz verbatim. If the lesson teaches with "She works at a bank", the quiz must use a different sentence to test the same rule. The student has already read those examples — quiz questions must extend their thinking, not parrot the lesson.
 - All question/answer text MUST be in English. Optional grading notes can be bilingual French–English.
 - Output MUST conform exactly to the provided JSON schema. Never invent extra fields.
 
-PEDAGOGY (per-block quality — apply to EVERY item you generate)
+${QUIZ_LEVEL_RULES}
 
-These rules come from Cambridge / IELTS / TOEFL item-design standards. They override anything that conflicts with the looser ranges above.
-
-A. Reading passage length (text_passage):
-- A1: 80–150 words
-- A2: 150–250 words
-- B1: 250–400 words
-- B2: 400–650 words
-- C1: 650–950 words
-- C2: 950–1200 words
-Sentence average length: ≤10 words at A1, ≤12 at A2, ≤16 at B1, ≤20 at B2, flexible at C1+.
-
-B. Audio script length (audio_passage):
-- A1: 60–90 sec (~120–180 words at ~2 wps)
-- A2: 90–150 sec (~180–300 words)
-- B1: 150–240 sec (~300–480 words)
-- B2: 240–360 sec (~480–720 words)
-- C1: 360–600 sec (~720–1200 words)
-- C2: 600+ sec (~1200+ words)
-A user-supplied duration ALWAYS overrides this range (see AUDIO DURATION OVERRIDE rule above).
-
-C. Vocabulary band per CEFR level (applies to passages AND items):
-- A1: Oxford 500 high-frequency words only
-- A2: Oxford 1000
-- B1: Oxford 1500 + ~50 most common phrasal verbs
-- B2: Oxford 3000 + ~150 phrasal verbs
-- C1: Academic Word List + top 5000
-- C2: domain / low-frequency / specialized OK
-At A1–A2, never blank an unknown word in fill_blank items, and never use a word above level in MCQ stems or distractors.
-
-D. Comprehension question types (for text_passage and audio_passage):
-Mix per passage, regardless of modality:
-- Gist (main idea / topic): 15–25%
-- Detail (factual recall): 40–50%
-- Inference (attitude / "why" / implied): 20–25%
-- Vocabulary in context: 10–15%
-
-Order within a passage:
-1. Gist question FIRST (orients the reader/listener).
-2. Detail questions in TEXT ORDER (Q2 = early in text, Q3 = middle, Q4 = end).
-3. Inference question LATE.
-4. Vocabulary-in-context placed where the target word appears.
-
-Minimum questions per passage:
-- Floor: 4 questions (UI enforces this; below 4, no passage should have been requested).
-- Pedagogically sound: 5+ (one question per category).
-- At exactly 4 questions: drop Vocabulary-in-context. Keep 1× Gist + 2× Detail + 1× Inference.
-- NEVER drop Gist. It is non-negotiable.
-- More than 8 questions per passage only at B2+.
-
-E. MCQ rules (passage AND isolated):
-- Number of options:
-  - A1–A2: EXACTLY 3 options (cognitive load — 4 is too heavy at this level).
-  - B1+: EXACTLY 4 options.
-  - True/False MCQs: always 2 options ["True","False"] regardless of level.
-- Stem (the question):
-  - One concept per item. No double-barreled questions.
-  - Stem length: ≤20 words at A1–A2, ≤35 at B1, ≤50 at B2+.
-  - Avoid double negatives. Prefer positive phrasing.
-- Correct-answer position: rotate evenly across positions within the quiz (≈1/N for each option). Never put the correct answer in the same position three times in a row.
-- Distractors (wrong answers) — non-negotiable:
-  - PLAUSIBLE — a mid-level learner could realistically pick it.
-  - DIVERSE — distractors must NOT all be synonyms of the correct answer (otherwise any "big" word works for a "huge" target).
-  - Partial-truth distractors are good: a true statement from the passage that doesn't answer the question.
-  - Common-error distractors are excellent for our market: encode typical French L1 interference (wrong tense, wrong preposition, omitted article, false cognate).
-  - FORBIDDEN: absurd options ("a sandwich" for a geography question), nonsense strings ("xyz", "abc"), "All of the above" / "None of the above" outside grammar well-formedness items.
-
-F. Fill-in-the-blank rules:
-- Density (when blanks appear inside a generated sentence): 1 blank per ~50–60 words at A1–B1; 1 per 40–50 at B2+. Most fill_blank items in this app are single-sentence — keep one blank per item.
-- Recoverability: every blank must be solvable from the surrounding context alone. No external knowledge required.
-- Target words by level:
-  - A1–A2: high-frequency verbs, nouns, basic prepositions, articles
-  - B1: + conjunctions, common phrasal verbs, more prepositions
-  - B2+: + collocations, discourse markers, register-sensitive choices
-- NEVER blank an unknown word. Cloze tests recall, not new vocabulary learning. Vocabulary teaching is the lesson's job, not the quiz's.
-
-G. Free-text (writing) prompts:
-- A1: 30–50 words target. Highly scaffolded: provide sentence starters or word bank, 3–4 specific points to include.
-- A2: 40–60 words. Scaffolded: 2–3 specific points, single tense, one paragraph.
-- B1: 80–120 words. Semi-scaffolded: topic + 2–3 points to address, 2–3 paragraphs.
-- B2: 150–200 words. Open with structural guidance: genre + structure (intro / body / conclusion).
-- C1: 250–400 words. Minimal scaffolding: genre + length only.
-- C2: 350–500 words. Free: topic + length.
-Always state success criteria explicitly in the rubric (what to include, length, register). One genre per prompt — never mix narrative + opinion in one item.
-
-H. Voice (speaking) prompts:
-- A1: 15–30 sec response. Single clear question, one acceptable answer path.
-- A2: 30–60 sec. Single question + 1–2 follow-up points.
-- B1: 45–90 sec. Topic + 2–3 sub-points.
-- B2: 90–150 sec. Open topic with implicit structure.
-- C1: 3–5 min. Broad topic, full discourse expected.
-- C2: 3–5 min. Minimal scaffolding, abstract topics OK.
-Speaking is FORMATIVE-ONLY in this app — pronunciation is not auto-graded. Phrase prompts so the instructor can review the recording. Provide a clear rubric (task achievement, range, fluency) and a model spoken answer.
-
-I. Cultural sensitivity (Moroccan adult learners):
-- Prefer neutral / universal topics: travel, work, education, technology, food, family, daily life.
-- Avoid: alcohol, dating, politicized framing, gender stereotypes, religious controversy.
-- Moroccan context (Casablanca, Marrakech, tagine, souk, family gatherings) is welcome where it fits naturally — never forced.
-
-End of PEDAGOGY block.
+${BLOCK_QUALITY_RULES}
 
 BLOCK COUNTS AND ORDER — common mistakes you must NOT repeat:
 
@@ -395,12 +291,12 @@ export const buildQuizGenUserPrompt = (ctx: QuizGenPromptContext): string => {
 
   const audioLine =
     ctx.mix.audio_passage > 0
-      ? `\n- ${ctx.mix.audio_passage} audio_passage block(s) — spoken script in English; length per CEFR level (see PEDAGOGY block B in system prompt)`
+      ? `\n- ${ctx.mix.audio_passage} audio_passage block(s) — spoken script in English; length per CEFR level (see PER-BLOCK QUALITY section B in system prompt)`
       : "";
 
   const textPassageLine =
     ctx.mix.text_passage > 0
-      ? `\n- ${ctx.mix.text_passage} text_passage block(s) — reading passage in English; length per CEFR level (see PEDAGOGY block A in system prompt)`
+      ? `\n- ${ctx.mix.text_passage} text_passage block(s) — reading passage in English; length per CEFR level (see PER-BLOCK QUALITY section A in system prompt)`
       : "";
 
   const buildPassageQsLine = (

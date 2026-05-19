@@ -5,10 +5,10 @@ import type { AIModelConfig, AIFeature } from "./types";
  * Never edit an existing version in place — add a new one.
  */
 export const PROMPT_VERSIONS = {
-  quiz_gen: "quiz_gen_v10",
-  quiz_edit: "quiz_edit_v4",
+  quiz_gen: "quiz_gen_v11",
+  quiz_edit: "quiz_edit_v8",
   quiz_judge: "quiz_judge_v1",
-  lesson_edit: "lesson_edit_v7",
+  lesson_edit: "lesson_edit_v9",
   lesson_gen: "lesson_gen_v4",
 } as const;
 
@@ -122,14 +122,20 @@ export const MAX_OUTPUT_TOKENS: Record<AIFeature, number> = {
 // consistency; env overrides let us A/B without editing this file.
 export const DEFAULT_MODEL: Record<AIFeature, ModelKey> = {
   quiz_gen: isModelKey(envQuizModel) ? envQuizModel : "claude-haiku-4-5",
-  quiz_edit: isModelKey(envQuizEditModel) ? envQuizEditModel : "claude-haiku-4-5",
+  quiz_edit: isModelKey(envQuizEditModel)
+    ? envQuizEditModel
+    : "claude-haiku-4-5",
   quiz_judge: "claude-haiku-4-5",
   free_text_grade: "claude-haiku-4-5",
   voice_grade: "claude-haiku-4-5",
   intervention_suggest: "claude-haiku-4-5",
   lesson_outline: "claude-haiku-4-5",
-  lesson_edit: isModelKey(envLessonEditModel) ? envLessonEditModel : "claude-haiku-4-5",
-  lesson_gen: isModelKey(envLessonGenModel) ? envLessonGenModel : "claude-haiku-4-5",
+  lesson_edit: isModelKey(envLessonEditModel)
+    ? envLessonEditModel
+    : "claude-haiku-4-5",
+  lesson_gen: isModelKey(envLessonGenModel)
+    ? envLessonGenModel
+    : "claude-haiku-4-5",
 };
 
 /**
@@ -187,11 +193,12 @@ export const QUIZ_GEN_MAX_DIRECT_QUESTIONS = 8;
 export const QUIZ_GEN_MAX_PASSAGES_PER_TYPE = 1;
 
 // ── TTS voice mapping ─────────────────────────────────────────────────────────────────
-export const VOICE_BY_HINT: Record<string, { voiceId: string; speed: number }> = {
-  neutral_female: { voiceId: "nova", speed: 1.0 },
-  neutral_male: { voiceId: "onyx", speed: 1.0 },
-  slow_clear: { voiceId: "nova", speed: 0.85 },
-};
+export const VOICE_BY_HINT: Record<string, { voiceId: string; speed: number }> =
+  {
+    neutral_female: { voiceId: "nova", speed: 1.0 },
+    neutral_male: { voiceId: "onyx", speed: 1.0 },
+    slow_clear: { voiceId: "nova", speed: 0.85 },
+  };
 export const DEFAULT_VOICE = VOICE_BY_HINT.neutral_female;
 
 // Hard monthly $-budget per tier in cents. Catches per-call cost spikes

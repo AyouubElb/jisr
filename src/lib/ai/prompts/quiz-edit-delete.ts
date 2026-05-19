@@ -1,3 +1,5 @@
+import { USER_FACING_REPLY_RULES } from "./user-facing-reply";
+
 export interface QuizEditDeleteContext {
   courseTitle: string;
   courseLevel: "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
@@ -25,6 +27,8 @@ Hard rules:
 - Be conservative. If unsure whether a block should be removed, omit it.
 - Reasons are short, factual French: "Doublon de la question 2.", "Hors-sujet par rapport à la leçon.", etc.
 - If no blocks should be deleted, return an empty "deletions" array.
+
+${USER_FACING_REPLY_RULES}
 `;
 
 export const buildQuizEditDeleteUserPrompt = (

@@ -1,4 +1,6 @@
 import { CEFR_RUBRIC } from "./cefr-rubric";
+import { BLOCK_QUALITY_RULES } from "./quiz-pedagogy";
+import { USER_FACING_REPLY_RULES } from "./user-facing-reply";
 
 export interface QuizEditUpdateContext {
   courseTitle: string;
@@ -38,6 +40,10 @@ Hard rules:
 - Keep the same block type unless the instruction explicitly asks to change it.
 - Keep the original CEFR level unless the instruction explicitly asks otherwise.
 - AUDIO blocks (input type "audio") cannot be rewritten — the audio file is TTS-generated and must be regenerated via delete+add. If you receive an audio block as input, return its content unchanged with reason: "Pour modifier l'audio, supprimez ce bloc et ajoutez un nouveau passage audio." Do NOT attempt to rewrite the script.
+
+${USER_FACING_REPLY_RULES}
+
+${BLOCK_QUALITY_RULES}
 
 EXACT BLOCK SHAPES (these are the ONLY valid output shapes):
 
