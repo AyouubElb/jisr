@@ -5,7 +5,6 @@ import type {
   QuizUpdate,
   QuizBlock,
   QuizBlockInsert,
-  QuizBlockUpdate,
   QuizWithBlocks,
 } from "@/lib/types";
 
@@ -55,30 +54,17 @@ export const quizzesApi = {
     if (error) throw error;
   },
 
-  /** Save all blocks for a quiz (delete existing + bulk insert) */
+  /** Atomic save via save_quiz_blocks RPC. One round-trip, transactional, owner-checked. */
   saveBlocks: async (
     quizId: string,
     blocks: Omit<QuizBlockInsert, "quiz_id">[],
   ): Promise<QuizBlock[]> => {
     const supabase = createClient();
-
-    // Delete existing blocks
-    const { error: deleteError } = await supabase
-      .from("quiz_blocks")
-      .delete()
-      .eq("quiz_id", quizId);
-
-    if (deleteError) throw deleteError;
-
-    if (blocks.length === 0) return [];
-
-    // Insert new blocks
-    const { data, error } = await supabase
-      .from("quiz_blocks")
-      .insert(blocks.map((b) => ({ ...b, quiz_id: quizId })))
-      .select();
-
+    const { data, error } = await supabase.rpc("save_quiz_blocks", {
+      p_quiz_id: quizId,
+      p_blocks: blocks,
+    });
     if (error) throw error;
-    return data;
+    return (data ?? []) as QuizBlock[];
   },
 };

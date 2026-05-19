@@ -957,6 +957,20 @@ export type Database = {
         Args: { p_section_item_id: string; p_new_position: number };
         Returns: void;
       };
+      save_quiz_blocks: {
+        Args: { p_quiz_id: string; p_blocks: unknown };
+        Returns: {
+          id: string;
+          quiz_id: string;
+          type: "text" | "audio" | "image" | "mcq" | "fill_blank" | "free_text" | "voice" | "section";
+          content: Record<string, unknown>;
+          weight: number | null;
+          model_answer: string | null;
+          grading_notes: string | null;
+          order: number;
+          created_at: string;
+        }[];
+      };
     };
   };
 };
