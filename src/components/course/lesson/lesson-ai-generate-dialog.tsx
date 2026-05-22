@@ -42,16 +42,13 @@ interface FormState {
   scope: string;
   depth: Depth;
   includeExercises: boolean;
-  includeFrenchSupport: boolean;
   theme: string;
 }
 
-const defaultForm = (level: CEFRLevel): FormState => ({
+const defaultForm = (): FormState => ({
   scope: "",
   depth: "quick",
   includeExercises: true,
-  // French support is the recommended default for A1/A2.
-  includeFrenchSupport: level === "A1" || level === "A2",
   theme: "",
 });
 
@@ -74,7 +71,7 @@ export function LessonAIGenerateDialog({
   hasExistingContent,
   onGenerated,
 }: LessonAIGenerateDialogProps): React.JSX.Element {
-  const [form, setForm] = useState<FormState>(() => defaultForm(courseLevel));
+  const [form, setForm] = useState<FormState>(() => defaultForm());
   const { mutate: generate, isPending } = useGenerateAILesson();
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]): void => {
@@ -90,7 +87,6 @@ export function LessonAIGenerateDialog({
         scope,
         depth: form.depth,
         includeExercises: form.includeExercises,
-        includeFrenchSupport: form.includeFrenchSupport,
         theme: form.theme.trim() || undefined,
       },
       {
@@ -194,26 +190,6 @@ export function LessonAIGenerateDialog({
                 <span className="font-medium">Include exercises</span>
                 <span className="block text-xs text-muted-foreground">
                   &ldquo;Quick check&rdquo; section at the end (2-4 questions)
-                </span>
-              </span>
-            </label>
-
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.includeFrenchSupport}
-                onChange={(e) =>
-                  update("includeFrenchSupport", e.target.checked)
-                }
-                disabled={isPending}
-                className="mt-0.5"
-              />
-              <span>
-                <span className="font-medium">
-                  French support
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                  Translations and FR/EN contrastive notes (recommended for A1-A2)
                 </span>
               </span>
             </label>

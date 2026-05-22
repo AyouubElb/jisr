@@ -5,16 +5,19 @@
  * Blocks are static — they sit in the cached prefix once caching is wired.
  */
 
-/** CEFR vocab budget, sentence length, French scaffolding. PEDAGOGY.md §3.4. */
-export const CEFR_LESSON_RULES = `CEFR LEVEL RULES (the level controls vocabulary, complexity, French support, AND which template skeleton is used — see PEDAGOGY §3.3):
+/** CEFR vocab budget, sentence length. PEDAGOGY.md §3.4. */
+export const CEFR_LESSON_RULES = `CEFR LEVEL RULES (the level controls vocabulary, complexity, AND which template skeleton is used — see PEDAGOGY §3.3):
+
+SPELLING — use AMERICAN ENGLISH consistently across every lesson. Never mix variants in the same lesson.
+
 
 A1 (Beginner) — uses the SIMPLE template, NOT the documentation template:
 - 6-8 new vocabulary items per lesson (max 8).
 - Vocabulary from Oxford 3000 only. No academic words, no idioms, no phrasal verbs.
 - Sentences: short, present tense, max 12 words.
 - Grammar lessons: EXACTLY 4 examples, ALL using the same pattern (repetition beats variety at A1).
-- French translations in every example blockquote (next line via <br>) — mandatory.
-- L1 interference appears as per-word/per-pattern "Say this, not this" PAIRS — never as a "Common mistakes" prose section, never with metalanguage.
+- Pure English throughout. Meaning comes from short context, examples, and (for grammar) "Say/Not" pairs.
+- GRAMMAR lessons surface common learner errors as per-pattern "Say this, not this" pairs — never as a "Common mistakes" prose section, never with metalanguage. Vocabulary lessons do NOT include "Say/Not" pairs.
 - ZERO metalanguage in student-facing text. No "uncountable", "auxiliary", "third-person singular", "article", "preposition", "modal" — these are teacher words. Show the right form; don't name the rule.
 - Grammar lesson titles name the FUNCTION, not the rule: "Talking about every day", NOT "Present simple".
 
@@ -23,8 +26,8 @@ A2 (Elementary) — same SIMPLE template as A1, dial turned up:
 - Oxford 3000 + a few high-frequency domain words (work, home, travel).
 - Sentences max 15 words.
 - Grammar lessons: 5-6 examples, all using the same pattern.
-- French translations still encouraged in blockquotes; transparent cognates ("hotel", "restaurant", "music") may skip the gloss.
-- L1 interference still uses per-word "Say/Not" pairs.
+- Pure English throughout.
+- GRAMMAR lessons still use per-pattern "Say/Not" pairs. Vocabulary lessons do NOT.
 - Minimal metalanguage allowed: "singular / plural" is OK. "Uncountable", "auxiliary", "modal", "third-person singular" are still banned.
 - Grammar titles still functional ("Talking about yesterday"), not analytical.
 
@@ -33,46 +36,24 @@ B1 (Intermediate):
 - Oxford 3000-5000. Phrasal verbs OK if common (find out, look for, give up).
 - Sentences may be complex but stay readable. Avoid academic jargon.
 - 5-8 examples.
-- French translations only for tricky phrases or false friends, NOT every example.
-- 1-2 French interference notes when relevant.
 
 B2 (Upper Intermediate):
 - Max 25 vocabulary items.
 - Full Oxford 5000 + early Academic Word List.
 - Nuanced explanations OK. Compare close synonyms.
 - 5-8 examples, including at least one in formal register.
-- NO blanket French translations. Only flag false friends explicitly.
 - Common mistakes section focuses on register, collocation, register-appropriate use.
 
 C1 (Advanced):
 - Max 25 vocabulary items, including specialized / less frequent words.
 - Cover register, connotation, stylistic variation.
 - 5-8 examples mixing registers.
-- French only when a false friend or pragmatic gap is genuinely useful.
 - "Common mistakes" focuses on overuse, register mismatch, idiomatic precision.
 
 C2 (Proficiency):
 - Up to 25 items, often rare / literary / idiomatic.
 - Discuss connotation, irony, register, collocation strength.
-- 5-8 examples, varied registers and styles.
-- No French unless a faux ami is the actual point.`;
-
-/** Predictable Francophone learner errors. PEDAGOGY.md §2.3. */
-export const FRENCH_L1_INTERFERENCE = `FRENCH L1 INTERFERENCE (our students are Moroccan, French-schooled — these errors are predictable, target them):
-
-| Error | French cause | Fix to teach |
-|---|---|---|
-| Omitting articles ("I saw book on table") | French generalizes with zero article | Explicit rule + a contrastive example |
-| No do-support in negation ("I not go") | French "ne...pas" needs no auxiliary | Note: "English requires 'do' in negatives and questions" |
-| Inversion in that-clauses ("I think that go you") | French allows it informally | Explicit: "English never inverts word order in that-clauses" |
-| Wrong question word order ("Where you live?") | French has multiple Q forms | Pattern: Q-word + Do/Does/Did + Subject + Verb |
-| Bare "on" for passive ("On told me") | French generic "on" | Substitute: "they" or the passive |
-| False cognates: actually, eventually, sensible, library, lecture, fabric | Same spelling, different meaning | Flag explicitly when the word appears |
-
-PLACEMENT depends on level:
-- **A1/A2** — interference appears as per-word/per-pattern "Say this, not this" PAIRS attached to each entry (one short line, no labels, no "uncountable" / "auxiliary"). NEVER as a "Common mistakes" prose section.
-- **B1+** — interference goes in the dedicated "Common mistakes" section, with brief explanation OK (the student can decode it).
-- **B2+** — shift the focus to register, collocation, and register-appropriate use, not raw interference.`;
+- 5-8 examples, varied registers and styles.`;
 
 /**
  * Internal review run before emitting. PEDAGOGY.md §3.7. Probabilistic, not
@@ -126,13 +107,23 @@ Review your draft once against this checklist. Fix any violation, THEN emit.
    invented register notes, no fake British/American distinctions.
 
 6. A1/A2 TEMPLATE DISCIPLINE — if this is an A1 or A2 lesson:
-   - There is NO "Common mistakes" section. Errors live in per-word/per-
-     pattern "Say this, not this" pairs.
+   - VOCABULARY lessons: each word entry has phrase + mini dialogue + speaking
+     task (in that order, each in its own <blockquote>). Then a "Conversations"
+     section with 2-3 realistic conversations using the target words in
+     <strong>. NO per-word "Say/Not" pairs. NO "Common mistakes" section.
+   - GRAMMAR lessons: errors live in per-pattern "Say this, not this" pairs.
+     NO "Common mistakes" section.
+   - Pure English throughout the lesson.
    - There is NO metalanguage in student-facing text: no "uncountable",
      "auxiliary", "third-person singular", "article", "preposition", "modal",
      "infinitive", "auxiliary verb". At A2 only "singular / plural" is OK.
      If a sentence uses any banned term, rewrite it to SHOW the form
      instead of NAMING the rule.
+     EXCEPTION: in A1/A2 GRAMMAR lessons, the per-form <em>Rule:</em> line
+     under each <h3>Affirmative/Negative/Question</h3> sub-block is
+     INSTRUCTOR-FACING — metalanguage IS allowed there (the instructor reads
+     it and reframes for the student live). Student-facing pattern sentences,
+     Say/Not pairs, and Try-it prompts remain metalanguage-free.
    - Grammar lesson titles must be FUNCTIONAL ("Talking about every day"),
      not analytical ("Present simple"). If the title is analytical, rewrite
      the title before emitting.
@@ -144,7 +135,7 @@ Review your draft once against this checklist. Fix any violation, THEN emit.
  * PEDAGOGY.md §3.3. The instructor screen-shares this and walks through it
  * with the student; the same artifact is the student's revision doc later.
  */
-export const A1_A2_TEMPLATES = `A1/A2 LESSON TEMPLATES (simple, screen-share-friendly, no metalanguage):
+export const A1_A2_TEMPLATES = `A1/A2 LESSON TEMPLATES (simple, screen-share-friendly, no metalanguage, pure English):
 
 ═══════════════════════════════════════════════════════════════════
 TEMPLATE — A1/A2 VOCABULARY
@@ -157,14 +148,31 @@ Output shape, in this order:
 
   [for EACH word — 6-8 at A1, 10-12 at A2]
     <h3>{word}</h3>
-    <p>{simple synonym OR French equivalent — ONE short line, NOT a definition paragraph}</p>
-    <blockquote>{one pattern sentence using the word}<br>{French gloss}</blockquote>
-    <p><em>Say:</em> {correct phrase} <em>Not:</em> {wrong phrase}</p>
+    <blockquote>{one simple phrase using the word — e.g. "I drink tea."}</blockquote>
+    <blockquote>{one mini dialogue — two short lines — e.g. "Do you want tea?" → "Yes, please."}</blockquote>
+    <blockquote><em>Speaking task:</em> {one open question that invites the student to use the word — e.g. "What do you drink in the morning?"}</blockquote>
   [end per-word]
 
-  <h2>Useful phrases</h2>
-  [3-5 functional chunks for the theme. Each in its own <blockquote> with French gloss:]
-    <blockquote>{chunk in English}<br>{French gloss}</blockquote>
+  <h2>Conversations</h2>
+  [2-3 short conversations (Conversation 1, Conversation 2, Conversation 3) — natural, realistic, varied across scenes related to the theme. Each conversation is 6-10 short lines between two named or labelled speakers (Man / Woman, Waiter / Customer, Friend A / Friend B, etc.). Every target word from the list above MUST appear at least once across the conversations and be wrapped in <strong> each time it appears.]
+
+  Format for each conversation — wrap the ENTIRE conversation in a <div data-conversation="N" data-voices='{...}'> container (N = 1, 2, 3…). The container is the stable marker the audio player keys off; the visible heading text can be anything (e.g. "Conversation 1", "Dialog 1", localized variants).
+
+    data-voices is REQUIRED — a JSON object mapping each speaker label EXACTLY as it appears in <strong>Speaker:</strong> to a voice id from this list:
+      male voices: onyx, echo, ash, ballad
+      female voices: nova, shimmer, coral, sage
+    Picking the voice (do this honestly — students rely on it):
+      - Speaker label says man / boy / father / Mr. X / waiter / doctor / a man's first name → male voice.
+      - Speaker label says woman / girl / mother / Mrs. X / Ms. X / waitress / a woman's first name → female voice.
+      - Ambiguous labels (Friend A, Friend B, Speaker 1, Speaker 2): assign one male and one female so the dialogue contrasts.
+      - Use DIFFERENT voices for different speakers in the same conversation. Two males → onyx + echo (or any two male voices). Two females → nova + shimmer.
+
+    <div data-conversation="{N}" data-voices='{"{Speaker A}":"{voice}","{Speaker B}":"{voice}"}'>
+      <h3>Conversation {N}</h3>
+      <p><strong>{Speaker A}:</strong> {short line — wrap any target word in <strong>}</p>
+      <p><strong>{Speaker B}:</strong> {short line — wrap any target word in <strong>}</p>
+      [continue alternating, 6-10 lines total]
+    </div>
 
   <h2>Try saying it</h2>   ← only if includeExercises = true
   [3-4 pattern fill-in prompts, each as a <p>. No answer keys.]
@@ -172,10 +180,15 @@ Output shape, in this order:
 
 Rules:
 - NO "About these words" intro paragraph. The theme card + function-frame line IS the intro.
-- NO definition paragraphs per word. One short synonym or French equivalent line, that's it.
-- NO "Common mistakes" section. Errors live in the per-word "Say/Not" pair.
-- ZERO metalanguage in any of the above ("uncountable", "article", "preposition" all banned).
-- "Try saying it" is pattern drills, NOT multiple-choice tests. Designed for the instructor to walk through on screen.
+- Pure English only.
+- NO definition paragraphs per word. The phrase + dialogue + speaking task ARE the word's context.
+- NO "Common mistakes" section.
+- NO "Say this, not this" pairs in the vocabulary template (those belong in the GRAMMAR template).
+- ZERO metalanguage ("uncountable", "article", "preposition" all banned).
+- Conversations must be CREATIVE and varied — different scenes, different speakers, different situations. Do NOT recycle the same speaking task questions as conversation lines. The conversations are the *real-world use* of the words; the per-word section is the *card*.
+- Every target word MUST appear bolded (<strong>) at least once across the conversations. A word can appear in multiple conversations.
+- Conversations stay short and CEFR-appropriate: A1 lines max 8 words each, A2 max 12 words each.
+- "Try saying it" is pattern drills, NOT multiple-choice tests.
 
 ═══════════════════════════════════════════════════════════════════
 TEMPLATE — A1/A2 GRAMMAR
@@ -189,21 +202,20 @@ Output shape, in this order:
   <h2>When you need this</h2>
   <p>{one short paragraph in context — when the student needs this language}</p>
 
-  <h2>The pattern</h2>
-  <blockquote>
-    {3-4 short sentences showing the SAME pattern with one word swapped each time}
-    <br>{second sentence}
-    <br>{third sentence}
-    <br>{fourth sentence}
-  </blockquote>
-  <p><em>Notice:</em> {one short cue line pointing at what the pattern already shows. NO rule paragraph.}</p>
+  [for EACH form the lesson actually supports — affirmative, negative, question — emit ONE sub-block. Skip any form that does not apply to this grammar point. Order: affirmative → negative → question.]
 
-  <h2>Examples</h2>
-  [4 short sentences at A1, 5-6 at A2 — ALL using the SAME pattern, each in its own <blockquote> with French gloss]
-    <blockquote>{example sentence}<br>{French gloss}</blockquote>
+    <h3>{Form name: Affirmative / Negative / Question}</h3>
+    <p><em>Rule:</em> {1-2 short sentences the INSTRUCTOR reads and explains in their own words. Metalanguage is allowed here ("subject", "verb", "auxiliary do/does", "third-person -s") because the instructor is the reader, not the student.}</p>
+    <blockquote>
+      {2-3 pattern sentences for this form, same shape with one word swapped each time}
+      <br>{second sentence}
+      <br>{third sentence}
+    </blockquote>
+
+  [end per-form]
 
   <h2>Say this, not this</h2>
-  [2-3 error pairs, each as a <p>. ZERO metalanguage.]
+  [2-3 error pairs across the forms covered, each as a <p>. ZERO metalanguage in the Say/Not pairs themselves — these are student-facing.]
     <p><em>Say:</em> {right form} <em>Not:</em> {wrong form}</p>
 
   <h2>Try it</h2>   ← only if includeExercises = true
@@ -212,10 +224,10 @@ Output shape, in this order:
 
 Rules:
 - Title names the FUNCTION, not the rule. "Talking about every day" / "Saying where things are" / "Asking simple questions".
-- "The pattern" is a substitution table, NOT a rule paragraph. Show, don't explain.
-- "Notice:" cue is ONE short line pointing at the visible pattern. If the cue needs more than one short sentence, the rule is too complex for this template.
-- Examples repeat the SAME pattern. At A1, variety hurts retention.
-- ZERO metalanguage in any student-facing text. No "subject", "verb", "auxiliary", "third-person".
+- Emit ONLY the forms the grammar point genuinely has. If the rule has no negative or no question form, omit that sub-block — do not invent one.
+- The "Rule" line is for the INSTRUCTOR. Metalanguage allowed here. Keep it to 1-2 short sentences they can read and reframe live. Highlight the KEY TERMS (the auxiliary, the ending, the structural pivot — e.g. "do/does", "-s", "auxiliary", "subject") with <strong> for plain emphasis, OR <strong><span style="color: #F97316">…</span></strong> for orange-bold when the term is the central pivot of the rule. Use highlighting sparingly — 1-3 terms per rule, not every word.
+- Pattern sentences inside the <blockquote> are student-facing — same constraints as before: short, repetitive, one word swap per line, ZERO metalanguage.
+- "Say this, not this" pairs and "Try it" prompts are student-facing — NO metalanguage there. No "subject", "verb", "auxiliary", "third-person" outside the <em>Rule:</em> line.
 - "Try it" is pattern fill-ins, NOT multiple-choice. No answer keys.`;
 
 /**
@@ -228,11 +240,22 @@ export const B1_PLUS_TEMPLATES = `B1+ LESSON TEMPLATES (documentation pattern �
 TEMPLATE — B1+ GRAMMAR
 ═══════════════════════════════════════════════════════════════════
 
-  <h2>What is it</h2>          → 1-2 sentence definition. Plain prose.
+  <h2>What is it</h2>          → 1-2 sentence definition. Plain prose. Metalanguage OK.
   <h2>When to use it</h2>      → Function / meaning. 2-4 typical uses as <ul>.
-  <h2>How to form it</h2>      → Structure / rule. <ul> for affirmative / negative / question forms when relevant.
-  <h2>Examples</h2>            → 5-8 example sentences, each in its own <blockquote>.
-  <h2>Common mistakes</h2>     → French L1 interference + typical errors, as <ul>. Metalanguage is OK here.
+
+  [for EACH form the grammar point actually supports — affirmative, negative, question — emit ONE sub-block. Skip any form that does not apply. Order: affirmative → negative → question.]
+
+    <h3>{Form name: Affirmative / Negative / Question}</h3>
+    <p><em>Rule:</em> {1-2 sentences. Metalanguage is allowed and useful here ("subject", "auxiliary do/does", "third-person -s"). Highlight 1-3 KEY TERMS with <strong> for plain emphasis, OR <strong><span style="color: #F97316">…</span></strong> for orange-bold when the term is the central pivot of the rule.}</p>
+    <blockquote>
+      {2-4 example sentences for this form — each on its own line via <br>}
+      <br>{second sentence}
+      <br>{third sentence}
+    </blockquote>
+
+  [end per-form]
+
+  <h2>Common mistakes</h2>     → Typical learner errors, as <ul>. Metalanguage is OK here.
   <h2>Quick check</h2>         → 2-4 self-test items (only if includeExercises = true).
 
 ═══════════════════════════════════════════════════════════════════
@@ -241,10 +264,11 @@ TEMPLATE — B1+ VOCABULARY
 
   <h2>About these words</h2>   → 1-2 sentence intro framing the theme.
   <h2>Word list</h2>           → For each word: <h3>word</h3> + <p>meaning</p> + <blockquote>example</blockquote>. Add <p><em>Collocations:</em> ...</p> if natural. Add <p><em>Be careful:</em> ...</p> for false friends.
-  <h2>Common mistakes</h2>     → Pronunciation / spelling / register / interference, as <ul>.
+  <h2>Common mistakes</h2>     → Pronunciation / spelling / register / typical errors, as <ul>.
   <h2>Quick check</h2>         → 2-4 self-test items (only if includeExercises = true).
 
 Rules:
-- Documentation pattern: definition before form, function before rule, examples in their own <blockquote>.
-- Metalanguage is allowed and useful at B1+ (the student can decode "uncountable", "auxiliary", etc.).
-- French gloss only for tricky phrases or false friends, not every example.`;
+- Documentation pattern: definition first, function next, then per-form sub-blocks (rule + examples co-located).
+- Emit ONLY the forms the grammar point genuinely has. If the rule has no negative or no question form, omit that sub-block — do not invent one.
+- Metalanguage is allowed and useful at B1+ (the student can decode "uncountable", "auxiliary", etc.) — including in the per-form <em>Rule:</em> line.
+- Highlight key terms in each Rule line sparingly: 1-3 per rule, not every word. <strong> for plain emphasis, <strong><span style="color: #F97316">…</span></strong> for orange-bold on the central pivot.`;

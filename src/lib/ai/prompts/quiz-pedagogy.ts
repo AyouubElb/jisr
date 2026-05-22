@@ -9,6 +9,8 @@ export const BLOCK_QUALITY_RULES = `PER-BLOCK QUALITY (apply to EVERY item — p
 
 These rules come from Cambridge / IELTS / TOEFL item-design standards. They override looser ranges elsewhere in the prompt.
 
+SPELLING — use AMERICAN ENGLISH consistently across every block. Never mix variants in the same quiz.
+
 A. Reading passage length (text_passage):
 - A1: 80–150 words
 - A2: 150–250 words
@@ -37,23 +39,31 @@ C. Vocabulary band per CEFR level (applies to passages AND items):
 At A1–A2, never blank an unknown word in fill_blank items, and never use a word above level in MCQ stems or distractors.
 
 D. Comprehension questions inside a passage (text_passage / audio_passage):
-Mix per passage, regardless of modality:
-- Gist (main idea / topic): 15–25%
-- Detail (factual recall): 40–50%
-- Inference (attitude / "why" / implied): 20–25%
-- Vocabulary in context: 10–15%
 
-Order within a passage:
-1. Gist question FIRST (orients the reader/listener).
-2. Detail questions in TEXT ORDER (Q2 = early in text, Q3 = middle, Q4 = end).
-3. Inference question LATE.
-4. Vocabulary-in-context placed where the target word appears.
+Question categories (apply only the ones the level supports — see "Mix by level" below):
+- Gist = main idea / topic of the whole passage.
+- Detail = explicit factual recall from a specific sentence.
+- Inference = implied meaning, attitude, "why" — answer is NOT stated literally.
+- Vocabulary in context = meaning of a single word as used in the passage.
 
-Minimum questions per passage when "questions" is present:
-- Floor: 4 questions (UI enforces this; below 4, no passage should have been requested).
-- Pedagogically sound: 5+ (one question per category).
-- At exactly 4 questions: drop Vocabulary-in-context. Keep 1× Gist + 2× Detail + 1× Inference.
-- NEVER drop Gist. It is non-negotiable.
+Mix by level (use the count the instructor requested; pick categories from the level's allowed set):
+- A1: Detail only. Inference and Vocabulary-in-context are above level — do not use. If only 1 question is requested, make it a Detail.
+- A2: Detail mostly. Gist allowed when there is a clear single topic. NO Inference. NO Vocabulary-in-context.
+- B1: Gist + Detail + light Inference. Vocabulary-in-context only for transparent words taught in the lesson.
+- B2: Gist + Detail + Inference + Vocabulary-in-context. Roughly 1 Gist, half Detail, the rest Inference + Vocabulary.
+- C1–C2: All four categories, weighted toward Inference and Vocabulary-in-context.
+
+Order within a passage (apply only to categories used at this level):
+1. Gist question FIRST (orients the reader/listener) — when Gist is used.
+2. Detail questions in TEXT ORDER (early → middle → end of passage).
+3. Inference question LATE — when Inference is used.
+4. Vocabulary-in-context placed where the target word appears — when used.
+
+Question count per passage:
+- Honour the instructor's requested count exactly (it can be 1 or more).
+- 1 question: pick the category most appropriate to the level (A1/A2 → Detail; B1+ → Gist if the passage has a clear topic, else Detail).
+- 2–3 questions at B1+: include a Gist if not already used; fill the rest with Detail (and Inference at B1+).
+- 4+ questions: follow the level's mix proportionally. Never include a category the level forbids just to hit a count — repeat Detail instead.
 - More than 8 questions per passage only at B2+.
 
 E. MCQ rules (passage AND isolated):
@@ -99,7 +109,34 @@ H. Voice (speaking) prompts:
 - C2: 3–5 min. Minimal scaffolding, abstract topics OK.
 Speaking is FORMATIVE-ONLY in this app — pronunciation is not auto-graded. Phrase prompts so the instructor can review the recording. Provide a clear rubric (task achievement, range, fluency) and a model spoken answer.
 
-I. Cultural sensitivity (Moroccan adult learners):
+I. Quiz focus type — vocabulary vs grammar:
+- Derive the focus from the quiz title, description, and focus topic. "Food and drink", "Jobs", "Colours" → vocabulary. "Present simple", "Past tense", "Articles" → grammar.
+- VOCABULARY-focused quiz: test word meaning, expression usage, and real-world phrases in context. FORBIDDEN in vocabulary quizzes: metalinguistic items that ask the student to judge whether a grammar rule is stated correctly (e.g. "True or False: you say 'a water' when ordering water" — this tests article rule knowledge, not vocabulary). Test the word/expression in USE, not the rule about it.
+- GRAMMAR-focused quiz: test rule application in sentences. Vocabulary in stems/options must stay within CEFR band.
+- Fill_blank constraint (all focus types): the target word must be the ONLY correct answer given the sentence. If more than one option produces a grammatically correct and meaningful sentence, redesign the sentence to force a unique answer.
+
+J. Lesson examples are NOT testable facts (critical — read carefully):
+- Lesson example sentences like "I drink milk with my tea", "I eat bread for breakfast", "Do you like eggs? → Yes, I do" are PERSONAL/OPINION statements showing HOW TO USE the word. They are NOT facts about the world that have one correct answer.
+- FORBIDDEN: turning a lesson example into a True/False or fill_blank where the "correct" answer is whatever the lesson sentence happens to say.
+  ✗ Lesson says "I drink milk with my tea." → quiz asks "True or False: You drink milk with water." → both are valid real-life answers; this is broken.
+  ✗ Lesson shows "Do you like eggs? → Yes, I do." → quiz asks "True or False: You like eggs." → opinion, not testable.
+  ✗ Lesson says "I eat rice for dinner." → quiz fill_blank "I eat ___ for dinner." with options ["rice","chicken","bread","fish"] → all four are valid; broken.
+- What you CAN test about vocabulary (use these patterns instead):
+  ✓ Word MEANING when the lesson defined it: "What is 'milk'?" → options describe the substance, not personal preference.
+  ✓ COLLOCATION where only one option is natural English: "I ___ tea every morning." → ["drink","eat","read","wear"] — only "drink" works with tea.
+  ✓ SCENARIO usage: "You are at a café. You want tea. What do you say?" → ["Can I have a tea, please?","I am tea.","Tea me.","To tea, please."] — only one is real English.
+  ✓ NEW dialogues you author for the question (not the lesson's dialogues): write a short 2-line exchange inside the question, then ask about it. The exchange must be self-contained — readable without the lesson.
+- Rule of thumb before writing a question: ask "could a real-life student honestly answer this differently and still be right?" If yes, the question is broken — switch to meaning, collocation, scenario, or a self-contained new dialogue.
+
+- THE STUDENT DOES NOT SEE THE LESSON DURING THE QUIZ. The lesson is INSPIRATION for vocabulary, scenarios, and phrasing — never a referenceable artifact inside the quiz. FORBIDDEN phrasings:
+  ✗ "In Conversation 1, what does the woman say?"
+  ✗ "According to the lesson, what does Sara drink?"
+  ✗ "In the dialogue, what time is the meeting?"
+  ✗ "The lesson says 'I drink milk' — what comes next?"
+  These require the student to remember which conversation was which, or to have the lesson open. That is memorization of the lesson, not vocabulary knowledge.
+- Every quiz question must be SELF-CONTAINED: a student who has the vocabulary but never read this specific lesson should be able to answer correctly. Use the lesson's words and themes in NEW sentences and NEW scenarios you write for the question, not callbacks to the lesson's specific dialogues.
+
+K. Cultural sensitivity (Moroccan adult learners):
 - Prefer neutral / universal topics: travel, work, education, technology, food, family, daily life.
 - Avoid: alcohol, dating, politicized framing, gender stereotypes, religious controversy.
 - Moroccan context (Casablanca, Marrakech, tagine, souk, family gatherings) is welcome where it fits naturally — never forced.`;

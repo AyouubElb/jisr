@@ -7,9 +7,10 @@ import type { AIModelConfig, AIFeature } from "./types";
 export const PROMPT_VERSIONS = {
   quiz_gen: "quiz_gen_v11",
   quiz_edit: "quiz_edit_v8",
-  quiz_judge: "quiz_judge_v1",
+  quiz_judge: "quiz_judge_v4",
   lesson_edit: "lesson_edit_v9",
   lesson_gen: "lesson_gen_v4",
+  student_grade: "student_grade_v1",
 } as const;
 
 /**
@@ -110,12 +111,14 @@ export const MAX_OUTPUT_TOKENS: Record<AIFeature, number> = {
   quiz_gen: 4096,
   quiz_edit: 2048,
   quiz_judge: 1024,
-  free_text_grade: 1024,
-  voice_grade: 1024,
+  free_text_grade: 3072,
+  voice_grade: 3072,
   intervention_suggest: 1024,
   lesson_outline: 2048,
   lesson_edit: 4096,
   lesson_gen: 6144,
+  // lesson_tts: irrelevant — TTS is char-based, not token-based.
+  lesson_tts: 0,
 };
 
 // Default model per feature. Claude Haiku 4.5 across the board for
@@ -136,6 +139,10 @@ export const DEFAULT_MODEL: Record<AIFeature, ModelKey> = {
   lesson_gen: isModelKey(envLessonGenModel)
     ? envLessonGenModel
     : "claude-haiku-4-5",
+  // lesson_tts uses OpenAI's gpt-4o-mini-tts (TTS, not an LLM). The actual
+  // model string is recorded directly when logging telemetry; this map entry
+  // is just a typesafety placeholder pointing at OpenAI.
+  lesson_tts: "gpt-5.4-nano",
 };
 
 /**
@@ -157,6 +164,7 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
     lesson_outline: 3,
     lesson_edit: 30,
     lesson_gen: 5,
+    lesson_tts: 50,
   },
   pro: {
     quiz_gen: 200,
@@ -168,6 +176,7 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
     lesson_outline: 50,
     lesson_edit: 600,
     lesson_gen: 100,
+    lesson_tts: 500,
   },
   studio: {
     quiz_gen: 1000,
@@ -179,6 +188,7 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
     lesson_outline: 300,
     lesson_edit: 3000,
     lesson_gen: 500,
+    lesson_tts: 3000,
   },
 };
 

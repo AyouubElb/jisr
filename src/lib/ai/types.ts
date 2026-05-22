@@ -17,6 +17,7 @@ export const AI_FEATURES = [
   "lesson_outline",
   "lesson_edit",
   "lesson_gen",
+  "lesson_tts",
 ] as const;
 export type AIFeature = (typeof AI_FEATURES)[number];
 

@@ -14,12 +14,13 @@ import { computeCostCents } from "../cost";
 import { logGeneration } from "../telemetry";
 import type { Database } from "@/lib/types/database";
 
-const JUDGE_MODEL_KEY = "claude-haiku-4-5" as const;
+// Cross-model judging: generator is Claude, judge is OpenAI.
+const JUDGE_MODEL_KEY = "gpt-5.4-mini" as const;
 const RUBRIC_KEY = "quiz_gen_v2";
 
 /**
  * Runs the LLM judge on a completed quiz generation and stores the result
- * in ai_evaluations with evaluator_type = "llm_judge".
+ * in generation_evaluations with evaluator_type = "llm_judge".
  *
  * Never throws — caller uses fire-and-forget. All errors are logged only.
  */
@@ -54,6 +55,10 @@ export const judgeAndStoreQuizEval = async ({
   let schemaValid = false;
   let errorMessage: string | null = null;
 
+  console.log(
+    `[quiz-judge] === INPUT === model: ${JUDGE_MODEL_KEY} (${provider}) | prompt: ${promptVersion} | rubric: ${RUBRIC_KEY} | level: ${context.courseLevel} | evaluating gen: ${generationId}`,
+  );
+
   try {
     const result = await generateObject({
       model,
@@ -76,8 +81,9 @@ export const judgeAndStoreQuizEval = async ({
       cacheReadTokens: result.usage.inputTokenDetails?.cacheReadTokens ?? null,
     };
     console.log(
-      `[quiz-judge] latency: ${latencyMs}ms | input: ${usage.inputTokens} | output: ${usage.outputTokens} | cache_read: ${usage.cacheReadTokens}`,
+      `[quiz-judge] === OUTPUT === model: ${JUDGE_MODEL_KEY} | latency: ${latencyMs}ms | schema_valid: ${schemaValid} | input: ${usage.inputTokens} | output: ${usage.outputTokens} | cache_read: ${usage.cacheReadTokens}`,
     );
+    console.log(`[quiz-judge] scores:\n${JSON.stringify(scores, null, 2)}`);
   } catch (err) {
     latencyMs = Date.now() - startedAt;
     errorMessage = err instanceof Error ? err.message : String(err);
@@ -114,18 +120,28 @@ export const judgeAndStoreQuizEval = async ({
 
   if (!scores) return;
 
-  const { notes, ...scoreFields } = scores;
+  const { notes, observed_blocks, mix_check, ...scoreFields } = scores;
   const cleanScores = Object.fromEntries(
     Object.entries(scoreFields).filter(([, v]) => v !== null),
   );
 
-  const { error } = await supabase.from("ai_evaluations").insert({
+  // Prefix observed_blocks + mix_check into notes so the admin panel renders
+  // them inline. Keeps `scores` purely numeric/boolean for the eval form.
+  const composedNotes = [
+    `OBSERVED BLOCKS:\n${observed_blocks}`,
+    `MIX CHECK:\n${mix_check}`,
+    notes ? `NOTES:\n${notes}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const { error } = await supabase.from("generation_evaluations").insert({
     generation_id: generationId,
     evaluator_id: null,
     evaluator_type: "llm_judge",
     rubric_key: RUBRIC_KEY,
     scores: cleanScores,
-    notes,
+    notes: composedNotes,
   });
 
   if (error) {

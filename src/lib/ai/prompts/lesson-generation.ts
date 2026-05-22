@@ -4,16 +4,15 @@
  * re-reads it at home. PEDAGOGY.md §3.1.
  *
  * Templates branch on level (PEDAGOGY §3.3):
- * - A1/A2 → simple, pattern-driven, no metalanguage, per-word Say/Not pairs
+ * - A1/A2 → simple, pattern-driven, no metalanguage, per-pattern Say/Not pairs (grammar only)
  * - B1+   → documentation pattern (definition → use → form → examples → CM → check)
  *
- * All pedagogy blocks (CEFR rules, L1 interference, templates, self-check)
- * are imported from lesson-pedagogy.ts — single source of truth shared with
- * lesson-edit so the two agents never drift.
+ * All pedagogy blocks (CEFR rules, templates, self-check) are imported from
+ * lesson-pedagogy.ts — single source of truth shared with lesson-edit so the
+ * two agents never drift.
  */
 import {
   CEFR_LESSON_RULES,
-  FRENCH_L1_INTERFERENCE,
   LESSON_SELF_CHECK,
   A1_A2_TEMPLATES,
   B1_PLUS_TEMPLATES,
@@ -33,11 +32,10 @@ export interface LessonGenContext {
   scope: string;
   depth: LessonDepth;
   includeExercises: boolean;
-  includeFrenchSupport: boolean;
   theme?: string;
 }
 
-export const LESSON_GEN_SYSTEM_PROMPT = `You generate a STUDENT REVISION DOCUMENT in HTML for an English lesson. The reader is a Moroccan student (French L1) who will re-read this at home AFTER the live class. You are NOT writing a lesson plan for a teacher.
+export const LESSON_GEN_SYSTEM_PROMPT = `You generate a STUDENT REVISION DOCUMENT in HTML for an English lesson. The reader is a Moroccan student who will re-read this at home AFTER the live class. You are NOT writing a lesson plan for a teacher.
 
 OUTPUT shape (always valid JSON, no markdown fences, no prose outside JSON):
 {
@@ -50,10 +48,10 @@ HARD RULES for new_content:
 2. Allowed tags: <h1> <h2> <h3> <h4> <p> <ul> <ol> <li> <strong> <em> <u> <s> <a> <br> <hr> <blockquote> <code> <pre> <span> (with optional style for color). Drop anything else.
 3. Use <h2> for section titles (What is it, When to use it, How to form it, Examples, Common mistakes, Quick check, etc.).
 4. Use <h3> for sub-sections inside a long section if depth = "detailed". Skip <h3> for "quick".
-5. Every example sentence MUST be wrapped in its OWN <blockquote> — one example per blockquote, never multiple. Do NOT add quotation marks ("…", «…», "…") around example text. Translations or hints in French go inside the same <blockquote> on a new line via <br>.
-6. NEVER include placeholder text like "[à compléter]", "...", "TBD", "TODO". If you cannot fulfil the request fully, fill the sections with the best content you can produce.
+5. Every example sentence MUST be wrapped in its OWN <blockquote> — one example per blockquote, never multiple. Do NOT add quotation marks ("…", «…», "…") around example text. Lessons are pure English — NO translations into other languages.
+6. NEVER include placeholder text like "...", "TBD", "TODO". If you cannot fulfil the request fully, fill the sections with the best content you can produce.
 7. NO <h1> as the title — the lesson title is shown above the content by the editor. Start directly with the first <h2>.
-8. NO closing remarks like "I hope this helps" or "Bonne révision !". The document is reference material, not a letter.
+8. NO closing remarks like "I hope this helps". The document is reference material, not a letter.
 
 ═══════════════════════════════════════════════════════════════════
 TEMPLATE — depends on level
@@ -74,12 +72,6 @@ CEFR LEVEL RULES
 ${CEFR_LESSON_RULES}
 
 ═══════════════════════════════════════════════════════════════════
-COMMON MISTAKES — FRENCH INTERFERENCE
-═══════════════════════════════════════════════════════════════════
-
-${FRENCH_L1_INTERFERENCE}
-
-═══════════════════════════════════════════════════════════════════
 DEPTH RULES
 ═══════════════════════════════════════════════════════════════════
 
@@ -94,20 +86,6 @@ depth = "detailed":
 - Each <h2> section: thorough explanation, multiple paragraphs OR multiple <ul> blocks.
 - Aim for ~500-900 words total.
 - Examples: 5-8 for grammar, 10-15 entries for vocabulary.
-
-═══════════════════════════════════════════════════════════════════
-FRENCH SUPPORT
-═══════════════════════════════════════════════════════════════════
-
-includeFrenchSupport = true:
-- Translations or hints in French inside <blockquote>s on a new line via <br>.
-- French interference notes in "Common mistakes" with explicit FR vs EN contrast.
-
-includeFrenchSupport = false:
-- No French translations inside examples.
-- "Common mistakes" still mentions FR interference if it is the obvious source of an error, but in English only.
-
-If level is A1 or A2 and includeFrenchSupport is false, still flag the most dangerous false friends in English ("'actually' does NOT mean 'actuellement' — it means 'in fact'.").
 
 ═══════════════════════════════════════════════════════════════════
 EXERCISES (Quick check)
@@ -167,7 +145,6 @@ Lesson type: ${ctx.lessonType}
 Scope: ${ctx.scope}
 Depth: ${ctx.depth}
 Include exercises: ${ctx.includeExercises ? "yes" : "no"}
-Include French support (translations + contrastive notes): ${ctx.includeFrenchSupport ? "yes" : "no"}
 ${themeLine}
 
 ═══════════════════════════════════════════════════════════════════
