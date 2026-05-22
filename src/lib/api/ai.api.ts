@@ -73,7 +73,6 @@ export interface GenerateLessonInput {
   scope: string;
   depth: "quick" | "detailed";
   includeExercises: boolean;
-  includeFrenchSupport: boolean;
   theme?: string;
 }
 
@@ -103,6 +102,46 @@ export type ProposeLessonEditResponse =
       newContent: string;
       diffHtml: string;
     };
+
+export interface LessonAudioInput {
+  lessonId: string;
+}
+
+export interface LessonAudioLine {
+  speaker: string;
+  text: string;
+  voice: string;
+  hash: string;
+  audioUrl: string;
+  cacheHit: boolean;
+}
+
+export interface LessonAudioEntry {
+  kind: "sentence" | "conversation";
+  key: string;
+  hash?: string;
+  text?: string;
+  audioUrl?: string;
+  cacheHit?: boolean;
+  /** Conversations only — one entry per line, ordered. */
+  lines?: LessonAudioLine[];
+}
+
+export interface LessonAudioResponse {
+  entries: LessonAudioEntry[];
+  generated: number;
+  reused: number;
+}
+
+export interface GradeAttemptInput {
+  attemptId: string;
+}
+
+export interface GradeAttemptResponse {
+  attemptId: string;
+  gradedBlockIds: string[];
+  skipped: { blockId: string; reason: string }[];
+}
 
 export const aiApi = {
   resolveGeneration: async (
@@ -233,6 +272,55 @@ export const aiApi = {
     }
 
     return (await res.json()) as GenerateQuizResponse;
+  },
+
+  synthesizeLessonAudio: async (
+    input: LessonAudioInput,
+  ): Promise<LessonAudioResponse> => {
+    const res = await fetch("/api/ai/lesson-audio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      throw new Error(payload?.error ?? "La génération audio a échoué");
+    }
+    return (await res.json()) as LessonAudioResponse;
+  },
+
+  fetchLessonAudio: async (
+    input: LessonAudioInput,
+  ): Promise<LessonAudioResponse> => {
+    const res = await fetch(
+      `/api/ai/lesson-audio?lessonId=${encodeURIComponent(input.lessonId)}`,
+    );
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      throw new Error(payload?.error ?? "Chargement audio échoué");
+    }
+    return (await res.json()) as LessonAudioResponse;
+  },
+
+  gradeAttempt: async (
+    input: GradeAttemptInput,
+  ): Promise<GradeAttemptResponse> => {
+    const res = await fetch("/api/ai/grade-attempt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+      throw new Error(payload?.error ?? "La correction IA a échoué");
+    }
+    return (await res.json()) as GradeAttemptResponse;
   },
 
   getMyUsage: async (): Promise<MonthlyUsageSummary> => {

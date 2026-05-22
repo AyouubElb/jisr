@@ -14,6 +14,7 @@ import { lessonImagesApi, LessonImageUploadError } from "@/lib/api/lesson-images
 import { toast } from "sonner";
 import { FontSize } from "@/lib/extensions/font-size";
 import { DiffDelete, DiffInsert } from "@/lib/extensions/diff-marks";
+import { ConversationBlock } from "@/lib/extensions/conversation-block";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -155,6 +156,7 @@ export function RichTextEditor({
       }).configure({ inline: false, allowBase64: false }),
       DiffDelete,
       DiffInsert,
+      ConversationBlock,
     ],
     content: isDiffMode ? diffContent : content,
     editorProps: {

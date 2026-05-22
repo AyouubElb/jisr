@@ -40,6 +40,7 @@ const FEATURE_LABELS: Record<AIFeature, string> = {
   lesson_outline: "Lesson outlines",
   lesson_edit: "Lesson edits (AI)",
   lesson_gen: "Lesson generations",
+  lesson_tts: "Lesson audio (TTS)",
 };
 
 // Hidden from the UI — internal/system features that aren't user-driven.

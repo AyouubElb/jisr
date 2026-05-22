@@ -39,6 +39,30 @@ const cacheKey = (script: string, voiceId: string, speed: number): string =>
     .update(`${voiceId}|${speed}|${script}`)
     .digest("hex");
 
+// Retries the TTS provider call only — cache/storage are local to Supabase.
+// Waits 5s before attempt 2, 10s before attempt 3. Total worst case ~15s.
+const RETRY_DELAYS_MS = [5000, 10000];
+const callProviderWithRetry = async (
+  req: Parameters<typeof synthesizeWithOpenAI>[0],
+): Promise<Awaited<ReturnType<typeof synthesizeWithOpenAI>>> => {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length + 1; attempt++) {
+    try {
+      return await synthesizeWithOpenAI(req);
+    } catch (err) {
+      lastErr = err;
+      const delay = RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) break;
+      console.warn(
+        `[ai.tts] provider attempt ${attempt + 1} failed, retrying in ${delay}ms | error:`,
+        err instanceof Error ? err.message : err,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+};
+
 export const synthesizeSpeech = async (
   args: SynthesizeArgs,
 ): Promise<SynthesizeResult> => {
@@ -72,9 +96,9 @@ export const synthesizeSpeech = async (
     };
   }
 
-  // ── 2. TTS provider call ─────────────────────────────────────────────
+  // ── 2. TTS provider call (with retry) ────────────────────────────────
   const providerStart = Date.now();
-  const tts = await synthesizeWithOpenAI({
+  const tts = await callProviderWithRetry({
     script: args.script,
     voiceId,
     speed,

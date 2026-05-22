@@ -28,6 +28,7 @@ import {
 } from "@/lib/hooks/useCompletions";
 import { useMyCourseAttempts } from "@/lib/hooks/useAttempts";
 import { useLessonMaterials } from "@/lib/hooks/useMaterials";
+import { useLessonAudio } from "@/lib/hooks/useLessonAudio";
 import { materialsApi } from "@/lib/api/materials.api";
 import { toast } from "sonner";
 import type { Lesson, QuizWithBlocks } from "@/lib/types";
@@ -60,6 +61,7 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
   const { data: attempts } = useMyCourseAttempts(courseId);
   const { data: materials, isLoading: materialsLoading } =
     useLessonMaterials(lessonId);
+  const { data: lessonAudio } = useLessonAudio(lessonId);
   const { mutate: markComplete, isPending: marking } =
     useMarkLessonComplete(courseId);
 
@@ -316,7 +318,11 @@ export default function StudentLessonViewerPage(): React.JSX.Element {
 
       {/* Body */}
       {lesson.content ? (
-        <RichTextViewer content={lesson.content} className="print:text-black" />
+        <RichTextViewer
+          content={lesson.content}
+          audioEntries={lessonAudio?.entries}
+          className="print:text-black"
+        />
       ) : (
         <div className="rounded-lg border border-dashed border-border p-8 text-center">
           <p className="text-sm text-muted-foreground">

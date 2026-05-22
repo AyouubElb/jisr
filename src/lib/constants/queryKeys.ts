@@ -30,6 +30,7 @@ export const lessonKeys = {
   bySection: (sectionId: string) => [...lessonKeys.all, "section", sectionId] as const,
   details: () => [...lessonKeys.all, "detail"] as const,
   detail: (id: string) => [...lessonKeys.details(), id] as const,
+  audio: (id: string) => [...lessonKeys.all, "audio", id] as const,
 };
 
 export const materialKeys = {
@@ -107,6 +108,8 @@ export const aiAdminKeys = {
   generation: (id: string) => [...aiAdminKeys.all, "generation", id] as const,
   evaluation: (generationId: string) =>
     [...aiAdminKeys.all, "evaluation", generationId] as const,
+  agreement: (rubricKey: string) =>
+    [...aiAdminKeys.all, "agreement", rubricKey] as const,
 };
 
 export const aiUsageKeys = {

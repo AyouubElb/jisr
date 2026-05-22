@@ -35,6 +35,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { LessonAIEditChat } from "@/components/course/lesson/lesson-ai-edit-chat";
 import { LessonAIGenerateDialog } from "@/components/course/lesson/lesson-ai-generate-dialog";
 import { useLesson, useUpdateLesson } from "@/lib/hooks/useLessons";
+import { useSynthesizeLessonAudio } from "@/lib/hooks/useLessonAudio";
 import { useCourse } from "@/lib/hooks/useCourses";
 // import { useAutosave } from "@/lib/hooks/useAutosave"; // disabled — see hook call below
 import {
@@ -60,6 +61,7 @@ export default function LessonEditPage(): React.JSX.Element {
   const { data: course } = useCourse(courseId);
   const { mutate: updateLesson, isPending: isSaving } =
     useUpdateLesson(courseId);
+  const { mutate: synthesizeAudio } = useSynthesizeLessonAudio();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -185,6 +187,8 @@ export default function LessonEditPage(): React.JSX.Element {
       { id: lessonId, updates: data },
       {
         onSuccess: () => {
+          // Fire-and-forget: audio gen is idempotent (cache-keyed by hash).
+          synthesizeAudio({ lessonId });
           router.push(`/instructor/courses/${courseId}`);
         },
       },
