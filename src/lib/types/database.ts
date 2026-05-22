@@ -510,6 +510,13 @@ export type Database = {
           earned_weight: number | null;
           instructor_feedback: string | null;
           graded_at: string | null;
+          ai_score: number | null;
+          ai_is_correct: boolean | null;
+          ai_rationale: string | null;
+          ai_errors: Record<string, unknown> | null;
+          ai_graded_at: string | null;
+          ai_model: string | null;
+          ai_prompt_version: string | null;
           created_at: string;
         };
         Insert: {
@@ -521,6 +528,13 @@ export type Database = {
           earned_weight?: number | null;
           instructor_feedback?: string | null;
           graded_at?: string | null;
+          ai_score?: number | null;
+          ai_is_correct?: boolean | null;
+          ai_rationale?: string | null;
+          ai_errors?: Record<string, unknown> | null;
+          ai_graded_at?: string | null;
+          ai_model?: string | null;
+          ai_prompt_version?: string | null;
           created_at?: string;
         };
         Update: {
@@ -532,6 +546,13 @@ export type Database = {
           earned_weight?: number | null;
           instructor_feedback?: string | null;
           graded_at?: string | null;
+          ai_score?: number | null;
+          ai_is_correct?: boolean | null;
+          ai_rationale?: string | null;
+          ai_errors?: Record<string, unknown> | null;
+          ai_graded_at?: string | null;
+          ai_model?: string | null;
+          ai_prompt_version?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -809,7 +830,7 @@ export type Database = {
           }
         ];
       };
-      ai_evaluations: {
+      generation_evaluations: {
         Row: {
           id: string;
           created_at: string;
@@ -903,7 +924,22 @@ export type Database = {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      generation_eval_agreement: {
+        Row: {
+          generation_id: string;
+          rubric_key: string;
+          human_scores: Record<string, unknown>;
+          human_notes: string | null;
+          human_evaluator_id: string | null;
+          human_updated_at: string;
+          judge_scores: Record<string, unknown>;
+          judge_notes: string | null;
+          judge_updated_at: string;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       touch_enrollment_activity: {
         Args: { p_course_id: string };

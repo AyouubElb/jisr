@@ -32,10 +32,15 @@ export function GradingInbox(): React.JSX.Element {
   const [filter, setFilter] = useState<Filter>("pending");
   const [courseId, setCourseId] = useState<string>("all");
   const [studentId, setStudentId] = useState<string>("all");
-  const [selected, setSelected] = useState<GradingAttempt | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [paneOpen, setPaneOpen] = useState(false);
 
   const { data: attempts, isLoading } = useGradingInbox(filter);
+
+  const selected = useMemo(
+    () => attempts?.find((a) => a.attempt_id === selectedId) ?? null,
+    [attempts, selectedId],
+  );
 
   const courseOptions = useMemo(() => {
     if (!attempts) return [];
@@ -106,7 +111,7 @@ export function GradingInbox(): React.JSX.Element {
   }, [attempts, courseId, studentId]);
 
   const openAttempt = (a: GradingAttempt): void => {
-    setSelected(a);
+    setSelectedId(a.attempt_id);
     setPaneOpen(true);
   };
 

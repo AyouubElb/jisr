@@ -4,6 +4,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { attemptKeys, enrollmentKeys } from "@/lib/constants/queryKeys";
 import { attemptsApi } from "@/lib/api/attempts.api";
 import type { SubmittedAnswerInput } from "@/lib/api/attempts.api";
+import { aiApi } from "@/lib/api/ai.api";
+import type {
+  GradeAttemptInput,
+  GradeAttemptResponse,
+} from "@/lib/api/ai.api";
 import { completionsApi } from "@/lib/api/completions.api";
 import { toast } from "sonner";
 import type { QuizBlock } from "@/lib/types";
@@ -141,6 +146,33 @@ export function useGradeAttempt() {
     },
     onError: (error: Error) => {
       toast.error(`Erreur : ${error.message}`);
+    },
+  });
+}
+
+/**
+ * AI suggestion pass — calls the student_grade agent on every free_text and
+ * voice answer in one attempt. Writes ai_* columns only; the instructor still
+ * has to accept or override before final_score moves.
+ */
+export function useGradeAttemptAI() {
+  const queryClient = useQueryClient();
+
+  return useMutation<GradeAttemptResponse, Error, GradeAttemptInput>({
+    mutationFn: aiApi.gradeAttempt,
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: attemptKeys.all });
+      const n = res.gradedBlockIds.length;
+      if (n === 0) {
+        toast.info("Aucune réponse à corriger par l'IA");
+        return;
+      }
+      toast.success(
+        `IA : ${n} réponse${n > 1 ? "s notées" : " notée"} — vérifiez avant d'enregistrer`,
+      );
+    },
+    onError: (error) => {
+      toast.error(`Correction IA : ${error.message}`);
     },
   });
 }

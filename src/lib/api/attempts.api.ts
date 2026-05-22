@@ -40,6 +40,17 @@ export interface GradingAttempt {
   pending_count: number;
 }
 
+export interface AIErrorEntry {
+  span: string;
+  kind: "grammar" | "vocab" | "spelling" | "l1_calque" | "register" | "off_topic";
+  fix: string;
+}
+
+export interface AIGradePayload {
+  items: AIErrorEntry[];
+  instructor_note: string | null;
+}
+
 export interface GradingAnswer {
   id: string;
   block_id: string;
@@ -48,6 +59,11 @@ export interface GradingAnswer {
   earned_weight: number | null;
   instructor_feedback: string | null;
   graded_at: string | null;
+  ai_score: number | null;
+  ai_is_correct: boolean | null;
+  ai_rationale: string | null;
+  ai_errors: AIGradePayload | null;
+  ai_graded_at: string | null;
 }
 
 /**
@@ -347,7 +363,8 @@ export const attemptsApi = {
         ),
         student_answers(
           id, block_id, answer, is_correct, earned_weight,
-          instructor_feedback, graded_at
+          instructor_feedback, graded_at,
+          ai_score, ai_is_correct, ai_rationale, ai_errors, ai_graded_at
         )
         `,
       )
@@ -625,7 +642,8 @@ export const attemptsApi = {
         ),
         student_answers(
           id, block_id, answer, is_correct, earned_weight,
-          instructor_feedback, graded_at
+          instructor_feedback, graded_at,
+          ai_score, ai_is_correct, ai_rationale, ai_errors, ai_graded_at
         )
         `,
       )

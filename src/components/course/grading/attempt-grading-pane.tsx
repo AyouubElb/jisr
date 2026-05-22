@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { LEVEL_BADGE_COLORS } from "@/lib/constants/levels";
-import { useGradeAttempt } from "@/lib/hooks/useAttempts";
+import { useGradeAttempt, useGradeAttemptAI } from "@/lib/hooks/useAttempts";
 import { isManualBlock, type BlockType } from "@/lib/schemas/quiz.schema";
 import type { GradingAnswer, GradingAttempt } from "@/lib/api/attempts.api";
 import type { CEFRLevel, QuizBlock } from "@/lib/types";
@@ -49,6 +49,7 @@ export function AttemptGradingPane({
   onOpenChange,
 }: AttemptGradingPaneProps): React.JSX.Element {
   const { mutate: gradeAttempt, isPending } = useGradeAttempt();
+  const { mutate: gradeWithAI, isPending: isAIPending } = useGradeAttemptAI();
 
   const answersByBlock = useMemo(() => {
     const m = new Map<string, GradingAnswer>();
@@ -144,6 +145,28 @@ export function AttemptGradingPane({
                 <span className="truncate">{attempt.quiz_title}</span>
               </div>
               <AttemptSummary attempt={attempt} />
+              <div className="mt-3 flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="border-violet-300 bg-violet-50 text-violet-900 hover:bg-violet-100"
+                  onClick={() =>
+                    gradeWithAI({ attemptId: attempt.attempt_id })
+                  }
+                  disabled={isPending || isAIPending}
+                >
+                  {isAIPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  Suggérer les notes avec l&apos;IA
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Suggestions seulement — vous validez chaque note.
+                </span>
+              </div>
             </SheetHeader>
 
             <div className="space-y-3 px-4 py-4">
@@ -300,6 +323,7 @@ function BlockView({
               blockId={block.id}
               modelAnswer={block.model_answer}
               gradingNotes={block.grading_notes}
+              aiSuggestion={aiSuggestionFromAnswer(answer)}
             />
           </>
         )}
@@ -315,12 +339,34 @@ function BlockView({
               blockId={block.id}
               modelAnswer={block.model_answer}
               gradingNotes={block.grading_notes}
+              aiSuggestion={aiSuggestionFromAnswer(answer)}
             />
           </>
         )}
       </CardContent>
     </Card>
   );
+}
+
+interface AISuggestion {
+  score: number;
+  isCorrect: boolean;
+  rationale: string;
+  errors: { span: string; kind: string; fix: string }[];
+  instructorNote: string | null;
+}
+
+function aiSuggestionFromAnswer(
+  answer: GradingAnswer | null,
+): AISuggestion | null {
+  if (!answer || answer.ai_score === null) return null;
+  return {
+    score: Number(answer.ai_score),
+    isCorrect: answer.ai_is_correct ?? false,
+    rationale: answer.ai_rationale ?? "",
+    errors: answer.ai_errors?.items ?? [],
+    instructorNote: answer.ai_errors?.instructor_note ?? null,
+  };
 }
 
 function GradeForm({
@@ -331,6 +377,7 @@ function GradeForm({
   blockId,
   modelAnswer,
   gradingNotes,
+  aiSuggestion,
 }: {
   weight: number;
   draft: GradeDraft | undefined;
@@ -339,9 +386,20 @@ function GradeForm({
   blockId: string;
   modelAnswer: string | null;
   gradingNotes: string | null;
+  aiSuggestion: AISuggestion | null;
 }): React.JSX.Element | null {
   if (!draft) return null;
   const error = scoreError(draft.score, weight);
+
+  const handleAcceptAI = (): void => {
+    if (!aiSuggestion) return;
+    const mappedScore = (aiSuggestion.score / 10) * weight;
+    onChange({
+      score: String(Math.round(mappedScore * 10) / 10),
+      feedback: aiSuggestion.rationale,
+    });
+  };
+
   return (
     <div className="space-y-3 rounded-md border bg-amber-50/40 p-3">
       {(modelAnswer || gradingNotes) && (
@@ -363,6 +421,15 @@ function GradeForm({
             </details>
           )}
         </div>
+      )}
+
+      {aiSuggestion && (
+        <AISuggestionCard
+          suggestion={aiSuggestion}
+          weight={weight}
+          onAccept={handleAcceptAI}
+          disabled={disabled}
+        />
       )}
 
       <div className="grid gap-2">
@@ -414,4 +481,84 @@ function scoreError(rawScore: string, weight: number): string | null {
   if (parsed < 0) return "La note ne peut pas etre negative";
   if (parsed > weight) return `La note ne peut pas depasser ${weight}`;
   return null;
+}
+
+function AISuggestionCard({
+  suggestion,
+  weight,
+  onAccept,
+  disabled,
+}: {
+  suggestion: AISuggestion;
+  weight: number;
+  onAccept: () => void;
+  disabled: boolean;
+}): React.JSX.Element {
+  const mapped = Math.round(((suggestion.score / 10) * weight) * 10) / 10;
+  return (
+    <div className="space-y-2 rounded-md border border-violet-300 bg-violet-50/60 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-3.5 w-3.5 text-violet-700" />
+          <span className="text-xs font-semibold uppercase tracking-wide text-violet-900">
+            Suggestion IA
+          </span>
+          <Badge variant="outline" className="border-violet-400 text-violet-900">
+            {mapped} / {weight}
+          </Badge>
+          <Badge
+            variant="outline"
+            className={
+              suggestion.isCorrect
+                ? "border-emerald-400 text-emerald-700"
+                : "border-rose-400 text-rose-700"
+            }
+          >
+            {suggestion.isCorrect ? "Acquis" : "Non acquis"}
+          </Badge>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 border-violet-400 bg-white text-violet-900 hover:bg-violet-100"
+          onClick={onAccept}
+          disabled={disabled}
+        >
+          Accepter
+        </Button>
+      </div>
+
+      {suggestion.rationale && (
+        <p className="whitespace-pre-wrap text-sm text-amber-950">
+          {suggestion.rationale}
+        </p>
+      )}
+
+      {suggestion.errors.length > 0 && (
+        <ul className="space-y-1 text-xs">
+          {suggestion.errors.map((e, idx) => (
+            <li
+              key={idx}
+              className="rounded border border-violet-200 bg-white/70 px-2 py-1"
+            >
+              <span className="font-semibold text-violet-900">
+                {e.kind}
+              </span>
+              <span className="text-muted-foreground"> — </span>
+              <span className="text-amber-950">&ldquo;{e.span}&rdquo;</span>
+              <span className="text-muted-foreground"> → </span>
+              <span className="text-amber-950">{e.fix}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {suggestion.instructorNote && (
+        <p className="rounded border border-amber-200 bg-amber-50/80 px-2 py-1 text-xs italic text-amber-900">
+          Note pour vous : {suggestion.instructorNote}
+        </p>
+      )}
+    </div>
+  );
 }
