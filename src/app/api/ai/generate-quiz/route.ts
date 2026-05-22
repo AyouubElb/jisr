@@ -14,6 +14,7 @@ import {
   AICostBudgetExceededError,
   AIQuotaExceededError,
 } from "@/lib/ai/types";
+import { AITimeoutError } from "@/lib/ai/timeout";
 import {
   QUIZ_GEN_MAX_LESSONS,
   QUIZ_GEN_MAX_DIRECT_QUESTIONS,
@@ -91,6 +92,15 @@ export async function POST(req: Request): Promise<Response> {
       err instanceof AICostBudgetExceededError
     ) {
       return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    if (err instanceof AITimeoutError) {
+      return NextResponse.json(
+        {
+          error:
+            "The AI took too long to respond. Try again, or generate a smaller quiz (fewer questions or one passage at a time).",
+        },
+        { status: 408 },
+      );
     }
     if (err instanceof QuizGenerationFailedError) {
       return NextResponse.json(

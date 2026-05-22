@@ -11,6 +11,7 @@ import {
   AIGenerationError,
   AIQuotaExceededError,
 } from "@/lib/ai/types";
+import { AITimeoutError } from "@/lib/ai/timeout";
 import { aiLimiter, enforceRateLimit } from "@/lib/services/rate-limit.service";
 
 const Body = z.object({
@@ -61,6 +62,15 @@ export async function POST(req: Request): Promise<Response> {
       err instanceof AICostBudgetExceededError
     ) {
       return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    if (err instanceof AITimeoutError) {
+      return NextResponse.json(
+        {
+          error:
+            "The AI took too long to respond. Try a simpler instruction, or edit one section at a time.",
+        },
+        { status: 408 },
+      );
     }
     if (err instanceof AIGenerationError) {
       return NextResponse.json(

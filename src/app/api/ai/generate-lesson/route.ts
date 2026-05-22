@@ -11,6 +11,7 @@ import {
   AIGenerationError,
   AIQuotaExceededError,
 } from "@/lib/ai/types";
+import { AITimeoutError } from "@/lib/ai/timeout";
 import { aiLimiter, enforceRateLimit } from "@/lib/services/rate-limit.service";
 
 const Body = z.object({
@@ -18,7 +19,6 @@ const Body = z.object({
   scope: z.string().min(3).max(500),
   depth: z.enum(["quick", "detailed"]),
   includeExercises: z.boolean(),
-  includeFrenchSupport: z.boolean(),
   theme: z.string().max(200).optional(),
 });
 
@@ -63,6 +63,15 @@ export async function POST(req: Request): Promise<Response> {
       err instanceof AICostBudgetExceededError
     ) {
       return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    if (err instanceof AITimeoutError) {
+      return NextResponse.json(
+        {
+          error:
+            "The AI took too long to respond. Try again with Quick depth, or shorten the scope.",
+        },
+        { status: 408 },
+      );
     }
     if (err instanceof AIGenerationError) {
       return NextResponse.json(

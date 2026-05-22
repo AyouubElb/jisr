@@ -5,6 +5,7 @@ import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
 import { DEFAULT_MODEL } from "@/lib/ai/constants";
+import { withTimeout, LLM_TIMEOUT_MS } from "@/lib/ai/timeout";
 import { normalizeHtml } from "@/lib/ai/html-normalize";
 import type { CEFRLevel } from "@/lib/types";
 
@@ -107,18 +108,19 @@ export const proposeLessonEdit = async (
     `[ai/edit-lesson] → request | lesson="${lesson.title}" (${course.level}) | instruction="${input.instruction}" | currentContent=${currentContent.length} chars | history=${(input.chatHistory ?? "").length} chars`,
   );
 
-  // ── LLM call (throws AIGenerationError on failure) ─────────────────
-  // The generator splits the lesson into numbered blocks, runs the model,
-  // applies the block ops, and returns the new HTML + diff.
-  const result = await runLessonEdit({
-    courseTitle: course.title,
-    courseLevel: course.level,
-    lessonTitle: lesson.title,
-    lessonType: lesson.type as "grammar" | "vocabulary" | "resource",
-    currentContent,
-    chatHistory: input.chatHistory ?? "",
-    instruction: input.instruction,
-  });
+  // ── LLM call (one attempt, 45s hard cap) ───────────────────────────
+  const result = await withTimeout(
+    runLessonEdit({
+      courseTitle: course.title,
+      courseLevel: course.level,
+      lessonTitle: lesson.title,
+      lessonType: lesson.type as "grammar" | "vocabulary" | "resource",
+      currentContent,
+      chatHistory: input.chatHistory ?? "",
+      instruction: input.instruction,
+    }),
+    LLM_TIMEOUT_MS,
+  );
 
   const totalMs = Date.now() - requestStartedAt;
   const tokens = result.usage;

@@ -2,12 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { generateQuiz } from "@/lib/ai/generators/quiz.generator";
 import { generatePassageQuestions } from "@/lib/ai/generators/passage-questions.generator";
+import { judgeAndStoreQuizEval } from "@/lib/ai/generators/quiz-judge.generator";
 import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
 import { synthesizeSpeech } from "@/lib/ai/tts/synthesize";
 import { stripLessonHtml } from "@/lib/extensions/lesson-html";
 import { AIGenerationError } from "@/lib/ai/types";
+import { AITimeoutError, withTimeout, LLM_TIMEOUT_MS } from "@/lib/ai/timeout";
 import { TTSError } from "@/lib/ai/tts/types";
 import { DEFAULT_MODEL, MODELS, PROMPT_VERSIONS, VOICE_BY_HINT, DEFAULT_VOICE } from "@/lib/ai/constants";
 import type { QuizGenPromptContext } from "@/lib/ai/prompts/quiz-generation";
@@ -117,35 +119,6 @@ export interface GenerateQuizResult {
 // ── Constants ──────────────────────────────────────────────────────────
 // Reject lessons whose content would balloon the prompt and risk a timeout.
 const MAX_LESSON_CONTENT_CHARS = 12000;
-
-// Bound the worst-case LLM hang. Two attempts at 30s = 60s, fits Vercel Hobby.
-const MAIN_LLM_TIMEOUT_MS = 30000;
-const MAX_MAIN_LLM_ATTEMPTS = 2;
-
-
-// ── Private helpers ────────────────────────────────────────────────────
-class LLMTimeoutError extends Error {
-  constructor(public ms: number) {
-    super(`LLM call exceeded ${ms}ms`);
-    this.name = "LLMTimeoutError";
-  }
-}
-
-const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-  return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new LLMTimeoutError(ms)), ms);
-    promise.then(
-      (v) => {
-        clearTimeout(t);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(t);
-        reject(e);
-      },
-    );
-  });
-};
 
 // Flat AI option list → rich UI/DB shape. Duplicated in quiz-edit.service.
 // Both will fold into a shared mapper at agent #3 — see AI-AGENTS.md.
@@ -262,43 +235,30 @@ export const generateQuizForSection = async (
   };
 
   let result: Awaited<ReturnType<typeof generateQuiz>> | undefined;
-  let attempts = 0;
-  let lastErr: unknown;
-  while (attempts < MAX_MAIN_LLM_ATTEMPTS) {
-    attempts++;
-    const attemptStart = Date.now();
-    try {
-      result = await withTimeout(
-        generateQuiz({ context: promptContext }),
-        MAIN_LLM_TIMEOUT_MS,
-      );
-      console.log(
-        `[ai/generate-quiz] main LLM call latency: ${result.latencyMs}ms (attempt ${attempts}/${MAX_MAIN_LLM_ATTEMPTS})`,
-      );
-      lastErr = undefined;
-      break;
-    } catch (err) {
-      lastErr = err;
-      const elapsed = Date.now() - attemptStart;
-      const isTimeout = err instanceof LLMTimeoutError;
-      console.warn(
-        `[ai/generate-quiz] attempt ${attempts}/${MAX_MAIN_LLM_ATTEMPTS} failed after ${elapsed}ms` +
-          (isTimeout ? " [timeout]" : ""),
-      );
-      if (attempts < MAX_MAIN_LLM_ATTEMPTS) {
-        console.warn("[ai/generate-quiz] retrying...");
-      }
-    }
-  }
-
-  if (!result) {
+  const attemptStart = Date.now();
+  try {
+    result = await withTimeout(
+      generateQuiz({ context: promptContext }),
+      LLM_TIMEOUT_MS,
+    );
+    console.log(
+      `[ai/generate-quiz] main LLM call latency: ${result.latencyMs}ms`,
+    );
+  } catch (err) {
+    const elapsed = Date.now() - attemptStart;
+    const isTimeout = err instanceof AITimeoutError;
+    console.warn(
+      `[ai/generate-quiz] call failed after ${elapsed}ms` +
+        (isTimeout ? " [timeout]" : ""),
+    );
+    if (isTimeout) throw err;
     await logFailedGenerationAndThrow({
       supabase,
       userId,
       input,
       courseId: course.id,
-      attempts,
-      err: lastErr,
+      attempts: 1,
+      err,
     });
   }
 
@@ -654,7 +614,7 @@ export const generateQuizForSection = async (
     }));
 
   const costCents = computeCostCents(DEFAULT_MODEL.quiz_gen, llmResult.usage);
-  await logGeneration({
+  const generationId = await logGeneration({
     supabase,
     userId,
     feature: "quiz_gen",
@@ -665,7 +625,40 @@ export const generateQuizForSection = async (
     blocksSnapshot,
   });
 
-  // LLM judge currently disabled during model bake-off (see prior code).
+  // Shadow-mode LLM judge: scores stored in generation_evaluations for
+  // calibration against human evals. Not gating yet. Fire-and-forget —
+  // judging must never delay or fail the generation response.
+  if (generationId) {
+    void judgeAndStoreQuizEval({
+      supabase,
+      generationId,
+      userId,
+      context: {
+        courseTitle: course.title,
+        courseLevel: course.level,
+        lessons: promptContext.lessons.map((l) => ({
+          title: l.title,
+          content: l.content,
+        })),
+        focusTopic: input.focusTopic,
+        requestedMix: {
+          ...input.mix,
+          questions_per_text_passage: input.questionsPerTextPassage,
+          questions_per_audio_passage: input.questionsPerAudioPassage,
+        },
+        quizOutput: {
+          title: llmResult.output.title,
+          description: llmResult.output.description,
+          cefr_targeted: llmResult.output.cefr_targeted,
+          // Nested LLM structure (passage questions live inside the passage)
+          // so the judge can distinguish attached from standalone questions.
+          blocks: llmResult.output.blocks,
+        },
+      },
+    }).catch((err) => {
+      console.error("[ai/generate-quiz] judge failed (non-blocking):", err);
+    });
+  }
 
   return {
     quizId: quiz.id,
@@ -708,7 +701,7 @@ async function logFailedGenerationAndThrow({
       : undefined;
 
   let kind: QuizGenFailureKind = "unknown";
-  if (err instanceof LLMTimeoutError) kind = "timeout";
+  if (err instanceof AITimeoutError) kind = "timeout";
   else if (rawText) kind = "schema";
   else if (
     statusCode === 429 ||

@@ -13,6 +13,7 @@ import {
   AIGenerationError,
   AIQuotaExceededError,
 } from "@/lib/ai/types";
+import { AITimeoutError } from "@/lib/ai/timeout";
 import { aiQuizChangeWireSchema } from "@/lib/ai/schemas/quiz-edit.schema";
 import { aiLimiter, enforceRateLimit } from "@/lib/services/rate-limit.service";
 
@@ -88,6 +89,15 @@ export async function POST(req: Request): Promise<Response> {
       err instanceof AICostBudgetExceededError
     ) {
       return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    if (err instanceof AITimeoutError) {
+      return NextResponse.json(
+        {
+          error:
+            "The AI took too long to respond. Try editing fewer blocks at once.",
+        },
+        { status: 408 },
+      );
     }
     if (err instanceof AIGenerationError) {
       return NextResponse.json(

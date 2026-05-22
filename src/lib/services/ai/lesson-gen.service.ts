@@ -5,6 +5,7 @@ import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
 import { DEFAULT_MODEL } from "@/lib/ai/constants";
+import { withTimeout, LLM_TIMEOUT_MS } from "@/lib/ai/timeout";
 import type { CEFRLevel } from "@/lib/types";
 import type { LessonDepth } from "@/lib/ai/prompts/lesson-generation";
 import {
@@ -17,7 +18,6 @@ export interface ProposeLessonGenInput {
   scope: string;
   depth: LessonDepth;
   includeExercises: boolean;
-  includeFrenchSupport: boolean;
   theme?: string;
 }
 
@@ -76,23 +76,25 @@ export const proposeLessonGen = async (
 
   const requestStartedAt = Date.now();
   console.log(
-    `[ai/generate-lesson] → request | lesson="${lesson.title}" (${course.level}) | type=${lesson.type} | depth=${input.depth} | exercises=${input.includeExercises} | french=${input.includeFrenchSupport} | scope="${input.scope}"`,
+    `[ai/generate-lesson] → request | lesson="${lesson.title}" (${course.level}) | type=${lesson.type} | depth=${input.depth} | exercises=${input.includeExercises} | scope="${input.scope}"`,
   );
 
-  // ── LLM call ───────────────────────────────────────────────────────
-  const result = await runLessonGen({
-    context: {
-      courseTitle: course.title,
-      courseLevel: course.level,
-      lessonTitle: lesson.title,
-      lessonType: lesson.type as "grammar" | "vocabulary" | "resource",
-      scope: input.scope,
-      depth: input.depth,
-      includeExercises: input.includeExercises,
-      includeFrenchSupport: input.includeFrenchSupport,
-      theme: input.theme,
-    },
-  });
+  // ── LLM call (one attempt, 45s hard cap) ───────────────────────────
+  const result = await withTimeout(
+    runLessonGen({
+      context: {
+        courseTitle: course.title,
+        courseLevel: course.level,
+        lessonTitle: lesson.title,
+        lessonType: lesson.type as "grammar" | "vocabulary" | "resource",
+        scope: input.scope,
+        depth: input.depth,
+        includeExercises: input.includeExercises,
+        theme: input.theme,
+      },
+    }),
+    LLM_TIMEOUT_MS,
+  );
 
   const totalMs = Date.now() - requestStartedAt;
   const tokens = result.usage;
@@ -111,7 +113,6 @@ export const proposeLessonGen = async (
       scope: input.scope,
       depth: input.depth,
       includeExercises: input.includeExercises,
-      includeFrenchSupport: input.includeFrenchSupport,
       theme: input.theme ?? null,
     },
     result,

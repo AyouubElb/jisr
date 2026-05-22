@@ -10,6 +10,7 @@ import { computeCostCents } from "@/lib/ai/cost";
 import { synthesizeSpeech } from "@/lib/ai/tts/synthesize";
 import { TTSError } from "@/lib/ai/tts/types";
 import { DEFAULT_MODEL, VOICE_BY_HINT, DEFAULT_VOICE } from "@/lib/ai/constants";
+import { withTimeout, LLM_TIMEOUT_MS } from "@/lib/ai/timeout";
 import type { AIQuizChange } from "@/lib/ai/schemas/quiz-edit.schema";
 import type { AIQuizBlock } from "@/lib/ai/schemas/quiz-output.schema";
 import type { QuizEditRouterStep } from "@/lib/ai/schemas/quiz-edit-router.schema";
@@ -161,23 +162,26 @@ export const proposeQuizEdit = async (
     ]),
   );
 
-  // ── Step 1: router (throws AIGenerationError on failure) ───────────
-  const routerResult = await routeQuizEdit({
-    context: {
-      courseTitle: course.title,
-      courseLevel: course.level,
-      quizTitle: quiz.title,
-      quizDescription: quiz.description,
-      instruction: input.instruction,
-      chatHistory,
-      blocks: allBlocks.map((b) => ({
-        id: b.id,
-        type: b.type,
-        order: b.order,
-        content: b.content as Record<string, unknown> | null,
-      })),
-    },
-  });
+  // ── Step 1: router (one attempt, 45s hard cap) ─────────────────────
+  const routerResult = await withTimeout(
+    routeQuizEdit({
+      context: {
+        courseTitle: course.title,
+        courseLevel: course.level,
+        quizTitle: quiz.title,
+        quizDescription: quiz.description,
+        instruction: input.instruction,
+        chatHistory,
+        blocks: allBlocks.map((b) => ({
+          id: b.id,
+          type: b.type,
+          order: b.order,
+          content: b.content as Record<string, unknown> | null,
+        })),
+      },
+    }),
+    LLM_TIMEOUT_MS,
+  );
 
   // Filter steps to those whose target ids are valid (drop hallucinations).
   const steps: QuizEditRouterStep[] = routerResult.output.steps
@@ -230,21 +234,24 @@ export const proposeQuizEdit = async (
     result: ToolResultUnknown;
   }>[] = steps.map(async (step) => {
     if (step.tool === "add") {
-      const out = await addQuizBlocks({
-        context: {
-          courseTitle: course.title,
-          courseLevel: course.level,
-          quizTitle: quiz.title,
-          quizDescription: quiz.description,
-          existingBlocks: allBlocks.map((b) => ({
-            id: b.id,
-            type: b.type,
-            order: b.order,
-            contentPreview: previewContent(b.content, b.type),
-          })),
-          subInstruction: step.sub_instruction,
-        },
-      });
+      const out = await withTimeout(
+        addQuizBlocks({
+          context: {
+            courseTitle: course.title,
+            courseLevel: course.level,
+            quizTitle: quiz.title,
+            quizDescription: quiz.description,
+            existingBlocks: allBlocks.map((b) => ({
+              id: b.id,
+              type: b.type,
+              order: b.order,
+              contentPreview: previewContent(b.content, b.type),
+            })),
+            subInstruction: step.sub_instruction,
+          },
+        }),
+        LLM_TIMEOUT_MS,
+      );
       const len = Math.min(
         out.output.blocks.length,
         out.output.reasons.length,
@@ -274,16 +281,19 @@ export const proposeQuizEdit = async (
           order: b.order,
           content: dbContentToFlatShape(b.type, b.content),
         }));
-      const out = await updateQuizBlocks({
-        context: {
-          courseTitle: course.title,
-          courseLevel: course.level,
-          quizTitle: quiz.title,
-          quizDescription: quiz.description,
-          blocksToUpdate,
-          subInstruction: step.sub_instruction,
-        },
-      });
+      const out = await withTimeout(
+        updateQuizBlocks({
+          context: {
+            courseTitle: course.title,
+            courseLevel: course.level,
+            quizTitle: quiz.title,
+            quizDescription: quiz.description,
+            blocksToUpdate,
+            subInstruction: step.sub_instruction,
+          },
+        }),
+        LLM_TIMEOUT_MS,
+      );
       const changes: AIQuizChange[] = out.output.updates
         .filter((u) => validIds.has(u.block_id))
         .map((u) => ({
@@ -305,15 +315,18 @@ export const proposeQuizEdit = async (
         order: b.order,
         contentPreview: previewContent(b.content, b.type),
       }));
-    const out = await deleteQuizBlocks({
-      context: {
-        courseTitle: course.title,
-        courseLevel: course.level,
-        quizTitle: quiz.title,
-        candidateBlocks,
-        subInstruction: step.sub_instruction,
-      },
-    });
+    const out = await withTimeout(
+      deleteQuizBlocks({
+        context: {
+          courseTitle: course.title,
+          courseLevel: course.level,
+          quizTitle: quiz.title,
+          candidateBlocks,
+          subInstruction: step.sub_instruction,
+        },
+      }),
+      LLM_TIMEOUT_MS,
+    );
     const changes: AIQuizChange[] = out.output.deletions
       .filter((d) => validIds.has(d.block_id))
       .map((d) => ({
