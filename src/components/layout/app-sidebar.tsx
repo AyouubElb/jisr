@@ -63,6 +63,7 @@ const adminNav: NavItem[] = [
   { title: "Instructors", href: "/admin/instructors", icon: GraduationCap },
   { title: "Students", href: "/admin/students", icon: Users },
   { title: "AI generations", href: "/admin/ai/generations", icon: Sparkles },
+  { title: "Judge calibration", href: "/admin/ai/calibration", icon: ClipboardCheck },
 ];
 
 export function AppSidebar({ role }: AppSidebarProps): React.JSX.Element {

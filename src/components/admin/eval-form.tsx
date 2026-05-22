@@ -12,7 +12,8 @@ import {
 import { useUpsertEvaluation } from "@/lib/hooks/useAIAdmin";
 import type { Database } from "@/lib/types/database";
 
-type AIEvaluationRow = Database["public"]["Tables"]["ai_evaluations"]["Row"];
+type AIEvaluationRow =
+  Database["public"]["Tables"]["generation_evaluations"]["Row"];
 
 interface EvalFormProps {
   generationId: string;
@@ -46,7 +47,11 @@ export function EvalForm({
   }, [rubric, seedSource]);
 
   const [scores, setScores] = useState(initial);
-  const [notes, setNotes] = useState(seedSource?.notes ?? "");
+  // Strip the LLM enumeration when seeding — keep only the trailing NOTES.
+  const seedNotes = humanEval
+    ? (humanEval.notes ?? "")
+    : extractJudgeNotes(llmEval?.notes ?? "");
+  const [notes, setNotes] = useState(seedNotes);
   const { mutate, isPending } = useUpsertEvaluation();
 
   const allFilled = rubric.criteria.every((c) => scores[c.key] !== null);
@@ -91,17 +96,17 @@ export function EvalForm({
         </h3>
         {humanEval ? (
           <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-            <p className="font-medium">Validée par admin</p>
+            <p className="font-medium">Validated by admin</p>
             <p className="text-emerald-700/80">
-              Vos modifications mettent à jour cette évaluation.
+              Your changes update this evaluation.
             </p>
           </div>
         ) : llmEval ? (
           <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <p className="font-medium">Évaluation LLM — non validée</p>
+            <p className="font-medium">LLM evaluation — not validated</p>
             <p className="text-amber-700/80">
-              Scores pré-remplis par le juge IA. Validez tel quel ou modifiez,
-              puis enregistrez.
+              Scores pre-filled by the AI judge. Validate as-is or edit, then
+              save.
             </p>
           </div>
         ) : null}
@@ -177,35 +182,48 @@ export function EvalForm({
           Notes{" "}
           {notesRequired ? (
             <span className="text-xs text-red-600">
-              (obligatoire — au moins un critère sous la barre)
+              (required — at least one criterion below the bar)
             </span>
           ) : (
-            <span className="text-xs text-slate-500">(facultatif)</span>
+            <span className="text-xs text-slate-500">(optional)</span>
           )}
         </Label>
         <Textarea
           id="eval-notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Que faut-il changer dans le prompt pour mieux scorer la prochaine fois ?"
+          placeholder="What should change in the prompt to score better next time?"
           rows={4}
         />
       </div>
 
       <Button type="submit" disabled={!canSubmit} className="w-full">
-        {isPending ? "Enregistrement…" : "Enregistrer l'évaluation"}
+        {isPending ? "Saving…" : "Save evaluation"}
       </Button>
 
       {!allFilled ? (
         <p className="text-xs text-slate-500">
-          Remplissez tous les critères pour enregistrer.
+          Fill in all criteria to save.
         </p>
       ) : !notesOk ? (
         <p className="text-xs text-red-600">
-          Une note d&apos;au moins 10 caractères est requise quand un critère
-          échoue.
+          A note of at least 10 characters is required when a criterion fails.
         </p>
       ) : null}
     </form>
   );
+}
+
+// Strip OBSERVED BLOCKS / MIX CHECK sections from the judge's composed notes
+// so the human textarea seeds only with the trailing NOTES content.
+function extractJudgeNotes(raw: string): string {
+  if (!raw) return "";
+  const marker = "NOTES:";
+  const idx = raw.indexOf(marker);
+  if (idx === -1) {
+    return raw.includes("OBSERVED BLOCKS:") || raw.includes("MIX CHECK:")
+      ? ""
+      : raw;
+  }
+  return raw.slice(idx + marker.length).trim();
 }

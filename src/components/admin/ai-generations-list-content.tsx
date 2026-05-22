@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { formatDistanceToNowStrict } from "date-fns";
-import { fr } from "date-fns/locale";
+import { enUS } from "date-fns/locale";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -54,7 +54,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
     for (const r of rows) {
       if (!r.user_id) continue;
       if (!map.has(r.user_id)) {
-        map.set(r.user_id, r.user_full_name ?? "(sans nom)");
+        map.set(r.user_id, r.user_full_name ?? "(no name)");
       }
     }
     return Array.from(map.entries())
@@ -102,9 +102,9 @@ export function AIGenerationsListContent(): React.JSX.Element {
   return (
     <div className="w-full min-w-0 space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Générations IA</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">AI generations</h1>
         <p className="text-muted-foreground">
-          Évaluation et suivi qualité des sorties IA
+          Quality evaluation and tracking of AI output
         </p>
       </div>
 
@@ -112,7 +112,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <div className="col-span-2 flex flex-col justify-between rounded-xl border bg-primary p-5 text-primary-foreground">
           <div className="flex items-start justify-between">
-            <p className="text-sm font-medium opacity-80">Générations</p>
+            <p className="text-sm font-medium opacity-80">Generations</p>
             <Sparkles className="h-5 w-5 opacity-60" />
           </div>
           {isLoading ? (
@@ -121,8 +121,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
             <>
               <p className="mt-1 text-4xl font-bold tracking-tight">{total}</p>
               <p className="text-sm opacity-70">
-                {evaluatedCount} évaluée{evaluatedCount > 1 ? "s" : ""} sur{" "}
-                {total}
+                {evaluatedCount} of {total} evaluated
               </p>
             </>
           )}
@@ -130,7 +129,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
         <div className="flex flex-col justify-between rounded-xl border bg-card p-5">
           <div className="flex items-start justify-between">
             <p className="text-sm font-medium text-muted-foreground">
-              Schéma valide
+              Valid schema
             </p>
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </div>
@@ -150,7 +149,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
         <div className="flex flex-col justify-between rounded-xl border bg-card p-5">
           <div className="flex items-start justify-between">
             <p className="text-sm font-medium text-muted-foreground">
-              Coût total
+              Total cost
             </p>
             <span className="text-xs font-mono text-muted-foreground">¢</span>
           </div>
@@ -176,7 +175,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Rechercher (titre, instructeur, modèle, feature, id…)"
+                placeholder="Search (title, instructor, model, feature, id…)"
                 className="pl-9"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -188,7 +187,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
                 onChange={(e) => setFeature(e.target.value)}
                 className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
               >
-                <option value="">Toutes fonctionnalités</option>
+                <option value="">All features</option>
                 <option value="quiz_gen">quiz_gen</option>
                 <option value="free_text_grade">free_text_grade</option>
                 <option value="voice_grade">voice_grade</option>
@@ -200,7 +199,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
                 onChange={(e) => setModel(e.target.value)}
                 className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
               >
-                <option value="">Tous modèles</option>
+                <option value="">All models</option>
                 {distinctModels.map((m) => (
                   <option key={m} value={m}>
                     {m}
@@ -212,7 +211,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
                 onChange={(e) => setInstructorId(e.target.value)}
                 className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
               >
-                <option value="">Tous instructeurs</option>
+                <option value="">All instructors</option>
                 {distinctInstructors.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.name}
@@ -225,7 +224,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
                   checked={onlyUnrated}
                   onChange={(e) => setOnlyUnrated(e.target.checked)}
                 />
-                À évaluer
+                To evaluate
               </label>
               <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm">
                 <input
@@ -233,7 +232,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
                   checked={onlyErrors}
                   onChange={(e) => setOnlyErrors(e.target.checked)}
                 />
-                Erreurs
+                Errors
               </label>
             </div>
           </div>
@@ -257,8 +256,8 @@ export function AIGenerationsListContent(): React.JSX.Element {
               <Sparkles className="h-8 w-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
                 {search || feature || model || instructorId || onlyUnrated || onlyErrors
-                  ? "Aucune génération ne correspond aux filtres"
-                  : "Aucune génération pour le moment"}
+                  ? "No generation matches the filters"
+                  : "No generations yet"}
               </p>
             </div>
           ) : (
@@ -278,15 +277,15 @@ export function AIGenerationsListContent(): React.JSX.Element {
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span>
                     {filtered.length === 0
-                      ? "0 résultat"
+                      ? "0 results"
                       : `${safePage * pageSize + 1}–${Math.min(
                           (safePage + 1) * pageSize,
                           filtered.length,
-                        )} sur ${filtered.length}`}
+                        )} of ${filtered.length}`}
                   </span>
                   <span aria-hidden>·</span>
                   <label className="flex items-center gap-1.5">
-                    <span>Afficher</span>
+                    <span>Show</span>
                     <select
                       value={pageSize}
                       onChange={(e) => setPageSize(Number(e.target.value))}
@@ -302,7 +301,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
-                    Page {safePage + 1} sur {totalPages}
+                    Page {safePage + 1} of {totalPages}
                   </span>
                   <Button
                     variant="outline"
@@ -349,11 +348,11 @@ function GenerationRow({
   const StatusIcon = status.icon;
 
   const instr = row.instructor_accepted
-    ? { label: "Acceptée", variant: "default" as const }
+    ? { label: "Accepted", variant: "default" as const }
     : row.instructor_edited
-      ? { label: "Éditée", variant: "secondary" as const }
+      ? { label: "Edited", variant: "secondary" as const }
       : row.instructor_rejected
-        ? { label: "Supprimée", variant: "destructive" as const }
+        ? { label: "Deleted", variant: "destructive" as const }
         : null;
 
   return (
@@ -371,7 +370,7 @@ function GenerationRow({
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className="line-clamp-1 block min-w-0 flex-1 text-sm font-medium">
-            {row.title ?? <span className="text-muted-foreground italic">(sans titre)</span>}
+            {row.title ?? <span className="text-muted-foreground italic">(untitled)</span>}
           </span>
         </div>
         <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
@@ -388,7 +387,7 @@ function GenerationRow({
           ) : null}
           <span>
             {formatDistanceToNowStrict(new Date(row.created_at), {
-              locale: fr,
+              locale: enUS,
               addSuffix: true,
             })}
             {row.latency_ms !== null
@@ -409,11 +408,11 @@ function GenerationRow({
         ) : null}
         {row.has_evaluation ? (
           <Badge variant="default" className="bg-emerald-600 text-[10px]">
-            Évaluée
+            Evaluated
           </Badge>
         ) : (
           <Badge variant="outline" className="text-[10px]">
-            À évaluer
+            To evaluate
           </Badge>
         )}
       </div>

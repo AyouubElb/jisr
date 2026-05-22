@@ -99,19 +99,19 @@ export function AIOutputPreview({
               <div className="space-y-2">
                 <p className="font-medium">{block.question}</p>
                 <p className="text-xs text-slate-500">
-                  {block.min_words ?? "?"}–{block.max_words ?? "?"} mots
+                  {block.min_words ?? "?"}–{block.max_words ?? "?"} words
                 </p>
                 <details className="text-sm">
                   <summary className="cursor-pointer text-slate-600">
-                    Réponse modèle + rubrique
+                    Model answer + rubric
                   </summary>
                   <div className="mt-2 space-y-2 rounded bg-slate-50 p-3">
                     <p>
-                      <span className="font-medium">Modèle :</span>{" "}
+                      <span className="font-medium">Model:</span>{" "}
                       {block.model_answer}
                     </p>
                     <p>
-                      <span className="font-medium">Rubrique :</span>{" "}
+                      <span className="font-medium">Rubric:</span>{" "}
                       {block.rubric}
                     </p>
                   </div>
@@ -123,20 +123,20 @@ export function AIOutputPreview({
               <div className="space-y-2">
                 <p className="font-medium">{block.question}</p>
                 <p className="text-xs text-slate-500">
-                  Réponse vocale
+                  Voice answer
                   {block.max_seconds ? ` · ${block.max_seconds}s max` : ""}
                 </p>
                 <details className="text-sm">
                   <summary className="cursor-pointer text-slate-600">
-                    Réponse modèle + rubrique
+                    Model answer + rubric
                   </summary>
                   <div className="mt-2 space-y-2 rounded bg-slate-50 p-3">
                     <p>
-                      <span className="font-medium">Modèle :</span>{" "}
+                      <span className="font-medium">Model:</span>{" "}
                       {block.model_answer}
                     </p>
                     <p>
-                      <span className="font-medium">Rubrique :</span>{" "}
+                      <span className="font-medium">Rubric:</span>{" "}
                       {block.rubric}
                     </p>
                   </div>

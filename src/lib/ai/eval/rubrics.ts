@@ -1,5 +1,5 @@
 /**
- * Versioned eval rubrics. Source of truth for the shape of `ai_evaluations.scores`.
+ * Versioned eval rubrics. Source of truth for the shape of `generation_evaluations.scores`.
  *
  * Rules:
  *  - Never edit a shipped rubric in place. Add a new version (e.g. quiz_gen_v2)
@@ -76,62 +76,70 @@ export const RUBRICS = {
   quiz_gen_v2: {
     key: "quiz_gen_v2",
     feature: "quiz_gen",
-    label: "Génération de quiz — v2",
+    label: "Quiz generation — v2",
     criteria: [
       {
         key: "cefr_alignment",
-        label: "Alignement CEFR",
+        label: "CEFR alignment",
         description:
-          "Vocabulaire, grammaire et abstraction au niveau demandé — ni au-dessus, ni en dessous.",
+          "Vocabulary, grammar and abstraction at the requested level — neither above nor below.",
+        type: "scale_1_5",
+        passBar: 4,
+      },
+      {
+        key: "instruction_following",
+        label: "Instruction following",
+        description:
+          "Block count and types match the requested mix (passage questions counted separately from standalone). No extra, missing, or wrong-type blocks.",
         type: "scale_1_5",
         passBar: 4,
       },
       {
         key: "content_grounding",
-        label: "Ancrage dans le contenu",
+        label: "Content grounding",
         description:
-          "Les questions testent ce que la leçon enseigne spécifiquement, pas un remplissage générique sur le même sujet.",
+          "Questions test what the lesson specifically teaches, not generic filler on the same topic.",
         type: "scale_1_5",
         passBar: 4,
       },
       {
         key: "distractor_quality",
-        label: "Qualité des distracteurs",
+        label: "Distractor quality",
         description:
-          "Chaque option incorrecte reflète une vraie erreur d'apprenant. Aucun distracteur absurde ou évident.",
+          "Each wrong option reflects a real learner error. No absurd or obvious distractors.",
         type: "scale_1_5",
         passBar: 4,
       },
       {
         key: "question_clarity",
-        label: "Clarté des énoncés",
+        label: "Question clarity",
         description:
-          "Énoncés non ambigus, une seule réponse clairement correcte. Pas de questions piège ni de suppositions culturelles injustes.",
+          "Unambiguous prompts with exactly one clearly correct answer. No trick questions or unfair cultural assumptions.",
         type: "scale_1_5",
         passBar: 4,
       },
       {
         key: "rubric_quality",
-        label: "Utilité de la rubrique",
+        label: "Rubric usability",
         description:
-          "Pour les blocs free_text et voice_response : la rubrique est suffisamment précise pour noter de manière cohérente. Null si aucun bloc de ce type.",
+          "For free_text and voice_response blocks: the rubric is precise enough to grade consistently. Null if no such block.",
         type: "scale_1_5",
         passBar: 4,
         nullable: true,
       },
       {
         key: "language_correctness",
-        label: "Correction linguistique",
+        label: "Language correctness",
         description:
-          "Aucune faute de grammaire, d'orthographe ou de tournure. Pass/fail — une seule erreur fait échouer.",
+          "No grammar, spelling, or phrasing errors. Pass/fail — a single error fails it.",
         type: "boolean",
         passBar: true,
       },
       {
         key: "focus_topic_present",
-        label: "Sujet de focus présent",
+        label: "Focus topic present",
         description:
-          "Si un sujet de focus a été demandé, il dirige réellement le quiz. True si aucun focus demandé.",
+          "If a focus topic was requested, it genuinely drives the quiz. True if no focus was requested.",
         type: "boolean",
         passBar: true,
       },

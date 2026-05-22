@@ -96,7 +96,7 @@ export function BlockDiffView({
       <Card>
         <CardContent className="flex flex-col items-center gap-2 p-10 text-center text-sm text-muted-foreground">
           <Trash2 className="h-6 w-6" />
-          <p>Quiz supprimé. Comparaison indisponible jusqu&apos;à ce que la capture-à-la-suppression soit ajoutée.</p>
+          <p>Quiz deleted. Comparison unavailable until delete-time capture is added.</p>
         </CardContent>
       </Card>
     );
@@ -106,7 +106,7 @@ export function BlockDiffView({
     return (
       <Card>
         <CardContent className="p-6 text-center text-sm text-muted-foreground">
-          Aucun instantané original à comparer.
+          No original snapshot to compare.
         </CardContent>
       </Card>
     );
@@ -118,7 +118,7 @@ export function BlockDiffView({
         <CardContent className="flex items-center gap-3 p-4 text-sm">
           <CheckCircle2 className="h-5 w-5 text-emerald-600" />
           <p>
-            <span className="font-medium">Aucune modification.</span> L&apos;instructeur a accepté la sortie de l&apos;IA telle quelle.
+            <span className="font-medium">No changes.</span> The instructor accepted the AI output as-is.
           </p>
         </CardContent>
       </Card>
@@ -129,10 +129,10 @@ export function BlockDiffView({
     <div className="space-y-3">
       {/* Counts */}
       <div className="flex flex-wrap gap-2 text-xs">
-        <CountBadge color="muted" label={`${counts.unchanged} inchangé${counts.unchanged > 1 ? "s" : ""}`} />
-        <CountBadge color="primary" label={`${counts.modified} modifié${counts.modified > 1 ? "s" : ""}`} />
-        <CountBadge color="emerald" label={`${counts.added} ajouté${counts.added > 1 ? "s" : ""}`} />
-        <CountBadge color="destructive" label={`${counts.deleted} supprimé${counts.deleted > 1 ? "s" : ""}`} />
+        <CountBadge color="muted" label={`${counts.unchanged} unchanged`} />
+        <CountBadge color="primary" label={`${counts.modified} modified`} />
+        <CountBadge color="emerald" label={`${counts.added} added`} />
+        <CountBadge color="destructive" label={`${counts.deleted} deleted`} />
       </div>
 
       {/* Entries */}
@@ -153,7 +153,7 @@ function DiffEntryCard({ entry }: { entry: DiffEntry }): React.JSX.Element {
       <Card className="opacity-60">
         <CardContent className="flex items-center gap-2 p-2.5">
           <Badge variant="outline" className="text-[10px]">
-            #{entry.live.order + 1} INCHANGÉ
+            #{entry.live.order + 1} UNCHANGED
           </Badge>
           <BlockOneLine block={entry.live} />
         </CardContent>
@@ -167,7 +167,7 @@ function DiffEntryCard({ entry }: { entry: DiffEntry }): React.JSX.Element {
         <CardContent className="space-y-2 bg-emerald-500/5 p-3">
           <div className="flex items-center gap-2">
             <Badge className="gap-1 bg-emerald-600 text-[10px] hover:bg-emerald-600">
-              <Plus className="h-3 w-3" /> AJOUTÉ #{entry.live.order + 1}
+              <Plus className="h-3 w-3" /> ADDED #{entry.live.order + 1}
             </Badge>
           </div>
           <BlockSummary block={entry.live} />
@@ -182,7 +182,7 @@ function DiffEntryCard({ entry }: { entry: DiffEntry }): React.JSX.Element {
         <CardContent className="space-y-2 bg-destructive/5 p-3">
           <div className="flex items-center gap-2">
             <Badge variant="destructive" className="gap-1 text-[10px]">
-              <Trash2 className="h-3 w-3" /> SUPPRIMÉ #{entry.original.order + 1}
+              <Trash2 className="h-3 w-3" /> DELETED #{entry.original.order + 1}
             </Badge>
           </div>
           <BlockSummary block={entry.original} />
@@ -197,19 +197,19 @@ function DiffEntryCard({ entry }: { entry: DiffEntry }): React.JSX.Element {
       <CardContent className="space-y-2 p-3">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="gap-1 text-[10px]">
-            <Pencil className="h-3 w-3" /> MODIFIÉ #{entry.live.order + 1}
+            <Pencil className="h-3 w-3" /> MODIFIED #{entry.live.order + 1}
           </Badge>
         </div>
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
           <div className="rounded border border-destructive/20 bg-destructive/5 p-2">
             <p className="mb-1 text-[10px] font-medium uppercase text-destructive">
-              Original IA
+              AI original
             </p>
             <BlockSummary block={entry.original} />
           </div>
           <div className="rounded border border-emerald-500/20 bg-emerald-500/5 p-2">
             <p className="mb-1 text-[10px] font-medium uppercase text-emerald-700">
-              Édition de l&apos;instructeur
+              Instructor edit
             </p>
             <BlockSummary block={entry.live} />
           </div>

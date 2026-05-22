@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Compass, ListChecks, Mic, School } from "lucide-react";
+import { BookOpen, Compass, FileText, ListChecks, Mic, School } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
@@ -32,10 +32,10 @@ export function AIInputContextPanel({
   return (
     <Card>
       <CardContent className="space-y-2 p-4">
-        <p className="text-sm font-medium">Contexte d&apos;entrée</p>
+        <p className="text-sm font-medium">Input context</p>
         <details>
           <summary className="cursor-pointer text-xs text-muted-foreground">
-            Afficher les données brutes
+            Show raw data
           </summary>
           <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-muted/50 p-3 text-xs">
             {JSON.stringify(inputContext, null, 2)}
@@ -55,6 +55,8 @@ interface QuizGenInput {
     mcq?: number;
     fill_blank?: number;
     free_text?: number;
+    voice_response?: number;
+    text_passage?: number;
     audio_passage?: number;
   };
   questionsPerTextPassage?: { mcq?: number; fill_blank?: number };
@@ -102,23 +104,34 @@ function QuizGenContext({
   const mcq = c.mix?.mcq ?? 0;
   const fill = c.mix?.fill_blank ?? 0;
   const free = c.mix?.free_text ?? 0;
+  const voice = c.mix?.voice_response ?? 0;
+  const text = c.mix?.text_passage ?? 0;
   const audio = c.mix?.audio_passage ?? 0;
+  const perTextMcq = c.questionsPerTextPassage?.mcq ?? 0;
+  const perTextFill = c.questionsPerTextPassage?.fill_blank ?? 0;
+  const perTextTotal = perTextMcq + perTextFill;
   const perAudioMcq = c.questionsPerAudioPassage?.mcq ?? 0;
   const perAudioFill = c.questionsPerAudioPassage?.fill_blank ?? 0;
   const perAudioTotal = perAudioMcq + perAudioFill;
-  const directTotal = mcq + fill + free;
+  const directTotal = mcq + fill + free + voice;
 
   const mixParts: string[] = [];
-  if (mcq) mixParts.push(`${mcq} QCM`);
-  if (fill) mixParts.push(`${fill} à compléter`);
-  if (free) mixParts.push(`${free} réponse${free > 1 ? "s" : ""} libre${free > 1 ? "s" : ""}`);
+  if (mcq) mixParts.push(`${mcq} MCQ`);
+  if (fill) mixParts.push(`${fill} fill-blank`);
+  if (free) mixParts.push(`${free} free-text`);
+  if (voice) mixParts.push(`${voice} voice`);
+
+  const subLabel = (m: number, f: number): string =>
+    [m > 0 ? `${m} MCQ` : "", f > 0 ? `${f} fill-blank` : ""]
+      .filter(Boolean)
+      .join(" + ");
 
   return (
     <Card>
       <CardContent className="space-y-4 p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Demande de l&apos;instructeur
+            Instructor request
           </h2>
           {course?.level ? (
             <Badge
@@ -132,7 +145,7 @@ function QuizGenContext({
         <dl className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <ContextRow
             icon={<School className="h-4 w-4" />}
-            label="Cours"
+            label="Course"
             value={
               courseLoading ? (
                 <Skeleton className="h-4 w-32" />
@@ -144,19 +157,19 @@ function QuizGenContext({
 
           <ContextRow
             icon={<Compass className="h-4 w-4" />}
-            label="Sujet ciblé"
+            label="Focus topic"
             value={
               c.focusTopic ? (
                 <span>{c.focusTopic}</span>
               ) : (
-                <span className="text-muted-foreground">Aucun</span>
+                <span className="text-muted-foreground">None</span>
               )
             }
           />
 
           <ContextRow
             icon={<BookOpen className="h-4 w-4" />}
-            label={`Leçons sources (${lessonIds.length})`}
+            label={`Source lessons (${lessonIds.length})`}
             value={
               lessonsLoading ? (
                 <Skeleton className="h-4 w-48" />
@@ -177,7 +190,7 @@ function QuizGenContext({
 
           <ContextRow
             icon={<ListChecks className="h-4 w-4" />}
-            label={`Composition (${directTotal} questions directes)`}
+            label={`Mix (${directTotal} direct questions)`}
             value={
               mixParts.length > 0 ? (
                 <span>{mixParts.join(" · ")}</span>
@@ -187,17 +200,37 @@ function QuizGenContext({
             }
           />
 
+          {text > 0 ? (
+            <ContextRow
+              icon={<FileText className="h-4 w-4" />}
+              label="Text passages"
+              value={
+                <span>
+                  {text} passage{text > 1 ? "s" : ""} × {perTextTotal} question
+                  {perTextTotal !== 1 ? "s" : ""}
+                  {perTextMcq > 0 || perTextFill > 0 ? (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      ({subLabel(perTextMcq, perTextFill)})
+                    </span>
+                  ) : null}
+                </span>
+              }
+            />
+          ) : null}
+
           {audio > 0 ? (
             <ContextRow
               icon={<Mic className="h-4 w-4" />}
-              label="Passages audio"
+              label="Audio passages"
               value={
                 <span>
                   {audio} passage{audio > 1 ? "s" : ""} × {perAudioTotal} question
                   {perAudioTotal !== 1 ? "s" : ""}
                   {perAudioMcq > 0 || perAudioFill > 0 ? (
                     <span className="text-muted-foreground">
-                      {" "}({[perAudioMcq > 0 ? `${perAudioMcq} QCM` : "", perAudioFill > 0 ? `${perAudioFill} à trous` : ""].filter(Boolean).join(" + ")})
+                      {" "}
+                      ({subLabel(perAudioMcq, perAudioFill)})
                     </span>
                   ) : null}
                 </span>

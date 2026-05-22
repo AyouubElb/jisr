@@ -12,7 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { enUS } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,7 +59,7 @@ export function AIGenerationDetailContent({
     return (
       <Card>
         <CardContent className="p-6 text-sm text-muted-foreground">
-          Génération introuvable.
+          Generation not found.
         </CardContent>
       </Card>
     );
@@ -98,10 +98,10 @@ export function AIGenerationDetailContent({
   }));
 
   const statusBadge = gen.error
-    ? { variant: "destructive" as const, label: "Erreur" }
+    ? { variant: "destructive" as const, label: "Error" }
     : gen.schema_valid
-      ? { variant: "default" as const, label: "Schéma valide" }
-      : { variant: "secondary" as const, label: "Schéma invalide" };
+      ? { variant: "default" as const, label: "Valid schema" }
+      : { variant: "secondary" as const, label: "Invalid schema" };
 
   return (
     <div className="space-y-6">
@@ -111,14 +111,14 @@ export function AIGenerationDetailContent({
           href="/admin/ai/generations"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Retour aux générations
+          <ArrowLeft className="h-4 w-4" /> Back to generations
         </Link>
 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">Évaluation de la génération</h1>
+            <h1 className="text-2xl md:text-3xl font-bold">Generation evaluation</h1>
             <p className="text-sm text-muted-foreground">
-              {format(new Date(gen.created_at), "PPPp", { locale: fr })}
+              {format(new Date(gen.created_at), "PPPp", { locale: enUS })}
             </p>
           </div>
           <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
@@ -131,18 +131,18 @@ export function AIGenerationDetailContent({
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <Stat
               icon={<Cpu className="h-4 w-4" />}
-              label="Modèle"
+              label="Model"
               value={gen.model}
               mono
             />
             <Stat
               icon={<Database className="h-4 w-4" />}
-              label="Fournisseur"
+              label="Provider"
               value={gen.provider}
             />
             <Stat
               icon={<Clock className="h-4 w-4" />}
-              label="Latence"
+              label="Latency"
               value={
                 gen.latency_ms !== null
                   ? `${(gen.latency_ms / 1000).toFixed(1)} s`
@@ -151,7 +151,7 @@ export function AIGenerationDetailContent({
             />
             <Stat
               icon={<Coins className="h-4 w-4" />}
-              label="Coût"
+              label="Cost"
               value={
                 gen.cost_cents !== null
                   ? `${Number(gen.cost_cents).toFixed(2)} ¢`
@@ -177,7 +177,7 @@ export function AIGenerationDetailContent({
             <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
             <div>
               <p className="font-medium text-destructive">
-                Erreur de génération
+                Generation error
               </p>
               <p className="mt-1 text-destructive/90">{gen.error}</p>
             </div>
@@ -188,13 +188,16 @@ export function AIGenerationDetailContent({
       {/* ── INPUT CONTEXT (friendly) ───────────────────────────── */}
       <AIInputContextPanel feature={gen.feature} inputContext={inputCtx} />
 
+      {/* ── JUDGE REASONING (LLM enumeration, before scores) ───── */}
+      <JudgeReasoningPanel notes={evals?.llm?.notes ?? null} />
+
       {/* ── QUIZ PREVIEW + EVAL FORM ───────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div>
           <Tabs defaultValue="ai-output">
             <TabsList>
-              <TabsTrigger value="ai-output">Sortie IA</TabsTrigger>
-              <TabsTrigger value="diff">Modifications</TabsTrigger>
+              <TabsTrigger value="ai-output">AI output</TabsTrigger>
+              <TabsTrigger value="diff">Changes</TabsTrigger>
             </TabsList>
 
             <TabsContent value="ai-output" className="mt-3">
@@ -205,7 +208,7 @@ export function AIGenerationDetailContent({
                   <CardContent className="flex flex-col items-center gap-2 p-10 text-center">
                     <AlertTriangle className="h-8 w-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
-                      Aucune sortie — la génération a échoué.
+                      No output — the generation failed.
                     </p>
                   </CardContent>
                 </Card>
@@ -213,7 +216,7 @@ export function AIGenerationDetailContent({
                 <Card>
                   <CardContent className="space-y-2 p-4">
                     <p className="text-sm font-medium">
-                      Sortie brute (impossible à parser comme quiz)
+                      Raw output (could not be parsed as a quiz)
                     </p>
                     <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-muted/50 p-3 text-xs">
                       {JSON.stringify(rawOutput, null, 2)}
@@ -247,14 +250,14 @@ export function AIGenerationDetailContent({
               <CardContent className="space-y-2 p-4 text-sm">
                 <p className="flex items-center gap-2 font-medium">
                   <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                  Pas de rubrique
+                  No rubric
                 </p>
                 <p className="text-muted-foreground">
-                  Aucune rubrique définie pour la fonctionnalité{" "}
+                  No rubric defined for the feature{" "}
                   <code className="rounded bg-muted px-1 py-0.5 text-xs">
                     {gen.feature}
                   </code>
-                  . Ajoutez-la dans{" "}
+                  . Add it in{" "}
                   <code className="rounded bg-muted px-1 py-0.5 text-xs">
                     src/lib/ai/eval/rubrics.ts
                   </code>
@@ -267,6 +270,85 @@ export function AIGenerationDetailContent({
       </div>
     </div>
   );
+}
+
+function JudgeReasoningPanel({
+  notes,
+}: {
+  notes: string | null;
+}): React.JSX.Element | null {
+  if (!notes) return null;
+  const observed = sectionOf(notes, "OBSERVED BLOCKS:");
+  const mix = sectionOf(notes, "MIX CHECK:");
+  const trailing = sectionOf(notes, "NOTES:");
+  if (!observed && !mix) return null;
+
+  const matchLine = mix?.toLowerCase() ?? "";
+  const mixBadge = matchLine.includes("mismatch")
+    ? { label: "MISMATCH", className: "bg-amber-100 text-amber-900" }
+    : matchLine.includes("match")
+      ? { label: "MATCH", className: "bg-emerald-100 text-emerald-900" }
+      : null;
+
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-5">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Judge reasoning
+        </h2>
+
+        {observed ? (
+          <div>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Observed blocks
+            </p>
+            <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-muted/50 p-3 text-xs leading-relaxed">
+              {observed}
+            </pre>
+          </div>
+        ) : null}
+
+        {mix ? (
+          <div>
+            <div className="mb-1 flex items-center gap-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Mix check
+              </p>
+              {mixBadge ? (
+                <Badge className={`text-[10px] ${mixBadge.className}`}>
+                  {mixBadge.label}
+                </Badge>
+              ) : null}
+            </div>
+            <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-muted/50 p-3 text-xs leading-relaxed">
+              {mix}
+            </pre>
+          </div>
+        ) : null}
+
+        {trailing ? (
+          <div>
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Notes
+            </p>
+            <p className="text-sm">{trailing}</p>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Pull a labelled section out of the composed notes blob written by the judge
+// generator ("OBSERVED BLOCKS:\n…\n\nMIX CHECK:\n…\n\nNOTES:\n…").
+function sectionOf(notes: string, label: string): string | null {
+  const start = notes.indexOf(label);
+  if (start === -1) return null;
+  const after = notes.slice(start + label.length);
+  // Stop at the next ALL-CAPS LABEL: ending in a colon.
+  const stop = after.search(/\n[A-Z][A-Z _]+:/);
+  const body = stop === -1 ? after : after.slice(0, stop);
+  return body.trim() || null;
 }
 
 function Stat({

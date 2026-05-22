@@ -4,13 +4,15 @@ import {
   aiAdminApi,
   type AIGenerationListFilters,
   type AIGenerationListItem,
+  type CalibrationSummary,
   type UpsertEvaluationInput,
 } from "@/lib/api/ai-admin.api";
 import { aiAdminKeys } from "@/lib/constants/queryKeys";
 import type { Database } from "@/lib/types/database";
 
 type AIGenerationRow = Database["public"]["Tables"]["ai_generations"]["Row"];
-type AIEvaluationRow = Database["public"]["Tables"]["ai_evaluations"]["Row"];
+type AIEvaluationRow =
+  Database["public"]["Tables"]["generation_evaluations"]["Row"];
 
 export const useAIGenerations = (filters: AIGenerationListFilters = {}) => {
   return useQuery<AIGenerationListItem[]>({
@@ -40,6 +42,14 @@ export const useAIEvaluations = (generationId: string, rubricKey: string) => {
     queryKey: aiAdminKeys.evaluation(generationId),
     queryFn: () => aiAdminApi.getEvaluations(generationId, rubricKey),
     enabled: !!generationId && !!rubricKey,
+  });
+};
+
+export const useCalibration = (rubricKey: string) => {
+  return useQuery<CalibrationSummary>({
+    queryKey: aiAdminKeys.agreement(rubricKey),
+    queryFn: () => aiAdminApi.getCalibration(rubricKey),
+    enabled: !!rubricKey,
   });
 };
 

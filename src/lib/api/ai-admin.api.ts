@@ -2,9 +2,10 @@ import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/types/database";
 
 type AIGenerationRow = Database["public"]["Tables"]["ai_generations"]["Row"];
-type AIEvaluationRow = Database["public"]["Tables"]["ai_evaluations"]["Row"];
+type AIEvaluationRow =
+  Database["public"]["Tables"]["generation_evaluations"]["Row"];
 type AIEvaluationInsert =
-  Database["public"]["Tables"]["ai_evaluations"]["Insert"];
+  Database["public"]["Tables"]["generation_evaluations"]["Insert"];
 
 export interface AIGenerationListItem {
   id: AIGenerationRow["id"];
@@ -46,6 +47,34 @@ export interface UpsertEvaluationInput {
   notes?: string | null;
 }
 
+export interface AgreementRow {
+  generation_id: string;
+  rubric_key: string;
+  human_scores: Record<string, unknown>;
+  judge_scores: Record<string, unknown>;
+  human_notes: string | null;
+  judge_notes: string | null;
+}
+
+export interface CalibrationSummary {
+  pairCount: number;
+  // Per-criterion agreement %: of pairs where both scored a criterion, share
+  // that "match" (scale: within 1 point; boolean: identical).
+  perCriterion: Record<string, { agree: number; total: number }>;
+  // Overall agreement = mean of per-criterion agreement, weighted by total.
+  overallPct: number | null;
+  rows: AgreementRow[];
+}
+
+// A scale_1_5 pair "agrees" within 1 point; a boolean pair must be identical.
+const scoresAgree = (h: unknown, j: unknown): boolean | null => {
+  if (typeof h === "boolean" && typeof j === "boolean") return h === j;
+  if (typeof h === "number" && typeof j === "number") {
+    return Math.abs(h - j) <= 1;
+  }
+  return null;
+};
+
 export const aiAdminApi = {
   listGenerations: async (
     filters: AIGenerationListFilters = {},
@@ -54,12 +83,18 @@ export const aiAdminApi = {
     let q = supabase
       .from("ai_generations")
       .select(
-        "id, created_at, feature, model, provider, schema_valid, cost_cents, latency_ms, instructor_accepted, instructor_edited, instructor_rejected, output_quiz_id, error, output, input_context, user_id, profiles:user_id(full_name), ai_evaluations(id)",
+        "id, created_at, feature, model, provider, schema_valid, cost_cents, latency_ms, instructor_accepted, instructor_edited, instructor_rejected, output_quiz_id, error, output, input_context, user_id, profiles:user_id(full_name), generation_evaluations(id)",
       )
       .order("created_at", { ascending: false })
       .limit(filters.limit ?? 100);
 
-    if (filters.feature) q = q.eq("feature", filters.feature);
+    // Hide judge rows from the user-facing list — they're system-internal
+    // calibration data, surfaced inside the parent generation's detail panel.
+    if (filters.feature) {
+      q = q.eq("feature", filters.feature);
+    } else {
+      q = q.neq("feature", "quiz_judge");
+    }
     if (filters.model) q = q.eq("model", filters.model);
     if (filters.onlyErrors) q = q.not("error", "is", null);
 
@@ -67,8 +102,9 @@ export const aiAdminApi = {
     if (error) throw error;
 
     const rows = (data ?? []).map((r) => {
-      const evals = (r as unknown as { ai_evaluations: { id: string }[] })
-        .ai_evaluations;
+      const evals = (
+        r as unknown as { generation_evaluations: { id: string }[] }
+      ).generation_evaluations;
 
       // Derive a human-readable title for the list view. quiz_gen rows put
       // the AI-generated title at output.model_output.title. quiz_edit rows
@@ -128,7 +164,7 @@ export const aiAdminApi = {
   ): Promise<{ human: AIEvaluationRow | null; llm: AIEvaluationRow | null }> => {
     const supabase = createClient();
     const { data, error } = await supabase
-      .from("ai_evaluations")
+      .from("generation_evaluations")
       .select("*")
       .eq("generation_id", generationId)
       .eq("rubric_key", rubricKey)
@@ -140,6 +176,53 @@ export const aiAdminApi = {
       human: rows.find((r) => r.evaluator_type === "human") ?? null,
       llm: rows.find((r) => r.evaluator_type === "llm_judge") ?? null,
     };
+  },
+
+  /**
+   * Calibration summary for a rubric: every generation that has BOTH a human
+   * and a judge eval, plus per-criterion agreement %. This is the number that
+   * tells us whether the judge is trustworthy enough to gate on (>80%).
+   */
+  getCalibration: async (rubricKey: string): Promise<CalibrationSummary> => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("generation_eval_agreement")
+      .select(
+        "generation_id, rubric_key, human_scores, judge_scores, human_notes, judge_notes",
+      )
+      .eq("rubric_key", rubricKey);
+    if (error) throw error;
+
+    const rows = (data ?? []) as AgreementRow[];
+    const perCriterion: Record<string, { agree: number; total: number }> = {};
+
+    for (const row of rows) {
+      const keys = new Set([
+        ...Object.keys(row.human_scores ?? {}),
+        ...Object.keys(row.judge_scores ?? {}),
+      ]);
+      for (const k of keys) {
+        const verdict = scoresAgree(
+          (row.human_scores as Record<string, unknown>)?.[k],
+          (row.judge_scores as Record<string, unknown>)?.[k],
+        );
+        if (verdict === null) continue; // one side didn't score it (e.g. nullable)
+        perCriterion[k] ??= { agree: 0, total: 0 };
+        perCriterion[k].total += 1;
+        if (verdict) perCriterion[k].agree += 1;
+      }
+    }
+
+    let agreeSum = 0;
+    let totalSum = 0;
+    for (const c of Object.values(perCriterion)) {
+      agreeSum += c.agree;
+      totalSum += c.total;
+    }
+    const overallPct =
+      totalSum > 0 ? Math.round((agreeSum / totalSum) * 100) : null;
+
+    return { pairCount: rows.length, perCriterion, overallPct, rows };
   },
 
   upsertEvaluation: async (
@@ -161,7 +244,7 @@ export const aiAdminApi = {
     };
 
     const { data, error } = await supabase
-      .from("ai_evaluations")
+      .from("generation_evaluations")
       .upsert(payload, {
         onConflict: "generation_id,rubric_key,evaluator_id,evaluator_type",
       })
