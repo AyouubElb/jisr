@@ -22,7 +22,7 @@ import {
 } from "@/lib/ai/constants";
 import { aiLimiter, enforceRateLimit } from "@/lib/services/rate-limit.service";
 
-// Vercel Hobby caps function execution at 60s.
+// Literal required by Next segment config; keep AI routes in sync.
 export const maxDuration = 60;
 
 const BodySchema = z.object({

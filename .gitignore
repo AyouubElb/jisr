@@ -51,3 +51,9 @@ next-env.d.ts
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Claude Code local settings/session state (per-developer)
+/.claude
+
+# Dev scripts (load tests, one-off tooling — not app code)
+/scripts

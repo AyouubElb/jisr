@@ -14,6 +14,9 @@ import {
 } from "@/lib/ai/types";
 import { aiLimiter, enforceRateLimit } from "@/lib/services/rate-limit.service";
 
+// Literal required by Next segment config; keep AI routes in sync.
+export const maxDuration = 60;
+
 const Body = z.object({
   attemptId: z.uuid(),
 });

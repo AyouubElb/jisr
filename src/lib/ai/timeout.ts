@@ -7,6 +7,10 @@
 
 export const LLM_TIMEOUT_MS = 45000;
 
+// AI routes set `export const maxDuration = 60` (literal — Next segment config
+// can't read an imported value). 60 > LLM_TIMEOUT_MS so our 45s timeout fires
+// first; Hobby caps at 60, Pro allows 300.
+
 export class AITimeoutError extends Error {
   readonly code = "AI_TIMEOUT";
   constructor(public readonly timeoutMs: number) {

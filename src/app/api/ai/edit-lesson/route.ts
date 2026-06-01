@@ -14,6 +14,9 @@ import {
 import { AITimeoutError } from "@/lib/ai/timeout";
 import { aiLimiter, enforceRateLimit } from "@/lib/services/rate-limit.service";
 
+// Literal required by Next segment config; keep AI routes in sync.
+export const maxDuration = 60;
+
 const Body = z.object({
   lessonId: z.uuid(),
   instruction: z.string().min(3).max(1000),

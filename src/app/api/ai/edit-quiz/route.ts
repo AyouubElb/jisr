@@ -17,6 +17,9 @@ import { AITimeoutError } from "@/lib/ai/timeout";
 import { aiQuizChangeWireSchema } from "@/lib/ai/schemas/quiz-edit.schema";
 import { aiLimiter, enforceRateLimit } from "@/lib/services/rate-limit.service";
 
+// Literal required by Next segment config; keep AI routes in sync.
+export const maxDuration = 60;
+
 // ── Body schemas ───────────────────────────────────────────────────────
 const ProposeBody = z.object({
   action: z.literal("propose"),
