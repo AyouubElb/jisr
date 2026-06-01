@@ -34,12 +34,15 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const isCallbackRoute = pathname.startsWith("/auth/callback");
   const isInstructorSignup = pathname.startsWith("/instructor/signup");
   const isInstructorSignupApi = pathname.startsWith("/api/auth/instructor-signup");
+  // Load-test mock route gates itself on ENABLE_LOAD_TEST_ROUTE; skip auth here.
+  const isLoadTestRoute = pathname.startsWith("/api/load-test");
   const isPublicRoute =
     pathname === "/" ||
     isAuthRoute ||
     isCallbackRoute ||
     isInstructorSignup ||
-    isInstructorSignupApi;
+    isInstructorSignupApi ||
+    isLoadTestRoute;
 
   // Not logged in and trying to access protected route
   if (!user && !isPublicRoute) {
