@@ -57,3 +57,6 @@ next-env.d.ts
 
 # Dev scripts (load tests, one-off tooling — not app code)
 /scripts
+
+# CLT experiment pages (local testing only)
+/src/app/(instructor)/instructor/clt
