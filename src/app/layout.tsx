@@ -12,9 +12,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Jisr — La boîte à outils du prof d'anglais au Maroc",
+  title: "Jisr — Enseignez plus, sans y laisser vos dimanches",
   description:
-    "Enseignez en direct, sans intermédiaire. Jisr réunit cours, sessions live, suivi et IA dans un seul outil pensé pour les profs d'anglais marocains.",
+    "L'IA qui travaille avec les profs d'anglais marocains, pas à leur place. Correction, quiz, suivi d'élèves — Jisr s'occupe des heures perdues, vous gardez la pédagogie.",
 };
 
 export default function RootLayout({

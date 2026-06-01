@@ -44,20 +44,21 @@ export function MoroccoSection(): React.JSX.Element {
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Fait au Maroc
+            Construit avec une prof
           </p>
 
           <h2 className="mt-4 text-3xl font-bold leading-[1.1] tracking-tight text-amber-950 sm:text-4xl lg:text-5xl">
-            La première plateforme marocaine{" "}
+            Chaque fonctionnalité passe d&apos;abord{" "}
             <span className="text-amber-950/70">
-              conçue pour les profs d&apos;anglais.
+              par les élèves d&apos;une vraie prof.
             </span>
           </h2>
 
           <p className="mx-auto mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
-            Tarifs en dirhams. Interface française. Niveaux CEFR adaptés au
-            bac, IELTS et TOEFL. Construit avec les profs d&apos;ici, pas
-            adapté depuis ailleurs.
+            Jisr est né d&apos;une prof d&apos;anglais qui enseigne en ligne à
+            ses élèves au Maroc — bac, IELTS, TOEFL. Rien ne sort en
+            production sans avoir été utilisé avec ses vrais élèves. Ce que
+            vous voyez ici a déjà servi en cours.
           </p>
         </div>
 

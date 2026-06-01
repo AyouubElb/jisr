@@ -66,10 +66,13 @@ export function FeaturesSection(): React.JSX.Element {
         </div>
 
         {/* ── Footer line ────────────────────────────────────────── */}
-        <p className="mt-12 max-w-3xl text-base text-muted-foreground sm:mt-16 sm:text-lg">
-          Jisr fait le pont entre vous et vos élèves. Pas une plateforme de
-          plus à apprendre —{" "}
-          <em className="font-semibold not-italic text-amber-950">a shortcut</em>.
+        <p className="mt-12 max-w-4xl text-base text-muted-foreground sm:mt-16 sm:text-lg">
+          Jisr fait le pont entre vous et vos élèves. Pas une plateforme de plus
+          à apprendre —{" "}
+          <em className="font-semibold not-italic text-amber-950">
+            a shortcut
+          </em>
+          .
         </p>
       </div>
     </section>

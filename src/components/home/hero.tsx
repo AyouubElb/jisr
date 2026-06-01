@@ -14,13 +14,17 @@ export function Hero(): React.JSX.Element {
           </div>
 
           <h1 className="mt-6 text-4xl font-bold tracking-tight text-amber-950 sm:text-5xl lg:text-6xl">
-            Vos élèves. Vos revenus. Vos outils.
+            Enseignez plus.
+            <br />
+            <span className="text-amber-950/70">
+              Sans y laisser vos dimanches.
+            </span>
           </h1>
 
           <p className="mt-6 text-lg text-muted-foreground sm:text-xl">
-            Jisr est la boîte à outils du prof d&apos;anglais moderne.
-            Enseignez en direct, sans intermédiaire, avec des outils d&apos;IA
-            qui s&apos;occupent du travail répétitif.
+            Une IA prend les heures perdues — correction, quiz, suivi
+            d&apos;élèves. Vous gardez l&apos;essentiel&nbsp;: la pédagogie, la
+            voix, la relation avec vos élèves.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

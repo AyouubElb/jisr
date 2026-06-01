@@ -11,29 +11,14 @@ const faqs = [
       "Jisr est en programme fondateur — on lance avec 10 profs choisis pour bien démarrer. On prend 15 minutes (sur WhatsApp ou par téléphone, comme vous préférez) pour comprendre votre contexte, puis on vous envoie une invitation si Jisr vous correspond. Pas de chichi, pas de vente forcée.",
   },
   {
-    question: "Combien de temps avant d'avoir mon accès ?",
-    answer:
-      "Discussion sous 48h, invitation envoyée le jour même si vous êtes retenu·e, compte actif en 5 minutes après.",
-  },
-  {
-    question: "Mes élèves actuels doivent-ils s'inscrire eux-mêmes ?",
-    answer:
-      "Non. Vous ajoutez manuellement vos élèves depuis votre tableau de bord. Ils reçoivent un accès sans avoir à chercher votre profil.",
-  },
-  {
     question: "Comment ça fonctionne avec WhatsApp ?",
     answer:
       "Jisr complète WhatsApp, il ne le remplace pas. Gardez WhatsApp pour la communication rapide, utilisez Jisr pour les cours, quiz et suivi.",
   },
   {
-    question: "Puis-je exporter mes données si je change d'avis ?",
+    question: "Mes élèves actuels doivent-ils s'inscrire eux-mêmes ?",
     answer:
-      "Oui, à tout moment. Vos cours, leçons, et données d'élèves vous appartiennent et sont exportables en quelques clics.",
-  },
-  {
-    question: "Comment payer depuis le Maroc ?",
-    answer:
-      "Virement bancaire pour l'instant. Nous intégrons CMI (paiement par carte) au fur et à mesure que la plateforme grandit.",
+      "Non. Vous ajoutez manuellement vos élèves depuis votre tableau de bord. Ils reçoivent un accès sans avoir à chercher votre profil.",
   },
 ];
 

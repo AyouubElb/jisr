@@ -3,7 +3,7 @@ const steps = [
     number: "01",
     title: "Une discussion (15 min)",
     description:
-      "Sur WhatsApp ou par téléphone, on comprend votre contexte et on vous montre Jisr en direct.",
+      "Sur WhatsApp ou par téléphone, on comprend votre contexte : nombre d'élèves, niveaux, ce qui vous prend le plus de temps aujourd'hui.",
   },
   {
     number: "02",

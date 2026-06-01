@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GraduationCap, Mail, Phone, MapPin } from "lucide-react";
+import { Mail, Phone, MapPin } from "lucide-react";
 import { SmoothScrollLink } from "@/components/home/smooth-scroll-link";
 import {
   CONTACT_EMAIL,
@@ -14,12 +14,16 @@ export function SiteFooter(): React.JSX.Element {
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
         <div className="grid gap-10 md:grid-cols-4">
           <div className="md:col-span-1">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <GraduationCap className="h-5 w-5 text-primary-foreground" />
-              </span>
-              <span className="text-base font-semibold text-amber-950">
+            <Link href="/" className="flex items-baseline gap-0.5">
+              <span className="text-xl font-bold tracking-tight text-amber-950">
                 Jisr
+              </span>
+              <span
+                aria-hidden
+                className="text-base font-semibold text-primary"
+                style={{ lineHeight: 1 }}
+              >
+                ج
               </span>
             </Link>
             <p className="mt-3 text-xs text-muted-foreground">
