@@ -1,21 +1,32 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { gradeStudentAnswers } from "@/lib/ai/generators/student-grade.generator";
+import { gradeStudentAudio } from "@/lib/ai/generators/student-grade-audio.generator";
 import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
 import { AIGenerationError } from "@/lib/ai/types";
 import { DEFAULT_MODEL } from "@/lib/ai/constants";
-import {
-  transcribeAnswer,
-  TranscriptionError,
-} from "@/lib/services/transcribe.service";
 import type {
   StudentGradeAnswer,
   StudentGradeContext,
 } from "@/lib/ai/prompts/student-grade";
 import type { StudentGradePerBlock } from "@/lib/ai/schemas/student-grade.schema";
+import type { StudentGradeAudioOutput } from "@/lib/ai/schemas/student-grade-audio.schema";
 import type { CEFRLevel } from "@/lib/types";
+
+const AUDIO_BUCKET = "materials";
+
+const audioMimeForPath = (audioPath: string): string => {
+  const dot = audioPath.lastIndexOf(".");
+  const ext = dot === -1 ? "webm" : audioPath.slice(dot + 1).toLowerCase();
+  if (ext === "webm") return "audio/webm";
+  if (ext === "mp3") return "audio/mpeg";
+  if (ext === "wav") return "audio/wav";
+  if (ext === "ogg") return "audio/ogg";
+  if (ext === "m4a" || ext === "mp4") return "audio/mp4";
+  return "audio/webm";
+};
 
 // ── Service-layer errors ───────────────────────────────────────────────
 export class AttemptNotFoundError extends Error {
@@ -66,18 +77,6 @@ const isFreeTextAnswer = (
 ): string | null => {
   const v = answer["text"];
   return typeof v === "string" ? v : null;
-};
-
-const isVoiceTranscript = (
-  answer: Record<string, unknown>,
-): { transcript: string; confidence?: number } | null => {
-  const transcript = answer["transcript"];
-  if (typeof transcript !== "string" || transcript.length === 0) return null;
-  const conf = answer["transcript_confidence"];
-  return {
-    transcript,
-    confidence: typeof conf === "number" ? conf : undefined,
-  };
 };
 
 const voiceAudioPath = (answer: Record<string, unknown>): string | null => {
@@ -169,66 +168,18 @@ export const gradeAttempt = async (
     grading_notes: string | null;
   };
 
-  // ── Pre-pass: transcribe voice answers that don't have a transcript yet ──
+  // ── Build separate input lists for the two graders ───────────────
   const skipped: GradeAttemptResult["skipped"] = [];
-  const voiceToTranscribe = answerRows
-    .filter((row) => {
-      const block = row.quiz_blocks as unknown as BlockJoin;
-      if (block.type !== "voice") return false;
-      if (isVoiceTranscript(row.answer)) return false;
-      return voiceAudioPath(row.answer) !== null;
-    })
-    .map((row) => ({
-      answerRowId: row.id,
-      blockId: (row.quiz_blocks as unknown as BlockJoin).id,
-      audioPath: voiceAudioPath(row.answer) as string,
-      original: row.answer,
-    }));
-
-  if (voiceToTranscribe.length > 0) {
-    const results = await Promise.allSettled(
-      voiceToTranscribe.map((v) => transcribeAnswer(supabase, v.audioPath)),
-    );
-
-    const persistUpdates: Promise<unknown>[] = [];
-    results.forEach((r, idx) => {
-      const v = voiceToTranscribe[idx];
-      if (r.status === "rejected") {
-        const msg =
-          r.reason instanceof TranscriptionError
-            ? r.reason.message
-            : "transcription failed";
-        skipped.push({ blockId: v.blockId, reason: `whisper: ${msg}` });
-        return;
-      }
-      console.log(
-        `[student-grade] whisper block=${v.blockId} confidence=${r.value.confidence} transcript:\n${r.value.transcript}`,
-      );
-      const merged: Record<string, unknown> = {
-        ...v.original,
-        transcript: r.value.transcript,
-        transcript_confidence: r.value.confidence,
-        transcript_language: r.value.language,
-      };
-      // Mutate the in-memory row so the filter loop below picks it up
-      // without re-fetching from the DB.
-      const row = answerRows.find((x) => x.id === v.answerRowId);
-      if (row) row.answer = merged;
-      persistUpdates.push(
-        (async () => {
-          await supabase
-            .from("student_answers")
-            .update({ answer: merged })
-            .eq("id", v.answerRowId);
-        })(),
-      );
-    });
-    // Persist transcripts in parallel; failure here doesn't block grading.
-    await Promise.allSettled(persistUpdates);
-  }
-
-  // ── Filter to free_text + voice; build grader input ───────────────
-  const gradableInputs: StudentGradeAnswer[] = [];
+  const textInputs: StudentGradeAnswer[] = [];
+  const voiceInputs: {
+    answerRowId: string;
+    blockId: string;
+    audioPath: string;
+    prompt: string;
+    modelAnswer: string | null;
+    gradingNotes: string | null;
+    taskHint: string | null;
+  }[] = [];
 
   for (const row of answerRows) {
     const block = row.quiz_blocks as unknown as BlockJoin;
@@ -240,7 +191,7 @@ export const gradeAttempt = async (
         skipped.push({ blockId: block.id, reason: "no free-text answer recorded" });
         continue;
       }
-      gradableInputs.push({
+      textInputs.push({
         blockId: block.id,
         blockType: "free_text",
         prompt: freeTextPrompt(block.content),
@@ -252,47 +203,106 @@ export const gradeAttempt = async (
       continue;
     }
 
-    const voice = isVoiceTranscript(row.answer);
-    if (!voice) {
-      const audioPath = voiceAudioPath(row.answer);
+    const audioPath = voiceAudioPath(row.answer);
+    if (!audioPath) {
       skipped.push({
         blockId: block.id,
-        reason: audioPath
-          ? "voice transcription failed"
-          : "voice answer has no audio file recorded",
+        reason: "voice answer has no audio file recorded",
       });
       continue;
     }
-    gradableInputs.push({
+    voiceInputs.push({
+      answerRowId: row.id,
       blockId: block.id,
-      blockType: "voice",
+      audioPath,
       prompt: freeTextPrompt(block.content),
       modelAnswer: block.model_answer,
       gradingNotes: block.grading_notes,
       taskHint: voiceHint(block.content),
-      studentAnswer: voice.transcript.slice(0, MAX_ANSWER_CHARS),
-      wasTranscribed: true,
-      transcriptConfidence: voice.confidence,
     });
   }
 
-  if (gradableInputs.length === 0) {
+  if (textInputs.length === 0 && voiceInputs.length === 0) {
     return { attemptId, gradedBlockIds: [], skipped };
   }
 
-  // ── Quota (count + monthly $-budget) ──────────────────────────────
-  await assertQuota(supabase, userId, "free_text_grade");
+  // ── Quotas: text + voice are separate features ────────────────────
+  if (textInputs.length > 0) {
+    await assertQuota(supabase, userId, "free_text_grade");
+  }
+  if (voiceInputs.length > 0) {
+    await assertQuota(supabase, userId, "voice_grade");
+  }
 
-  // ── LLM call ──────────────────────────────────────────────────────
-  const context: StudentGradeContext = {
-    cefrLevel: course.level,
-    quizTitle: quiz.title,
-    answers: gradableInputs,
-  };
+  // ── Text bundle: one call grades all free_text answers together ──
+  const textPromise: Promise<{
+    grades: Map<string, StudentGradePerBlock>;
+    model: string;
+    promptVersion: string;
+    usage: { inputTokens: number | null; outputTokens: number | null; cacheReadTokens: number | null };
+  } | null> = textInputs.length === 0
+    ? Promise.resolve(null)
+    : (async () => {
+        const context: StudentGradeContext = {
+          cefrLevel: course.level,
+          quizTitle: quiz.title,
+          answers: textInputs,
+        };
+        const result = await gradeStudentAnswers({ context });
+        const map = new Map<string, StudentGradePerBlock>();
+        for (const g of result.output.grades) map.set(g.block_id, g);
+        return {
+          grades: map,
+          model: result.model,
+          promptVersion: result.promptVersion,
+          usage: result.usage,
+        };
+      })();
 
-  let result;
+  // ── Voice: one call per audio, in parallel ───────────────────────
+  const voicePromises = voiceInputs.map(async (v) => {
+    const { data: blob, error: dlError } = await supabase.storage
+      .from(AUDIO_BUCKET)
+      .download(v.audioPath);
+    if (dlError || !blob) {
+      return {
+        blockId: v.blockId,
+        answerRowId: v.answerRowId,
+        error: `audio download failed: ${dlError?.message ?? "unknown"}`,
+      } as const;
+    }
+    const buf = Buffer.from(await blob.arrayBuffer());
+    const result = await gradeStudentAudio({
+      modelKey: DEFAULT_MODEL.voice_grade,
+      audioBase64: buf.toString("base64"),
+      audioMimeType: audioMimeForPath(v.audioPath),
+      context: {
+        blockId: v.blockId,
+        cefrLevel: course.level,
+        quizTitle: quiz.title,
+        prompt: v.prompt,
+        modelAnswer: v.modelAnswer,
+        gradingNotes: v.gradingNotes,
+        taskHint: v.taskHint,
+      },
+    });
+    return {
+      blockId: v.blockId,
+      answerRowId: v.answerRowId,
+      output: result.output,
+      model: result.model,
+      promptVersion: result.promptVersion,
+      usage: result.usage,
+    } as const;
+  });
+
+  let textResult: Awaited<typeof textPromise>;
+  let voiceResults: PromiseSettledResult<Awaited<(typeof voicePromises)[number]>>[];
   try {
-    result = await gradeStudentAnswers({ context });
+    [textResult, voiceResults] = await Promise.all([
+      textPromise,
+      Promise.allSettled(voicePromises),
+    ]);
   } catch (err) {
     if (err instanceof AIGenerationError) {
       throw new GradingFailedError(err.message, err.rawText);
@@ -302,39 +312,97 @@ export const gradeAttempt = async (
     );
   }
 
-  // ── Persist ai_* columns; join grade ↔ answer row by block_id ─────
-  const gradesByBlock = new Map<string, StudentGradePerBlock>();
-  for (const g of result.output.grades) gradesByBlock.set(g.block_id, g);
-
+  // ── Persist text grades ──────────────────────────────────────────
   const rowByBlock = new Map<string, { id: string }>();
   for (const r of answerRows) rowByBlock.set(r.block_id, { id: r.id });
 
-  const updates = gradableInputs
-    .map((input) => {
-      const g = gradesByBlock.get(input.blockId);
-      const row = rowByBlock.get(input.blockId);
-      if (!g || !row) return null;
-      return { answerRowId: row.id, blockId: input.blockId, grade: g };
-    })
-    .filter((v): v is { answerRowId: string; blockId: string; grade: StudentGradePerBlock } => v !== null);
-
   const nowIso = new Date().toISOString();
-  await Promise.all(
-    updates.map((u) =>
+  const gradedBlockIds: string[] = [];
+  const persistOps: PromiseLike<unknown>[] = [];
+
+  if (textResult) {
+    for (const input of textInputs) {
+      const g = textResult.grades.get(input.blockId);
+      const row = rowByBlock.get(input.blockId);
+      if (!g || !row) {
+        skipped.push({ blockId: input.blockId, reason: "no grade returned" });
+        continue;
+      }
+      gradedBlockIds.push(input.blockId);
+      persistOps.push(
+        supabase
+          .from("student_answers")
+          .update({
+            ai_score: g.score,
+            ai_is_correct: g.is_correct,
+            ai_rationale: g.rationale,
+            ai_errors: { items: g.errors, instructor_note: g.instructor_note ?? null },
+            ai_graded_at: nowIso,
+            ai_model: textResult.model,
+            ai_prompt_version: textResult.promptVersion,
+          })
+          .eq("id", row.id),
+      );
+    }
+  }
+
+  // ── Persist voice grades ─────────────────────────────────────────
+  const voiceTelemetry: {
+    model: string;
+    promptVersion: string;
+    usage: { inputTokens: number | null; outputTokens: number | null; cacheReadTokens: number | null };
+  }[] = [];
+
+  voiceResults.forEach((r, idx) => {
+    const v = voiceInputs[idx];
+    if (r.status === "rejected") {
+      const msg =
+        r.reason instanceof AIGenerationError
+          ? r.reason.message
+          : r.reason instanceof Error
+            ? r.reason.message
+            : "voice grading failed";
+      skipped.push({ blockId: v.blockId, reason: msg });
+      return;
+    }
+    const val = r.value;
+    if ("error" in val && typeof val.error === "string") {
+      skipped.push({ blockId: v.blockId, reason: val.error });
+      return;
+    }
+    if (!("output" in val)) {
+      skipped.push({ blockId: v.blockId, reason: "voice grading returned no output" });
+      return;
+    }
+    gradedBlockIds.push(val.blockId);
+    voiceTelemetry.push({
+      model: val.model,
+      promptVersion: val.promptVersion,
+      usage: val.usage,
+    });
+    const g: StudentGradeAudioOutput = val.output;
+    persistOps.push(
       supabase
         .from("student_answers")
         .update({
-          ai_score: u.grade.score,
-          ai_is_correct: u.grade.is_correct,
-          ai_rationale: u.grade.rationale,
-          ai_errors: { items: u.grade.errors, instructor_note: u.grade.instructor_note ?? null },
+          ai_score: g.score,
+          ai_is_correct: g.is_correct,
+          ai_rationale: g.rationale,
+          ai_errors: {
+            items: g.errors,
+            instructor_note: g.instructor_note ?? null,
+            pronunciation_errors: g.pronunciation_errors,
+            fluency_note: g.fluency_note ?? null,
+          },
           ai_graded_at: nowIso,
-          ai_model: result.model,
-          ai_prompt_version: result.promptVersion,
+          ai_model: val.model,
+          ai_prompt_version: val.promptVersion,
         })
-        .eq("id", u.answerRowId),
-    ),
-  );
+        .eq("id", val.answerRowId),
+    );
+  });
+
+  await Promise.all(persistOps);
 
   // Mark the attempt as pending_review so the instructor knows AI has
   // produced suggestions and a human still needs to accept/override.
@@ -343,26 +411,65 @@ export const gradeAttempt = async (
     .update({ status: "pending_review" })
     .eq("id", attemptId);
 
-  // ── Telemetry ─────────────────────────────────────────────────────
-  const costCents = computeCostCents(DEFAULT_MODEL.free_text_grade, result.usage);
-  await logGeneration({
-    supabase,
-    userId,
-    feature: "free_text_grade",
-    inputContext: {
-      attemptId,
-      quizId: quiz.id,
-      courseId: course.id,
-      gradedCount: updates.length,
-      skippedCount: skipped.length,
-    },
-    result,
-    costCents,
-  });
+  // ── Telemetry: one row per feature ────────────────────────────────
+  if (textResult) {
+    const costCents = computeCostCents(DEFAULT_MODEL.free_text_grade, textResult.usage);
+    await logGeneration({
+      supabase,
+      userId,
+      feature: "free_text_grade",
+      inputContext: {
+        attemptId,
+        quizId: quiz.id,
+        courseId: course.id,
+        gradedCount: textInputs.length,
+        skippedCount: skipped.length,
+      },
+      result: {
+        output: null,
+        usage: textResult.usage,
+        latencyMs: 0,
+        model: textResult.model,
+        provider: "vercel-gateway",
+        promptVersion: textResult.promptVersion,
+        retryCount: 0,
+        schemaValid: true,
+        inputHash: "",
+        error: null,
+      },
+      costCents,
+    });
+  }
+  for (const t of voiceTelemetry) {
+    const costCents = computeCostCents(DEFAULT_MODEL.voice_grade, t.usage);
+    await logGeneration({
+      supabase,
+      userId,
+      feature: "voice_grade",
+      inputContext: {
+        attemptId,
+        quizId: quiz.id,
+        courseId: course.id,
+      },
+      result: {
+        output: null,
+        usage: t.usage,
+        latencyMs: 0,
+        model: t.model,
+        provider: "google",
+        promptVersion: t.promptVersion,
+        retryCount: 0,
+        schemaValid: true,
+        inputHash: "",
+        error: null,
+      },
+      costCents,
+    });
+  }
 
   return {
     attemptId,
-    gradedBlockIds: updates.map((u) => u.blockId),
+    gradedBlockIds,
     skipped,
   };
 };

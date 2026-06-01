@@ -40,11 +40,12 @@ const FEATURE_LABELS: Record<AIFeature, string> = {
   lesson_outline: "Lesson outlines",
   lesson_edit: "Lesson edits (AI)",
   lesson_gen: "Lesson generations",
+  lesson_judge: "Internal evaluations",
   lesson_tts: "Lesson audio (TTS)",
 };
 
 // Hidden from the UI — internal/system features that aren't user-driven.
-const HIDDEN_FEATURES: AIFeature[] = ["quiz_judge"];
+const HIDDEN_FEATURES: AIFeature[] = ["quiz_judge", "lesson_judge"];
 
 
 export default function InstructorSettingsPage(): React.JSX.Element {

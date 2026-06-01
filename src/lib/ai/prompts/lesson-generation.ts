@@ -1,22 +1,13 @@
-/**
- * Lesson generation prompt — single-call agent producing a DUAL-PURPOSE
- * document: the instructor screen-shares it in the meeting AND the student
- * re-reads it at home. PEDAGOGY.md §3.1.
- *
- * Templates branch on level (PEDAGOGY §3.3):
- * - A1/A2 → simple, pattern-driven, no metalanguage, per-pattern Say/Not pairs (grammar only)
- * - B1+   → documentation pattern (definition → use → form → examples → CM → check)
- *
- * All pedagogy blocks (CEFR rules, templates, self-check) are imported from
- * lesson-pedagogy.ts — single source of truth shared with lesson-edit so the
- * two agents never drift.
- */
+// Lesson-gen prompt builder — composes shared rules + the picked pattern's
+// templateBlock + few-shot examples. Pattern selection happens in the loader.
+import { pickPattern } from "../pedagogy/loader";
+import type { LessonStyle } from "../pedagogy/styles";
 import {
-  CEFR_LESSON_RULES,
-  LESSON_SELF_CHECK,
-  A1_A2_TEMPLATES,
-  B1_PLUS_TEMPLATES,
-} from "./lesson-pedagogy";
+  HTML_HARD_RULES,
+  OUTPUT_SHAPE_RULES,
+} from "../pedagogy/shared/html-rules";
+import { CEFR_LESSON_RULES } from "../pedagogy/shared/cefr-rules";
+import { LESSON_SELF_CHECK } from "../pedagogy/shared/self-check";
 
 export type CEFRLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 export type LessonType = "grammar" | "vocabulary" | "resource";
@@ -33,37 +24,21 @@ export interface LessonGenContext {
   depth: LessonDepth;
   includeExercises: boolean;
   theme?: string;
+  // Optional — defaults to "documentary" (the only style shipped in Phase A).
+  style?: LessonStyle;
 }
 
 export const LESSON_GEN_SYSTEM_PROMPT = `You generate a STUDENT REVISION DOCUMENT in HTML for an English lesson. The reader is a Moroccan student who will re-read this at home AFTER the live class. You are NOT writing a lesson plan for a teacher.
 
-OUTPUT shape (always valid JSON, no markdown fences, no prose outside JSON):
-{
-  "summary": "1-line description of what was generated, IN ENGLISH",
-  "new_content": "<the full lesson HTML, see template rules below>"
-}
+${OUTPUT_SHAPE_RULES}
 
-HARD RULES for new_content:
-1. Output PURE HTML — no <html>, <body>, <head>, <script>, <style>, or DOCTYPE. Inner content only.
-2. Allowed tags: <h1> <h2> <h3> <h4> <p> <ul> <ol> <li> <strong> <em> <u> <s> <a> <br> <hr> <blockquote> <code> <pre> <span> (with optional style for color). Drop anything else.
-3. Use <h2> for section titles (What is it, When to use it, How to form it, Examples, Common mistakes, Quick check, etc.).
-4. Use <h3> for sub-sections inside a long section if depth = "detailed". Skip <h3> for "quick".
-5. Every example sentence MUST be wrapped in its OWN <blockquote> — one example per blockquote, never multiple. Do NOT add quotation marks ("…", «…», "…") around example text. Lessons are pure English — NO translations into other languages.
-6. NEVER include placeholder text like "...", "TBD", "TODO". If you cannot fulfil the request fully, fill the sections with the best content you can produce.
-7. NO <h1> as the title — the lesson title is shown above the content by the editor. Start directly with the first <h2>.
-8. NO closing remarks like "I hope this helps". The document is reference material, not a letter.
+${HTML_HARD_RULES}
 
 ═══════════════════════════════════════════════════════════════════
-TEMPLATE — depends on level
+TEMPLATE
 ═══════════════════════════════════════════════════════════════════
 
-The template skeleton is NOT the same across levels. A1/A2 use a simpler,
-pattern-driven, screen-share-friendly shape. B1+ use the documentation
-pattern. The user prompt below inlines the exact template for the level you
-must follow — read it before writing.
-
-For lessonType = "resource" at any level: free-form. Use clear <h2> sections
-that match what the instructor asked for. Still follow HARD RULES 1-8.
+The template skeleton is provided in the USER PROMPT below. It is chosen for this specific (style, level, lesson type) — follow it exactly. Section order, allowed sub-blocks, and rules in the template OVERRIDE anything generic above.
 
 ═══════════════════════════════════════════════════════════════════
 CEFR LEVEL RULES
@@ -76,7 +51,7 @@ DEPTH RULES
 ═══════════════════════════════════════════════════════════════════
 
 depth = "quick":
-- Skip <h3> sub-sections.
+- Skip <h3> sub-sections where the template marks them optional.
 - Each <h2> section: 1-3 short paragraphs OR a tight <ul>.
 - Aim for ~250-450 words total (excluding HTML).
 - Examples: 3-4 for grammar, 6-10 entries for vocabulary.
@@ -88,17 +63,12 @@ depth = "detailed":
 - Examples: 5-8 for grammar, 10-15 entries for vocabulary.
 
 ═══════════════════════════════════════════════════════════════════
-EXERCISES (Quick check)
+EXERCISES (Quick check / Try it / Try saying it)
 ═══════════════════════════════════════════════════════════════════
 
-includeExercises = true → add the "Quick check" section. 2-4 items max. Format options:
-- Fill-in-the-blank: <p>1. I _____ (go) to school every day.</p>
-- True/False: <p>1. We use the present simple for finished actions. (T / F)</p>
-- Multiple choice with <ul>.
+includeExercises = true → emit the exercise section the template specifies (Quick check / Try it / Try saying it). 2-4 items max. Do NOT include answer keys.
 
-Do NOT include answer keys — students self-check or ask the teacher. Mark the section with <p><em>Try these on your own.</em></p> at the end.
-
-includeExercises = false → omit the "Quick check" section entirely.
+includeExercises = false → omit the exercise section entirely.
 
 ═══════════════════════════════════════════════════════════════════
 THEME / CONTEXT
@@ -114,8 +84,7 @@ SELF-CHECK BEFORE FINALIZING
 
 ${LESSON_SELF_CHECK}
 
-After this internal review, output ONLY the JSON with "summary" and
-"new_content".
+After this internal review, output ONLY the JSON with "summary" and "new_content".
 
 ═══════════════════════════════════════════════════════════════════
 SUMMARY FIELD
@@ -128,19 +97,45 @@ The "summary" is 1 sentence in ENGLISH describing what you generated. Examples:
 Do NOT repeat the lesson title in the summary. Do NOT explain HTML choices.
 `;
 
+const renderExamples = (
+  examples: ReturnType<typeof pickPattern>["examples"],
+): string => {
+  if (examples.length === 0) return "";
+  const blocks = examples
+    .map(
+      (ex, i) => `
+─── EXAMPLE ${i + 1} — ${ex.title} ───
+Scope: ${ex.scope}
+HTML:
+${ex.html}
+`,
+    )
+    .join("\n");
+  return `\n═══════════════════════════════════════════════════════════════════
+WORKED EXAMPLES (match this shape, not the literal content)
+═══════════════════════════════════════════════════════════════════
+${blocks}
+`;
+};
+
 export const buildLessonGenUserPrompt = (ctx: LessonGenContext): string => {
+  const style: LessonStyle = ctx.style ?? "documentary";
+  const pattern = pickPattern({
+    style,
+    level: ctx.courseLevel,
+    lessonType: ctx.lessonType,
+  });
+
   const themeLine = ctx.theme?.trim()
     ? `Theme / context: ${ctx.theme.trim()}`
     : "Theme / context: (none — use general everyday situations)";
 
-  // Branch the template by level — A1/A2 get the simple pattern-driven
-  // shape, B1+ get the documentation pattern. PEDAGOGY §3.3.
-  const isLowLevel = ctx.courseLevel === "A1" || ctx.courseLevel === "A2";
-  const templateBlock = isLowLevel ? A1_A2_TEMPLATES : B1_PLUS_TEMPLATES;
+  const examplesBlock = renderExamples(pattern.examples);
 
   return `Course: ${ctx.courseTitle} (Level: ${ctx.courseLevel})
 Lesson title: ${ctx.lessonTitle}
 Lesson type: ${ctx.lessonType}
+Style: ${style} (${pattern.id})
 
 Scope: ${ctx.scope}
 Depth: ${ctx.depth}
@@ -148,12 +143,18 @@ Include exercises: ${ctx.includeExercises ? "yes" : "no"}
 ${themeLine}
 
 ═══════════════════════════════════════════════════════════════════
-TEMPLATE TO FOLLOW (for level ${ctx.courseLevel})
+WHEN THIS PATTERN FITS
 ═══════════════════════════════════════════════════════════════════
 
-${templateBlock}
+${pattern.whenToUse}
 
 ═══════════════════════════════════════════════════════════════════
+TEMPLATE TO FOLLOW (${pattern.id})
+═══════════════════════════════════════════════════════════════════
 
-Generate the full lesson HTML following the "${ctx.lessonType}" template above for level ${ctx.courseLevel}, with depth = "${ctx.depth}". Return JSON with "summary" and "new_content".`;
+${pattern.templateBlock}
+${examplesBlock}
+═══════════════════════════════════════════════════════════════════
+
+Generate the full lesson HTML following the template above for level ${ctx.courseLevel}, with depth = "${ctx.depth}". Return JSON with "summary" and "new_content".`;
 };

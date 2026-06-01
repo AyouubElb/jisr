@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
 import { runLessonGen } from "@/lib/ai/generators/lesson-gen.generator";
+import { judgeAndStoreLessonEval } from "@/lib/ai/generators/lesson-judge.generator";
+import { runDeterministicChecks } from "@/lib/ai/lesson-checks";
+import { pickPattern } from "@/lib/ai/pedagogy/loader";
 import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
@@ -110,6 +113,9 @@ export const proposeLessonGen = async (
     feature: "lesson_gen",
     inputContext: {
       lessonId: input.lessonId,
+      lessonTitle: lesson.title,
+      lessonType: lesson.type,
+      courseLevel: course.level,
       scope: input.scope,
       depth: input.depth,
       includeExercises: input.includeExercises,
@@ -118,6 +124,43 @@ export const proposeLessonGen = async (
     result,
     costCents,
   });
+
+  // ── Judge (fire-and-forget, mirrors quiz-gen pattern) ─────────────
+  // gen → deterministic checks (JS) → LLM judge (soft checks only).
+  // Writes ai_generations(feature=lesson_judge) + generation_evaluations.
+  // Repair on violations is deferred — log first.
+  if (generationId) {
+    const pattern = pickPattern({
+      style: "documentary",
+      level: course.level,
+      lessonType: lesson.type as "grammar" | "vocabulary" | "resource",
+    });
+    const det = runDeterministicChecks({
+      html: result.output.new_content,
+      level: course.level,
+      pattern,
+    });
+    console.log(
+      `[ai/generate-lesson] judge: gen=${generationId} pattern=${pattern.id} det_violations=${det.violations.length}`,
+    );
+    void judgeAndStoreLessonEval({
+      supabase,
+      generationId,
+      userId,
+      pattern,
+      context: {
+        courseTitle: course.title,
+        courseLevel: course.level,
+        lessonTitle: lesson.title,
+        lessonType: lesson.type as "grammar" | "vocabulary" | "resource",
+        lessonHtml: result.output.new_content,
+        facts: det.facts,
+      },
+      deterministicViolations: det.violations,
+    }).catch((err) => {
+      console.error("[ai/generate-lesson] judge failed (non-blocking):", err);
+    });
+  }
 
   return {
     generationId,

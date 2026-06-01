@@ -46,9 +46,16 @@ export interface AIErrorEntry {
   fix: string;
 }
 
+export interface AIPronunciationError {
+  word: string;
+  issue: string;
+}
+
 export interface AIGradePayload {
   items: AIErrorEntry[];
   instructor_note: string | null;
+  pronunciation_errors?: AIPronunciationError[];
+  fluency_note?: string | null;
 }
 
 export interface GradingAnswer {

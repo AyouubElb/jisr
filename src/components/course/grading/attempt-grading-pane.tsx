@@ -354,6 +354,8 @@ interface AISuggestion {
   rationale: string;
   errors: { span: string; kind: string; fix: string }[];
   instructorNote: string | null;
+  pronunciationErrors: { word: string; issue: string }[];
+  fluencyNote: string | null;
 }
 
 function aiSuggestionFromAnswer(
@@ -366,6 +368,8 @@ function aiSuggestionFromAnswer(
     rationale: answer.ai_rationale ?? "",
     errors: answer.ai_errors?.items ?? [],
     instructorNote: answer.ai_errors?.instructor_note ?? null,
+    pronunciationErrors: answer.ai_errors?.pronunciation_errors ?? [],
+    fluencyNote: answer.ai_errors?.fluency_note ?? null,
   };
 }
 
@@ -552,6 +556,31 @@ function AISuggestionCard({
             </li>
           ))}
         </ul>
+      )}
+
+      {suggestion.pronunciationErrors.length > 0 && (
+        <ul className="space-y-1 text-xs">
+          {suggestion.pronunciationErrors.map((p, idx) => (
+            <li
+              key={idx}
+              className="rounded border border-sky-200 bg-sky-50/70 px-2 py-1"
+            >
+              <span className="font-semibold text-sky-900">
+                prononciation
+              </span>
+              <span className="text-muted-foreground"> — </span>
+              <span className="text-amber-950">&ldquo;{p.word}&rdquo;</span>
+              <span className="text-muted-foreground"> : </span>
+              <span className="text-amber-950">{p.issue}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {suggestion.fluencyNote && (
+        <p className="rounded border border-sky-200 bg-sky-50/70 px-2 py-1 text-xs text-sky-900">
+          Fluidité : {suggestion.fluencyNote}
+        </p>
       )}
 
       {suggestion.instructorNote && (

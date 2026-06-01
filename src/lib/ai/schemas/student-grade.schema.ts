@@ -28,9 +28,10 @@ export const studentGradePerBlockSchema = z.object({
   block_id: z.string(),
   score: z.number().min(0).max(10),
   is_correct: z.boolean(),
-  rationale: z.string(),
-  instructor_note: z.string().optional(),
-  errors: z.array(studentGradeErrorSchema).default([]),
+  rationale: z.string().max(600),
+  // Nullable not optional — OpenAI structured outputs reject optional fields.
+  instructor_note: z.string().max(800).nullable(),
+  errors: z.array(studentGradeErrorSchema),
 });
 
 export const studentGradeOutputSchema = z.object({

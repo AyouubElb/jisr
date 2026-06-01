@@ -25,9 +25,11 @@ export interface AIGenerationListItem {
   user_id: AIGenerationRow["user_id"];
   user_full_name: string | null;
   /**
-   * Derived from output.model_output.title (quiz_gen) or
-   * input_context.instruction (quiz_edit). Null for rows where neither
-   * is present (errored generations).
+   * Derived per-feature:
+   *  · quiz_gen   → output.model_output.title (or output.title for legacy rows)
+   *  · lesson_gen → input_context.lessonTitle, falling back to scope summary
+   *  · quiz_edit  → input_context.instruction
+   * Null when nothing usable is present (errored generations).
    */
   title: string | null;
 }
@@ -88,12 +90,13 @@ export const aiAdminApi = {
       .order("created_at", { ascending: false })
       .limit(filters.limit ?? 100);
 
-    // Hide judge rows from the user-facing list — they're system-internal
-    // calibration data, surfaced inside the parent generation's detail panel.
+    // Scope at the Supabase query: only fetch generation agents the admin
+    // list cares about. Judges, TTS, grading rows stay out of the DB result.
+    const LISTED_FEATURES = ["quiz_gen", "lesson_gen"] as const;
     if (filters.feature) {
       q = q.eq("feature", filters.feature);
     } else {
-      q = q.neq("feature", "quiz_judge");
+      q = q.in("feature", LISTED_FEATURES as unknown as string[]);
     }
     if (filters.model) q = q.eq("model", filters.model);
     if (filters.onlyErrors) q = q.not("error", "is", null);
@@ -106,17 +109,22 @@ export const aiAdminApi = {
         r as unknown as { generation_evaluations: { id: string }[] }
       ).generation_evaluations;
 
-      // Derive a human-readable title for the list view. quiz_gen rows put
-      // the AI-generated title at output.model_output.title. quiz_edit rows
-      // put the user instruction at input_context.instruction.
+      // Derive a human-readable title for the list view.
+      //   quiz_gen   → output.model_output.title (current) or output.title (legacy)
+      //   lesson_gen → input_context.lessonTitle (current) or input_context.scope (legacy)
+      //   quiz_edit  → input_context.instruction
       const out = r.output as Record<string, unknown> | null;
-      const modelOutput = (out?.model_output ?? null) as
+      const modelOutput = (out?.model_output ?? out ?? null) as
         | Record<string, unknown>
         | null;
-      const inCtx = r.input_context as Record<string, unknown> | null;
+      const inCtx = (r.input_context ?? {}) as Record<string, unknown>;
       const title =
+        (r.feature === "lesson_gen"
+          ? (typeof inCtx.lessonTitle === "string" ? inCtx.lessonTitle : null) ??
+            (typeof inCtx.scope === "string" ? inCtx.scope : null)
+          : null) ??
         (typeof modelOutput?.title === "string" ? modelOutput.title : null) ??
-        (typeof inCtx?.instruction === "string" ? inCtx.instruction : null) ??
+        (typeof inCtx.instruction === "string" ? inCtx.instruction : null) ??
         null;
 
       const profile = (r as unknown as { profiles: { full_name: string | null } | null })

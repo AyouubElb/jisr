@@ -9,7 +9,8 @@ export const PROMPT_VERSIONS = {
   quiz_edit: "quiz_edit_v8",
   quiz_judge: "quiz_judge_v4",
   lesson_edit: "lesson_edit_v9",
-  lesson_gen: "lesson_gen_v4",
+  lesson_gen: "lesson_gen_v5",
+  lesson_judge: "lesson_judge_v1",
   student_grade: "student_grade_v1",
 } as const;
 
@@ -91,6 +92,22 @@ export const MODELS = {
     cacheReadCostPerMTokens: 0.03,
     supportsCaching: true,
   },
+  "gemini-3-5-flash": {
+    provider: "google",
+    modelId: "gemini-3.5-flash",
+    inputCostPerMTokens: 1.5,
+    outputCostPerMTokens: 9.0,
+    cacheReadCostPerMTokens: 0.15,
+    supportsCaching: true,
+  },
+  "gemini-2-5-flash": {
+    provider: "google",
+    modelId: "gemini-2.5-flash",
+    inputCostPerMTokens: 0.3,
+    outputCostPerMTokens: 2.5,
+    cacheReadCostPerMTokens: 0.075,
+    supportsCaching: true,
+  },
 } as const satisfies Record<string, AIModelConfig>;
 
 export type ModelKey = keyof typeof MODELS;
@@ -104,6 +121,9 @@ const envQuizModel = process.env.AI_QUIZ_MODEL;
 const envQuizEditModel = process.env.AI_QUIZ_EDIT_MODEL;
 const envLessonEditModel = process.env.AI_LESSON_EDIT_MODEL;
 const envLessonGenModel = process.env.AI_LESSON_GEN_MODEL;
+const envLessonJudgeModel = process.env.AI_LESSON_JUDGE_MODEL;
+const envGradeModel = process.env.AI_GRADE_MODEL;
+const envVoiceGradeModel = process.env.AI_VOICE_GRADE_MODEL;
 
 // Hard output-token cap per feature. Prevents one runaway response from
 // blowing the per-call budget. Tune up only if real outputs hit the ceiling.
@@ -117,6 +137,7 @@ export const MAX_OUTPUT_TOKENS: Record<AIFeature, number> = {
   lesson_outline: 2048,
   lesson_edit: 4096,
   lesson_gen: 6144,
+  lesson_judge: 2048,
   // lesson_tts: irrelevant — TTS is char-based, not token-based.
   lesson_tts: 0,
 };
@@ -129,8 +150,8 @@ export const DEFAULT_MODEL: Record<AIFeature, ModelKey> = {
     ? envQuizEditModel
     : "claude-haiku-4-5",
   quiz_judge: "claude-haiku-4-5",
-  free_text_grade: "claude-haiku-4-5",
-  voice_grade: "claude-haiku-4-5",
+  free_text_grade: isModelKey(envGradeModel) ? envGradeModel : "claude-haiku-4-5",
+  voice_grade: isModelKey(envVoiceGradeModel) ? envVoiceGradeModel : "gemini-2-5-flash",
   intervention_suggest: "claude-haiku-4-5",
   lesson_outline: "claude-haiku-4-5",
   lesson_edit: isModelKey(envLessonEditModel)
@@ -139,6 +160,10 @@ export const DEFAULT_MODEL: Record<AIFeature, ModelKey> = {
   lesson_gen: isModelKey(envLessonGenModel)
     ? envLessonGenModel
     : "claude-haiku-4-5",
+  // Cross-provider judge — kills self-enhancement bias vs the generator.
+  lesson_judge: isModelKey(envLessonJudgeModel)
+    ? envLessonJudgeModel
+    : "gpt-5.4-mini",
   // lesson_tts uses OpenAI's gpt-4o-mini-tts (TTS, not an LLM). The actual
   // model string is recorded directly when logging telemetry; this map entry
   // is just a typesafety placeholder pointing at OpenAI.
@@ -164,6 +189,7 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
     lesson_outline: 3,
     lesson_edit: 30,
     lesson_gen: 5,
+    lesson_judge: 100000,
     lesson_tts: 50,
   },
   pro: {
@@ -176,6 +202,7 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
     lesson_outline: 50,
     lesson_edit: 600,
     lesson_gen: 100,
+    lesson_judge: 100000,
     lesson_tts: 500,
   },
   studio: {
@@ -188,6 +215,7 @@ export const TIER_QUOTAS: Record<Tier, Record<AIFeature, number>> = {
     lesson_outline: 300,
     lesson_edit: 3000,
     lesson_gen: 500,
+    lesson_judge: 100000,
     lesson_tts: 3000,
   },
 };

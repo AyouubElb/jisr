@@ -107,7 +107,9 @@ export default function InstructorDashboardPage(): React.JSX.Element {
 
   const publishedCount = courses?.filter((c) => c.is_published).length ?? 0;
   const draftCount = courses?.filter((c) => !c.is_published).length ?? 0;
-  const totalStudents = enrollmentData?.reduce((s, c) => s + c.students.length, 0) ?? 0;
+  const totalStudents = enrollmentData
+    ? new Set(enrollmentData.flatMap((c) => c.students.map((s) => s.studentId))).size
+    : 0;
   const atRisk = getAtRiskStudents(enrollmentData);
 
   return (

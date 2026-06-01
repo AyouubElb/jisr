@@ -189,10 +189,7 @@ export function AIGenerationsListContent(): React.JSX.Element {
               >
                 <option value="">All features</option>
                 <option value="quiz_gen">quiz_gen</option>
-                <option value="free_text_grade">free_text_grade</option>
-                <option value="voice_grade">voice_grade</option>
-                <option value="intervention_suggest">intervention_suggest</option>
-                <option value="lesson_outline">lesson_outline</option>
+                <option value="lesson_gen">lesson_gen</option>
               </select>
               <select
                 value={model}

@@ -12,6 +12,13 @@
  * the two in sync.
  */
 import type { AIFeature } from "../types";
+import type { LessonPattern } from "../pedagogy/styles";
+import { UNIVERSAL_CHECKS } from "../pedagogy/shared/rubric-base";
+import { documentaryA1A2Vocabulary } from "../pedagogy/patterns/documentary-a1-a2-vocabulary";
+import { documentaryA1A2Grammar } from "../pedagogy/patterns/documentary-a1-a2-grammar";
+import { documentaryB1PlusVocabulary } from "../pedagogy/patterns/documentary-b1-plus-vocabulary";
+import { documentaryB1PlusGrammar } from "../pedagogy/patterns/documentary-b1-plus-grammar";
+import { resourceFreeForm } from "../pedagogy/patterns/resource-free-form";
 
 export type CriterionType = "scale_1_5" | "boolean";
 
@@ -72,6 +79,9 @@ export const RUBRICS = {
       },
     ],
   },
+
+  // Lesson rubrics are AUTO-DERIVED from pattern files below — search for
+  // `patternToRubric`. One rubric per (style, level-bucket, type) pattern.
 
   quiz_gen_v2: {
     key: "quiz_gen_v2",
@@ -147,7 +157,47 @@ export const RUBRICS = {
   },
 } as const satisfies Record<string, Rubric>;
 
-export type RubricKey = keyof typeof RUBRICS;
+// Lesson rubric version — bumped when an atomic check is added or its
+// semantics change. Pattern-level granularity, not per-check.
+export const LESSON_RUBRIC_VERSION = "v1";
+
+// Auto-derive a Rubric from a LessonPattern: universal checks + the pattern's
+// style-specific checks, each rendered as a boolean criterion (pass/fail).
+const patternToRubric = (pattern: LessonPattern): Rubric => ({
+  key: `${pattern.id}_${LESSON_RUBRIC_VERSION}`,
+  feature: "lesson_judge",
+  label: `Lesson judge — ${pattern.id}`,
+  criteria: [...UNIVERSAL_CHECKS, ...pattern.styleChecks].map((c) => ({
+    key: c.id,
+    label: c.label ?? c.id,
+    description: c.description,
+    type: "boolean" as const,
+    passBar: true,
+  })),
+});
+
+const LESSON_PATTERNS: LessonPattern[] = [
+  documentaryA1A2Vocabulary,
+  documentaryA1A2Grammar,
+  documentaryB1PlusVocabulary,
+  documentaryB1PlusGrammar,
+  resourceFreeForm,
+];
+
+const LESSON_RUBRICS: Record<string, Rubric> = Object.fromEntries(
+  LESSON_PATTERNS.map((p) => {
+    const r = patternToRubric(p);
+    return [r.key, r];
+  }),
+);
+
+// Flat, runtime-mutable map. `RUBRICS` is typed; `ALL_RUBRICS` is the lookup.
+const ALL_RUBRICS: Record<string, Rubric> = {
+  ...(RUBRICS as Record<string, Rubric>),
+  ...LESSON_RUBRICS,
+};
+
+export type RubricKey = keyof typeof RUBRICS | string;
 
 const DEFAULT_RUBRIC_BY_FEATURE: Partial<Record<AIFeature, RubricKey>> = {
   quiz_gen: "quiz_gen_v2",
@@ -157,12 +207,37 @@ export const getDefaultRubricForFeature = (
   feature: string,
 ): Rubric | null => {
   const key = DEFAULT_RUBRIC_BY_FEATURE[feature as AIFeature];
-  return key ? RUBRICS[key] : null;
+  return key ? (ALL_RUBRICS[key] ?? null) : null;
+};
+
+// lesson_gen needs the input_context to pick its per-pattern rubric.
+export const getDefaultRubricForGeneration = (
+  feature: string,
+  inputContext: Record<string, unknown> | null,
+): Rubric | null => {
+  if (feature === "lesson_gen" && inputContext) {
+    const level = inputContext.courseLevel as string | undefined;
+    const lessonType = inputContext.lessonType as string | undefined;
+    if (level && lessonType) {
+      const bucket = level === "A1" || level === "A2" ? "a1-a2" : "b1-plus";
+      const patternId =
+        lessonType === "resource"
+          ? "resource-free-form"
+          : `documentary-${bucket}-${lessonType}`;
+      const r = ALL_RUBRICS[`${patternId}_${LESSON_RUBRIC_VERSION}`];
+      if (r) return r;
+    }
+  }
+  return getDefaultRubricForFeature(feature);
 };
 
 export const getRubric = (key: string): Rubric | null => {
-  return (RUBRICS as Record<string, Rubric>)[key] ?? null;
+  return ALL_RUBRICS[key] ?? null;
 };
+
+/** Default lesson rubric key for a given pattern id. Used by the judge. */
+export const getLessonRubricKeyForPattern = (patternId: string): string =>
+  `${patternId}_${LESSON_RUBRIC_VERSION}`;
 
 /**
  * Validate a scores object against a rubric. Returns a normalised object

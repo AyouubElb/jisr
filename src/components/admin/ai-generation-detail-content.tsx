@@ -18,12 +18,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAIEvaluations, useAIGeneration } from "@/lib/hooks/useAIAdmin";
 import { useQuiz } from "@/lib/hooks/useQuizzes";
-import { getDefaultRubricForFeature } from "@/lib/ai/eval/rubrics";
+import { getDefaultRubricForGeneration } from "@/lib/ai/eval/rubrics";
 import { aiQuizOutputSchema } from "@/lib/ai/schemas/quiz-output.schema";
+import { aiLessonGenOutputSchema } from "@/lib/ai/schemas/lesson-gen.schema";
 import { AIOutputPreview } from "./ai-output-preview";
 import { AIInputContextPanel } from "./ai-input-context-panel";
 import { BlockDiffView, type DiffBlock } from "./block-diff-view";
 import { EvalForm } from "./eval-form";
+import { RichTextViewer } from "@/components/ui/rich-text-viewer";
 
 interface AIGenerationDetailContentProps {
   id: string;
@@ -33,7 +35,12 @@ export function AIGenerationDetailContent({
   id,
 }: AIGenerationDetailContentProps): React.JSX.Element {
   const { data: gen, isLoading, error } = useAIGeneration(id);
-  const rubric = gen ? getDefaultRubricForFeature(gen.feature) : null;
+  const rubric = gen
+    ? getDefaultRubricForGeneration(
+        gen.feature,
+        gen.input_context as Record<string, unknown> | null,
+      )
+    : null;
   const { data: evals } = useAIEvaluations(id, rubric?.key ?? "");
   // Always call this hook (rules-of-hooks); it no-ops with empty id.
   const { data: liveQuiz } = useQuiz(gen?.output_quiz_id ?? "");
@@ -72,8 +79,12 @@ export function AIGenerationDetailContent({
     rawOutput && "model_output" in rawOutput
       ? (rawOutput.model_output as unknown)
       : rawOutput;
-  const parsed = candidate
+  const isLessonGen = gen.feature === "lesson_gen";
+  const parsedQuiz = !isLessonGen && candidate
     ? aiQuizOutputSchema.safeParse(candidate)
+    : { success: false as const };
+  const parsedLesson = isLessonGen && candidate
+    ? aiLessonGenOutputSchema.safeParse(candidate)
     : { success: false as const };
   const inputCtx = gen.input_context as Record<string, unknown> | null;
 
@@ -197,12 +208,50 @@ export function AIGenerationDetailContent({
           <Tabs defaultValue="ai-output">
             <TabsList>
               <TabsTrigger value="ai-output">AI output</TabsTrigger>
-              <TabsTrigger value="diff">Changes</TabsTrigger>
+              {!isLessonGen ? (
+                <TabsTrigger value="diff">Changes</TabsTrigger>
+              ) : null}
             </TabsList>
 
             <TabsContent value="ai-output" className="mt-3">
-              {parsed.success ? (
-                <AIOutputPreview output={parsed.data} />
+              {isLessonGen ? (
+                parsedLesson.success ? (
+                  <Card>
+                    <CardContent className="p-6">
+                      {parsedLesson.data.summary ? (
+                        <p className="mb-4 text-sm italic text-muted-foreground">
+                          {parsedLesson.data.summary}
+                        </p>
+                      ) : null}
+                      <RichTextViewer
+                        content={parsedLesson.data.new_content}
+                        className="prose-headings:text-amber-950"
+                      />
+                    </CardContent>
+                  </Card>
+                ) : gen.error ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center gap-2 p-10 text-center">
+                      <AlertTriangle className="h-8 w-8 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        No output — the generation failed.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardContent className="space-y-2 p-4">
+                      <p className="text-sm font-medium">
+                        Raw output (could not be parsed as a lesson)
+                      </p>
+                      <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-muted/50 p-3 text-xs">
+                        {JSON.stringify(rawOutput, null, 2)}
+                      </pre>
+                    </CardContent>
+                  </Card>
+                )
+              ) : parsedQuiz.success ? (
+                <AIOutputPreview output={parsedQuiz.data} />
               ) : gen.error ? (
                 <Card>
                   <CardContent className="flex flex-col items-center gap-2 p-10 text-center">
@@ -226,13 +275,15 @@ export function AIGenerationDetailContent({
               )}
             </TabsContent>
 
-            <TabsContent value="diff" className="mt-3">
-              <BlockDiffView
-                originalBlocks={originalBlocks}
-                liveBlocks={liveBlocks}
-                quizDeleted={quizDeleted}
-              />
-            </TabsContent>
+            {!isLessonGen ? (
+              <TabsContent value="diff" className="mt-3">
+                <BlockDiffView
+                  originalBlocks={originalBlocks}
+                  liveBlocks={liveBlocks}
+                  quizDeleted={quizDeleted}
+                />
+              </TabsContent>
+            ) : null}
           </Tabs>
         </div>
 
