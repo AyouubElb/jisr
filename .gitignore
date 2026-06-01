@@ -60,3 +60,6 @@ next-env.d.ts
 
 # CLT experiment pages (local testing only)
 /src/app/(instructor)/instructor/clt
+
+# Load-test mock endpoint (kept local for re-testing, never deployed)
+/src/app/api/load-test
