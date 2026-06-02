@@ -1,11 +1,22 @@
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { randomBytes } from "node:crypto";
 import { requireAdmin } from "@/lib/supabase/guards";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createInviteSchema } from "@/lib/schemas/auth.schema";
+import { createInvite } from "@/lib/services/invites/create-invite.service";
 import { CreateInviteDialog } from "./create-invite-dialog";
 import { InvitesTable } from "./invites-table";
+
+// App origin from request headers (proxy-aware) — links work on localhost and
+// behind Vercel without a hardcoded base URL.
+async function getOrigin(): Promise<string> {
+  const headerList = await headers();
+  const host =
+    headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost:3000";
+  const protocol =
+    headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  return `${protocol}://${host}`;
+}
 
 async function createInviteAction(formData: FormData): Promise<void> {
   "use server";
@@ -22,21 +33,7 @@ async function createInviteAction(formData: FormData): Promise<void> {
     throw new Error(parsed.error.issues[0]?.message ?? "Donnees invalides.");
   }
 
-  const { email, full_name, kind, expires_in_days } = parsed.data;
-  const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(
-    Date.now() + expires_in_days * 24 * 60 * 60 * 1000
-  ).toISOString();
-
-  const supabase = await createServerSupabase();
-  const { error } = await supabase.from("invites").insert({
-    token,
-    email,
-    full_name,
-    kind,
-    expires_at: expiresAt,
-  });
-  if (error) throw new Error(error.message);
+  await createInvite({ ...parsed.data, origin: await getOrigin() });
 
   revalidatePath("/admin/invites");
 }
@@ -50,10 +47,7 @@ export default async function AdminInvitesPage(): Promise<React.JSX.Element> {
     .select("*")
     .order("created_at", { ascending: false });
 
-  const headerList = await headers();
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost:3000";
-  const protocol = headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const origin = `${protocol}://${host}`;
+  const origin = await getOrigin();
 
   return (
     <div className="space-y-6">
