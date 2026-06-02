@@ -15,6 +15,20 @@ export interface AttemptWithAnswers extends StudentAttempt {
   student_answers: StudentAnswer[];
 }
 
+// gradeAttempt finalizes only when every manual block is graded. On finalize it
+// returns the data the notify step needs; otherwise just { finalized: false }.
+export type GradeAttemptResult =
+  | { finalized: false }
+  | {
+      finalized: true;
+      attempt_id: string;
+      student_id: string;
+      quiz_id: string;
+      quiz_title: string;
+      course_id: string;
+      score: number | null;
+    };
+
 /**
  * One row per submitted attempt that contains at least one manual block.
  * Carries the full quiz shape (all blocks, all answers) so the grading pane
@@ -459,7 +473,7 @@ export const attemptsApi = {
       earned_weight: number;
       feedback: string | null;
     }[];
-  }): Promise<void> => {
+  }): Promise<GradeAttemptResult> => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Non authentifie");
@@ -485,13 +499,15 @@ export const attemptsApi = {
       ),
     );
 
-    // Refetch attempt to see if we can finalize
+    // Refetch attempt to see if we can finalize. Also pull student + quiz +
+    // course so a finalize can hand the notification step what it needs.
     const { data: attempt, error: fetchError } = await supabase
       .from("student_attempts")
       .select(
         `
         id,
-        quiz:quizzes!inner(quiz_blocks(id, type, weight)),
+        student_id,
+        quiz:quizzes!inner(id, title, quiz_blocks(id, type, weight), section:sections!inner(course_id)),
         student_answers(block_id, earned_weight, graded_at)
         `,
       )
@@ -502,8 +518,12 @@ export const attemptsApi = {
 
     type AttemptShape = {
       id: string;
+      student_id: string;
       quiz: {
+        id: string;
+        title: string;
         quiz_blocks: { id: string; type: BlockType; weight: number | null }[];
+        section: { course_id: string };
       };
       student_answers: {
         block_id: string;
@@ -521,7 +541,7 @@ export const attemptsApi = {
       return a && a.graded_at !== null;
     });
 
-    if (!allManualGraded) return;
+    if (!allManualGraded) return { finalized: false };
 
     const totalWeight = gradableBlocks.reduce(
       (sum, b) => sum + Number(b.weight ?? 0),
@@ -545,6 +565,17 @@ export const attemptsApi = {
       .eq("id", input.attempt_id);
 
     if (updateError) throw updateError;
+
+    // Finalized — return what the notify step needs (student is the recipient).
+    return {
+      finalized: true,
+      attempt_id: att.id,
+      student_id: att.student_id,
+      quiz_id: att.quiz.id,
+      quiz_title: att.quiz.title,
+      course_id: att.quiz.section.course_id,
+      score: finalScore,
+    };
   },
 
   // ── Student "mes notes" history ────────────────────────────────────

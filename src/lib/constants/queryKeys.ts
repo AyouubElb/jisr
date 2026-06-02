@@ -116,3 +116,9 @@ export const aiUsageKeys = {
   all: ["ai-usage"] as const,
   mine: () => [...aiUsageKeys.all, "mine"] as const,
 };
+
+export const notificationKeys = {
+  all: ["notifications"] as const,
+  list: () => [...notificationKeys.all, "list"] as const,
+  unreadCount: () => [...notificationKeys.all, "unread-count"] as const,
+};

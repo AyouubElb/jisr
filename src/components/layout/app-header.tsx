@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -88,6 +89,8 @@ export function AppHeader({ fullName, role }: AppHeaderProps): React.JSX.Element
           ج
         </span>
       </Link>
+      <div className="flex items-center gap-1">
+      <NotificationBell role={role} />
       <DropdownMenu>
         <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Avatar className="h-8 w-8">
@@ -119,6 +122,7 @@ export function AppHeader({ fullName, role }: AppHeaderProps): React.JSX.Element
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
     </header>
   );
 }

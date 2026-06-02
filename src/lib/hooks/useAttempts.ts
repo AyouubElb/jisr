@@ -140,9 +140,27 @@ export function useGradeAttempt() {
 
   return useMutation({
     mutationFn: attemptsApi.gradeAttempt,
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: attemptKeys.all });
       toast.success("Notes enregistrees");
+
+      // Only when the attempt actually flipped to graded — notify the student
+      // (+ email). Fire-and-forget: a notification failure must not surface as a
+      // grading error.
+      if (result.finalized) {
+        void fetch("/api/notifications/quiz-corrected", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            student_id: result.student_id,
+            attempt_id: result.attempt_id,
+            quiz_id: result.quiz_id,
+            quiz_title: result.quiz_title,
+            course_id: result.course_id,
+            score: result.score,
+          }),
+        });
+      }
     },
     onError: (error: Error) => {
       toast.error(`Erreur : ${error.message}`);
