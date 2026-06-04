@@ -33,12 +33,12 @@ export function CreateInviteDialog({
     startTransition(async () => {
       try {
         await action(formData);
-        toast.success("Invitation creee");
+        toast.success("Invitation created");
         form.reset();
         setOpen(false);
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "Erreur inconnue";
+          error instanceof Error ? error.message : "Unknown error";
         toast.error(message);
       }
     });

@@ -7,21 +7,17 @@ import { enUS } from "date-fns/locale";
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Search,
   Sparkles,
   XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DataListCard,
+  PAGE_SIZE_OPTIONS,
+} from "@/components/admin/data-list-card";
 import { useAIGenerations } from "@/lib/hooks/useAIAdmin";
 import type { AIGenerationListItem } from "@/lib/api/ai-admin.api";
-
-const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 export function AIGenerationsListContent(): React.JSX.Element {
   const router = useRouter();
@@ -169,163 +165,92 @@ export function AIGenerationsListContent(): React.JSX.Element {
       </div>
 
       {/* ── FILTER BAR + LIST ──────────────────────────────────── */}
-      <Card className="min-w-0 overflow-hidden">
-        <CardContent className="p-0">
-          <div className="space-y-3 border-b p-4">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search (title, instructor, model, feature, id…)"
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={feature}
-                onChange={(e) => setFeature(e.target.value)}
-                className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-              >
-                <option value="">All features</option>
-                <option value="quiz_gen">quiz_gen</option>
-                <option value="lesson_gen">lesson_gen</option>
-              </select>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-              >
-                <option value="">All models</option>
-                {distinctModels.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={instructorId}
-                onChange={(e) => setInstructorId(e.target.value)}
-                className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-              >
-                <option value="">All instructors</option>
-                {distinctInstructors.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.name}
-                  </option>
-                ))}
-              </select>
-              <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={onlyUnrated}
-                  onChange={(e) => setOnlyUnrated(e.target.checked)}
-                />
-                To evaluate
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={onlyErrors}
-                  onChange={(e) => setOnlyErrors(e.target.checked)}
-                />
-                Errors
-              </label>
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="divide-y">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center gap-4 px-4 py-4">
-                  <Skeleton className="h-9 w-9 rounded-full" />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
-                  <Skeleton className="h-5 w-16" />
-                  <Skeleton className="h-5 w-16" />
-                </div>
+      <DataListCard
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: "Search (title, instructor, model, feature, id…)",
+        }}
+        filters={
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={feature}
+              onChange={(e) => setFeature(e.target.value)}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+            >
+              <option value="">All features</option>
+              <option value="quiz_gen">quiz_gen</option>
+              <option value="lesson_gen">lesson_gen</option>
+            </select>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+            >
+              <option value="">All models</option>
+              {distinctModels.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <Sparkles className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                {search || feature || model || instructorId || onlyUnrated || onlyErrors
-                  ? "No generation matches the filters"
-                  : "No generations yet"}
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="divide-y">
-                {paginated.map((r) => (
-                  <GenerationRow
-                    key={r.id}
-                    row={r}
-                    onClick={() =>
-                      router.push(`/admin/ai/generations/${r.id}`)
-                    }
-                  />
-                ))}
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>
-                    {filtered.length === 0
-                      ? "0 results"
-                      : `${safePage * pageSize + 1}–${Math.min(
-                          (safePage + 1) * pageSize,
-                          filtered.length,
-                        )} of ${filtered.length}`}
-                  </span>
-                  <span aria-hidden>·</span>
-                  <label className="flex items-center gap-1.5">
-                    <span>Show</span>
-                    <select
-                      value={pageSize}
-                      onChange={(e) => setPageSize(Number(e.target.value))}
-                      className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-                    >
-                      {PAGE_SIZE_OPTIONS.map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    Page {safePage + 1} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    disabled={safePage === 0}
-                    onClick={() => setPage(Math.max(0, safePage - 1))}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    disabled={safePage >= totalPages - 1}
-                    onClick={() =>
-                      setPage(Math.min(totalPages - 1, safePage + 1))
-                    }
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </select>
+            <select
+              value={instructorId}
+              onChange={(e) => setInstructorId(e.target.value)}
+              className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+            >
+              <option value="">All instructors</option>
+              {distinctInstructors.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name}
+                </option>
+              ))}
+            </select>
+            <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={onlyUnrated}
+                onChange={(e) => setOnlyUnrated(e.target.checked)}
+              />
+              To evaluate
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm">
+              <input
+                type="checkbox"
+                checked={onlyErrors}
+                onChange={(e) => setOnlyErrors(e.target.checked)}
+              />
+              Errors
+            </label>
+          </div>
+        }
+        isLoading={isLoading}
+        loadingRowCount={5}
+        isEmpty={filtered.length === 0}
+        emptyState={{
+          icon: <Sparkles />,
+          message:
+            search || feature || model || instructorId || onlyUnrated || onlyErrors
+              ? "No generation matches the filters"
+              : "No generations yet",
+        }}
+        pagination={{
+          page: safePage,
+          pageSize,
+          totalCount: filtered.length,
+          onPageChange: setPage,
+          onPageSizeChange: setPageSize,
+          pageSizeOptions: PAGE_SIZE_OPTIONS,
+        }}
+      >
+        {paginated.map((r) => (
+          <GenerationRow
+            key={r.id}
+            row={r}
+            onClick={() => router.push(`/admin/ai/generations/${r.id}`)}
+          />
+        ))}
+      </DataListCard>
     </div>
   );
 }

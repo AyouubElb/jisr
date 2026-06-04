@@ -13,12 +13,17 @@ import {
 } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
+// Standard page sizes for every dashboard list.
+export const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
 interface DataListCardProps {
   search?: {
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
   };
+  // Extra filter controls (selects, checkboxes) shown under the search box.
+  filters?: React.ReactNode;
   isLoading?: boolean;
   isEmpty: boolean;
   emptyState: { icon: React.ReactNode; message: string };
@@ -36,6 +41,7 @@ interface DataListCardProps {
 
 export function DataListCard({
   search,
+  filters,
   isLoading = false,
   isEmpty,
   emptyState,
@@ -46,17 +52,20 @@ export function DataListCard({
   return (
     <Card className="gap-0! py-0!">
       <CardContent className="p-0!">
-        {search && (
-          <div className="border-b p-4">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={search.placeholder}
-                className="pl-9"
-                value={search.value}
-                onChange={(e) => search.onChange(e.target.value)}
-              />
-            </div>
+        {(search || filters) && (
+          <div className="space-y-3 border-b p-4">
+            {search && (
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder={search.placeholder}
+                  className="pl-9"
+                  value={search.value}
+                  onChange={(e) => search.onChange(e.target.value)}
+                />
+              </div>
+            )}
+            {filters}
           </div>
         )}
 

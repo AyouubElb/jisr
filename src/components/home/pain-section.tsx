@@ -5,13 +5,13 @@ const fieldNotes = [
     when: "Mardi · 22 h 47",
     icon: MessageCircle,
     headline: "47 messages WhatsApp non lus.",
-    sub: "Vous coupez votre série pour répondre. Encore.",
+    sub: "Vous lâchez tout pour répondre. Encore.",
   },
   {
     when: "Dimanche · 6 h 12",
     icon: ClipboardCheck,
     headline: "23 copies à corriger avant lundi.",
-    sub: "Café numéro 3. Stylo rouge presque vide.",
+    sub: "Et la semaine n'a même pas commencé.",
   },
 ] as const;
 
@@ -36,14 +36,15 @@ export function PainSection(): React.JSX.Element {
               </span>
               <br />
               <span className="text-amber-950/70">
-                Le reste — vous le faites parce qu&apos;il le faut.
+                Le reste vous le faites parce qu&apos;il le faut.
               </span>
             </h2>
 
             <p className="mt-6 max-w-xl text-base text-muted-foreground sm:text-lg">
-              Vous préparez, vous expliquez, vous accompagnez. Ça, c&apos;est
-              votre métier. Tout ce qu&apos;il y a autour, ce ne devrait pas
-              être votre problème.
+              Vous préparez, vous expliquez, vous accompagnez. C&apos;est votre
+              métier. Le reste, c&apos;est 5 onglets ouverts, des messages qui
+              n&apos;arrêtent pas, et des copies à corriger à 23h. Ça ne
+              devrait pas être votre problème.
             </p>
           </div>
 
@@ -118,10 +119,10 @@ function PrepTimeNote(): React.JSX.Element {
 
       <div className="md:pb-4">
         <p className="text-xl font-semibold leading-snug text-amber-950 sm:text-2xl">
-          partent dans la prépa avant la semaine.
+          perdues dans la prépa de la semaine.
         </p>
         <p className="mt-2 text-sm italic text-muted-foreground sm:text-base">
-          PowerPoint, Word, Google Forms — un onglet par outil.
+          PowerPoint, Word, Google Forms. Un onglet par outil.
         </p>
       </div>
     </div>

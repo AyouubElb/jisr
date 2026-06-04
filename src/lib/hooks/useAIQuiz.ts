@@ -21,7 +21,7 @@ export const useGenerateAIQuiz = (courseId: string, sectionId: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: quizKeys.bySection(sectionId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Brouillon de quiz généré — révisez avant de publier");
+      toast.success("Quiz draft generated. Review before publishing.");
     },
     onError: (error) => {
       toast.error(error.message);
@@ -59,7 +59,7 @@ export const useApplyAIQuizEdit = (quizId: string) => {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: quizKeys.detail(quizId) });
       toast.success(
-        `${res.applied} changement${res.applied > 1 ? "s" : ""} appliqué${res.applied > 1 ? "s" : ""}`,
+        `${res.applied} change${res.applied > 1 ? "s" : ""} applied`,
       );
     },
     onError: (error) => {

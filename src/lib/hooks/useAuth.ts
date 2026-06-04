@@ -48,7 +48,7 @@ export function useUpdateProfile() {
     mutationFn: async ({ full_name }: { full_name: string }): Promise<void> => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Non authentifie");
+      if (!user) throw new Error("Not authenticated");
       const { error } = await supabase
         .from("profiles")
         .update({ full_name })
@@ -57,10 +57,10 @@ export function useUpdateProfile() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: profileKeys.me() });
-      toast.success("Profil mis à jour");
+      toast.success("Profile updated");
     },
     onError: () => {
-      toast.error("Impossible de mettre à jour le profil. Veuillez réessayer.");
+      toast.error("Could not update profile. Please try again.");
     },
   });
 }
@@ -73,10 +73,10 @@ export function useUpdatePassword() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Mot de passe mis à jour");
+      toast.success("Password updated");
     },
     onError: () => {
-      toast.error("Le mot de passe n'a pas pu être mis à jour. Veuillez réessayer.");
+      toast.error("Could not update password. Please try again.");
     },
   });
 }

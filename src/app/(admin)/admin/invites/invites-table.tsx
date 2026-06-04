@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DataListCard } from "@/components/admin/data-list-card";
+import { DataListCard, PAGE_SIZE_OPTIONS } from "@/components/admin/data-list-card";
 import { Copy, Mail } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -51,8 +51,6 @@ function getInitials(fullName: string | null, email: string): string {
     .toUpperCase();
 }
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
-
 export function InvitesTable({
   invites,
   origin,
@@ -79,7 +77,7 @@ export function InvitesTable({
   const copyLink = async (invite: Invite): Promise<void> => {
     const link = `${origin}/instructor/signup?token=${invite.token}`;
     await navigator.clipboard.writeText(link);
-    toast.success("Lien copie dans le presse-papiers");
+    toast.success("Link copied to clipboard");
   };
 
   return (

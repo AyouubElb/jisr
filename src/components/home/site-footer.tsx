@@ -39,20 +39,28 @@ export function SiteFooter(): React.JSX.Element {
                   href="#fonctionnalites"
                   className="hover:text-amber-950"
                 >
-                  Fonctionnalités
+                  Les outils
                 </SmoothScrollLink>
               </li>
               <li>
                 <SmoothScrollLink
-                  href="#tarifs"
+                  href="#fondateur"
                   className="hover:text-amber-950"
                 >
-                  Tarifs
+                  L&apos;offre fondateur
                 </SmoothScrollLink>
               </li>
               <li>
                 <SmoothScrollLink href="#faq" className="hover:text-amber-950">
                   FAQ
+                </SmoothScrollLink>
+              </li>
+              <li>
+                <SmoothScrollLink
+                  href="#waitlist"
+                  className="hover:text-amber-950"
+                >
+                  Rejoindre la liste
                 </SmoothScrollLink>
               </li>
               <li>
@@ -62,7 +70,7 @@ export function SiteFooter(): React.JSX.Element {
                   rel="noopener noreferrer"
                   className="hover:text-amber-950"
                 >
-                  Demander un accès
+                  Nous contacter
                 </a>
               </li>
             </ul>

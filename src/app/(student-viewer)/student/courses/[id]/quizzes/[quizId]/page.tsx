@@ -42,6 +42,7 @@ import type { QuizBlock, QuizWithBlocks, Lesson, StudentAttempt } from "@/lib/ty
 import type { SubmittedAnswerInput } from "@/lib/api/attempts.api";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
 
 interface AnswerState {
   selected_option_id?: string;
@@ -1149,6 +1150,12 @@ function FreeTextView({
   const minWords = content.min_words as number | undefined;
   const wordCount = value.trim().split(/\s+/).filter(Boolean).length;
 
+  // Block paste + drag-drop so students write their own answers (deterrent, not a lock).
+  const blockPaste = (e: React.ClipboardEvent | React.DragEvent): void => {
+    e.preventDefault();
+    toast.warning("Coller du texte est désactivé. Saisissez votre réponse directement.");
+  };
+
   return (
     <div className="space-y-3">
       {prompt && <p className="text-sm font-medium text-amber-950">{prompt}</p>}
@@ -1156,6 +1163,8 @@ function FreeTextView({
         rows={5}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onPaste={blockPaste}
+        onDrop={blockPaste}
         placeholder="Écrivez votre réponse ici..."
         className="resize-none"
       />

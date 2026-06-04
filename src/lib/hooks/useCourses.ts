@@ -39,10 +39,10 @@ export function useCreateCourse() {
     mutationFn: (course: CourseInsert) => coursesApi.create(course),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: courseKeys.all });
-      toast.success("Cours cree avec succes");
+      toast.success("Course created");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur lors de la creation du cours : ${error.message}`);
+      toast.error(`Failed to create course: ${error.message}`);
     },
   });
 }
@@ -57,10 +57,10 @@ export function useUpdateCourse() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: courseKeys.all });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(id) });
-      toast.success("Cours mis a jour");
+      toast.success("Course updated");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur lors de la mise a jour : ${error.message}`);
+      toast.error(`Failed to update course: ${error.message}`);
     },
   });
 }
@@ -73,10 +73,10 @@ export function useDeleteCourse() {
     mutationFn: coursesApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: courseKeys.all });
-      toast.success("Cours supprime");
+      toast.success("Course deleted");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur lors de la suppression : ${error.message}`);
+      toast.error(`Failed to delete course: ${error.message}`);
     },
   });
 }

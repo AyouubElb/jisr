@@ -48,9 +48,9 @@ export const useUpdateInstructorTier = () => {
       adminApi.updateInstructorTier(id, tier),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.instructors() });
-      toast.success("Tier mis a jour");
+      toast.success("Tier updated");
     },
-    onError: () => toast.error("Erreur lors de la mise a jour"),
+    onError: () => toast.error("Update failed"),
   });
 };
 
@@ -62,8 +62,8 @@ export const useUpdateInstructorStatus = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminKeys.instructors() });
       queryClient.invalidateQueries({ queryKey: adminKeys.stats() });
-      toast.success("Statut mis a jour");
+      toast.success("Status updated");
     },
-    onError: () => toast.error("Erreur lors de la mise a jour"),
+    onError: () => toast.error("Update failed"),
   });
 };

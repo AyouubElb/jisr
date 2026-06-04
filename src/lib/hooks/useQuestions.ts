@@ -88,11 +88,11 @@ export function useSetQuestionStatus(courseId: string) {
         queryKey: questionKeys.byCourse(courseId),
       });
       toast.success(
-        status === "resolved" ? "Marquee comme resolue" : "Rouvert",
+        status === "resolved" ? "Marked as resolved" : "Reopened",
       );
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -107,10 +107,10 @@ export function useDeleteQuestion(courseId: string) {
       queryClient.invalidateQueries({
         queryKey: questionKeys.byCourse(courseId),
       });
-      toast.success("Question supprimee");
+      toast.success("Question deleted");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }

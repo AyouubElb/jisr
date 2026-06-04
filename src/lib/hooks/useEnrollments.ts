@@ -17,7 +17,7 @@ export function useCreateStudent() {
         body: JSON.stringify(data),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Erreur inconnue");
+      if (!res.ok) throw new Error(json.error ?? "Unknown error");
       return json;
     },
     onSuccess: () => {
@@ -77,10 +77,10 @@ export function useAddStudent() {
       queryClient.invalidateQueries({
         queryKey: ["engagement", "student", studentId, "course", courseId],
       });
-      toast.success("Etudiant ajouté au cours");
+      toast.success("Student added to course");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -97,10 +97,10 @@ export function useRemoveStudent() {
       queryClient.invalidateQueries({
         queryKey: ["engagement", "student", studentId, "course", courseId],
       });
-      toast.success("Etudiant retiré du cours");
+      toast.success("Student removed from course");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }

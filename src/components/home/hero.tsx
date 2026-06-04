@@ -14,17 +14,15 @@ export function Hero(): React.JSX.Element {
           </div>
 
           <h1 className="mt-6 text-4xl font-bold tracking-tight text-amber-950 sm:text-5xl lg:text-6xl">
-            Enseignez plus.
+            Votre classe d&apos;anglais en ligne.
             <br />
-            <span className="text-amber-950/70">
-              Sans y laisser vos dimanches.
-            </span>
+            <span className="text-amber-950/70">Dans un seul outil.</span>
           </h1>
 
           <p className="mt-6 text-lg text-muted-foreground sm:text-xl">
-            Une IA prend les heures perdues — correction, quiz, suivi
-            d&apos;élèves. Vous gardez l&apos;essentiel&nbsp;: la pédagogie, la
-            voix, la relation avec vos élèves.
+            Jisr réunit vos cours, vos quiz et le suivi de vos élèves. Une IA
+            prend le travail répétitif. Vous gardez l&apos;essentiel&nbsp;: la
+            pédagogie et la relation avec vos élèves.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

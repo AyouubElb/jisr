@@ -142,7 +142,7 @@ export function useGradeAttempt() {
     mutationFn: attemptsApi.gradeAttempt,
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: attemptKeys.all });
-      toast.success("Notes enregistrees");
+      toast.success("Grades saved");
 
       // Only when the attempt actually flipped to graded — notify the student
       // (+ email). Fire-and-forget: a notification failure must not surface as a
@@ -163,7 +163,7 @@ export function useGradeAttempt() {
       }
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -182,15 +182,15 @@ export function useGradeAttemptAI() {
       queryClient.invalidateQueries({ queryKey: attemptKeys.all });
       const n = res.gradedBlockIds.length;
       if (n === 0) {
-        toast.info("Aucune réponse à corriger par l'IA");
+        toast.info("No answers for AI to grade");
         return;
       }
       toast.success(
-        `IA : ${n} réponse${n > 1 ? "s notées" : " notée"} — vérifiez avant d'enregistrer`,
+        `AI: ${n} answer${n > 1 ? "s graded" : " graded"}. Review before saving.`,
       );
     },
     onError: (error) => {
-      toast.error(`Correction IA : ${error.message}`);
+      toast.error(`AI grading: ${error.message}`);
     },
   });
 }

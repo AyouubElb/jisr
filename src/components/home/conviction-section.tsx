@@ -45,8 +45,9 @@ export function ConvictionSection(): React.JSX.Element {
         <div className="order-2 lg:order-1">
           <div className="max-w-xl space-y-6 text-lg leading-relaxed text-amber-950/85 sm:text-xl sm:leading-[1.7]">
             <p>
-              On a vu des profs donner leurs heures au répétitif, pendant que
-              la pédagogie — ce pour quoi ils sont là — passe en deuxième.
+              On a vu des profs perdre leurs heures dans le répétitif. Ils
+              sont là pour créer, inventer, s&apos;adapter à chaque élève. Pas
+              pour refaire les mêmes corrections tous les soirs.
             </p>
 
             <p>
@@ -61,7 +62,7 @@ export function ConvictionSection(): React.JSX.Element {
 
             <p>
               Alors on a construit Jisr. Vos cours, vos quiz, vos sessions,
-              vos élèves — dans un seul outil. Avec une IA qui prend ce qui
+              vos élèves. Dans un seul outil. Avec une IA qui prend ce qui
               se répète&nbsp;: la correction, la prépa, le suivi.
             </p>
 
@@ -84,8 +85,8 @@ export function ConvictionSection(): React.JSX.Element {
             <div className="border-t border-amber-950/10 pt-6">
               <p className="text-sm leading-relaxed text-amber-950/65">
                 Construit au Maroc, avec une prof qui enseigne en ligne à ses
-                élèves — bac, IELTS, TOEFL. Rien ne sort sans avoir été utilisé
-                avec ses vrais élèves.
+                élèves&nbsp;: bac, IELTS, TOEFL. Rien ne sort sans avoir été
+                utilisé avec ses vrais élèves.
               </p>
             </div>
           </div>

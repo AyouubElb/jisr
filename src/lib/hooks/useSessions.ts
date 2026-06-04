@@ -49,10 +49,10 @@ export function useCreateSession(courseId: string) {
       queryClient.invalidateQueries({ queryKey: sessionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: sessionKeys.upcoming() });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Session creee");
+      toast.success("Session created");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -68,10 +68,10 @@ export function useUpdateSession(courseId: string) {
       queryClient.invalidateQueries({ queryKey: sessionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: sessionKeys.upcoming() });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Session mise a jour");
+      toast.success("Session updated");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -86,10 +86,10 @@ export function useDeleteSession(courseId: string) {
       queryClient.invalidateQueries({ queryKey: sessionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: sessionKeys.upcoming() });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Session supprimee");
+      toast.success("Session deleted");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }

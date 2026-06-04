@@ -34,10 +34,10 @@ export function useUploadMaterial() {
           queryKey: materialKeys.byLesson(material.lesson_id),
         });
       }
-      toast.success("Document ajoute");
+      toast.success("Document added");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur lors de l'envoi : ${error.message}`);
+      toast.error(`Upload failed: ${error.message}`);
     },
   });
 }
@@ -61,10 +61,10 @@ export function useDeleteMaterial() {
           queryKey: materialKeys.byLesson(lessonId),
         });
       }
-      toast.success("Document supprime");
+      toast.success("Document deleted");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur lors de la suppression : ${error.message}`);
+      toast.error(`Delete failed: ${error.message}`);
     },
   });
 }
@@ -74,7 +74,7 @@ export function useSignedUrl() {
   return useMutation({
     mutationFn: (path: string) => materialsApi.getSignedUrl(path),
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }

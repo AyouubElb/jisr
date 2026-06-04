@@ -24,10 +24,10 @@ export function useCreateSection(courseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Section ajoutee");
+      toast.success("Section added");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -42,10 +42,10 @@ export function useUpdateSection(courseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Section mise a jour");
+      toast.success("Section updated");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -59,10 +59,10 @@ export function useDeleteSection(courseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Section supprimee");
+      toast.success("Section deleted");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }

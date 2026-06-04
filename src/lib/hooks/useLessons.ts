@@ -24,10 +24,10 @@ export function useCreateLesson(courseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Lecon ajoutee");
+      toast.success("Lesson added");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -43,10 +43,10 @@ export function useUpdateLesson(courseId: string) {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
       queryClient.invalidateQueries({ queryKey: lessonKeys.detail(id) });
-      if (!silent) toast.success("Lecon mise a jour");
+      if (!silent) toast.success("Lesson updated");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -60,10 +60,10 @@ export function useDeleteLesson(courseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Lecon supprimee");
+      toast.success("Lesson deleted");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }

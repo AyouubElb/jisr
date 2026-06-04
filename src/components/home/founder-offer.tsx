@@ -39,7 +39,7 @@ export function FounderOffer(): React.JSX.Element {
                 <span className="text-4xl font-bold text-amber-950">99 DH</span>
                 <span className="text-sm text-muted-foreground">/ mois</span>
                 <span className="text-sm text-muted-foreground line-through">
-                  199 DH
+                  200 DH
                 </span>
               </div>
               <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900">
@@ -47,7 +47,7 @@ export function FounderOffer(): React.JSX.Element {
               </p>
               <p className="mt-4 text-sm text-muted-foreground">
                 Tarif fondateur réservé aux 10 premiers profs. Après ce cercle,
-                le plan Pro passe au tarif standard (199 DH/mois).
+                le plan Pro passe au tarif standard (200 DH/mois).
               </p>
             </div>
 

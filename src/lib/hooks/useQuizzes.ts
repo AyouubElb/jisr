@@ -24,10 +24,10 @@ export function useCreateQuiz(courseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Quiz ajoute");
+      toast.success("Quiz added");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -43,10 +43,10 @@ export function useUpdateQuiz(courseId: string) {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
       queryClient.invalidateQueries({ queryKey: quizKeys.detail(id) });
-      if (!silent) toast.success("Quiz mis a jour");
+      if (!silent) toast.success("Quiz updated");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -70,7 +70,7 @@ export function useDuplicateQuiz(courseId: string) {
 
       const copy = await quizzesApi.create({
         section_id: source.section_id,
-        title: `${source.title} (copie)`,
+        title: `${source.title} (copy)`,
         description: source.description,
         time_limit_minutes: source.time_limit_minutes,
         order: nextOrder,
@@ -95,10 +95,10 @@ export function useDuplicateQuiz(courseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Quiz duplique");
+      toast.success("Quiz duplicated");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -112,10 +112,10 @@ export function useDeleteQuiz(courseId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
       queryClient.invalidateQueries({ queryKey: courseKeys.detail(courseId) });
-      toast.success("Quiz supprime");
+      toast.success("Quiz deleted");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }
@@ -136,10 +136,10 @@ export function useSaveQuizBlocks(courseId: string) {
     onSuccess: (_, { quizId, silent }) => {
       queryClient.invalidateQueries({ queryKey: quizKeys.detail(quizId) });
       queryClient.invalidateQueries({ queryKey: sectionKeys.byCourse(courseId) });
-      if (!silent) toast.success("Blocs du quiz enregistres");
+      if (!silent) toast.success("Quiz blocks saved");
     },
     onError: (error: Error) => {
-      toast.error(`Erreur : ${error.message}`);
+      toast.error(`Error: ${error.message}`);
     },
   });
 }

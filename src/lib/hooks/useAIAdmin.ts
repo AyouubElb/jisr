@@ -63,10 +63,10 @@ export const useUpsertEvaluation = () => {
       queryClient.invalidateQueries({
         queryKey: aiAdminKeys.evaluation(variables.generationId),
       });
-      toast.success("Évaluation enregistrée");
+      toast.success("Evaluation saved");
     },
     onError: (error) => {
-      toast.error(error.message || "Échec de l'enregistrement");
+      toast.error(error.message || "Save failed");
     },
   });
 };

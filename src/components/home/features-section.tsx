@@ -1,31 +1,37 @@
 import {
-  Bot,
+  BookOpen,
+  Sparkles,
   CheckCheck,
-  MessageSquare,
   AlertCircle,
-  Play,
+  MessageSquare,
 } from "lucide-react";
+import { VideoPlayer } from "@/components/home/video-player";
 
 const features = [
   {
-    icon: Bot,
-    headline: "Décrivez un thème. Jisr génère le quiz",
-    sub: "Questions, audios, corrigés — prêts en quelques secondes.",
+    icon: BookOpen,
+    headline: "Vos cours. Organisés à votre façon.",
+    sub: "Créez vos leçons, vos supports, vos parcours par niveau CEFR. Partagez avec vos élèves en un clic.",
+  },
+  {
+    icon: Sparkles,
+    headline: "L'IA prépare. Vous validez.",
+    sub: "Leçons, quiz, passages audio avec leurs questions. Décrivez le thème, l'IA propose. Vous gardez la main.",
   },
   {
     icon: CheckCheck,
-    headline: "Les QCM se corrigent seuls",
-    sub: "Les rédactions, on vous fait une première passe. Vous validez en 2 minutes.",
-  },
-  {
-    icon: MessageSquare,
-    headline: "Tout passe par Jisr",
-    sub: "Messages, devoirs, ressources. Votre WhatsApp respire.",
+    headline: "Les corrections divisées par deux.",
+    sub: "QCM corrigés seuls. Rédactions : l'IA fait la première passe, vous validez en 2 minutes.",
   },
   {
     icon: AlertCircle,
-    headline: "On vous prévient quand un élève décroche",
-    sub: "14 jours sans connexion — vous le voyez avant lui.",
+    headline: "Vos élèves. Suivis en continu.",
+    sub: "Engagement, scores, ce qui décroche. Vous le voyez avant que l'élève parte.",
+  },
+  {
+    icon: MessageSquare,
+    headline: "Tout passe par Jisr.",
+    sub: "Messages, devoirs, ressources, sessions live. Votre WhatsApp respire.",
   },
 ] as const;
 
@@ -54,7 +60,7 @@ export function FeaturesSection(): React.JSX.Element {
         <div className="mt-12 grid gap-6 sm:mt-16 lg:grid-cols-5 lg:gap-8">
           {/* Video — spans 3 of 5 cols on lg */}
           <div className="lg:col-span-3">
-            <VideoPlaceholder />
+            <VideoPlayer />
           </div>
 
           {/* Features — spans 2 of 5 cols on lg */}
@@ -68,10 +74,8 @@ export function FeaturesSection(): React.JSX.Element {
         {/* ── Footer line ────────────────────────────────────────── */}
         <p className="mt-12 max-w-4xl text-base text-muted-foreground sm:mt-16 sm:text-lg">
           Jisr fait le pont entre vous et vos élèves. Pas une plateforme de plus
-          à apprendre —{" "}
-          <em className="font-semibold not-italic text-amber-950">
-            a shortcut
-          </em>
+          à apprendre.{" "}
+          <em className="font-semibold not-italic text-amber-950">a shortcut</em>
           .
         </p>
       </div>
@@ -89,7 +93,7 @@ function FeatureRow({
   sub: string;
 }): React.JSX.Element {
   return (
-    <div className="group flex gap-4 p-5 transition-colors hover:bg-primary/5 sm:p-6">
+    <div className="group flex flex-1 gap-4 p-5 transition-colors hover:bg-primary/5 sm:p-6">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
         <Icon className="h-4 w-4" />
       </div>
@@ -103,50 +107,3 @@ function FeatureRow({
   );
 }
 
-/**
- * Placeholder for the demo video. Swap the inner content for a real
- * <video> element when the demo file is ready.
- *
- * Suggested swap:
- *   <video src="/demo/jisr-demo.mp4"
- *          poster="/demo/jisr-demo-poster.jpg"
- *          autoPlay muted loop playsInline preload="none"
- *          className="h-full w-full object-cover" />
- */
-function VideoPlaceholder(): React.JSX.Element {
-  return (
-    <div className="group relative aspect-video w-full overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-stone-900 shadow-2xl shadow-amber-950/20 ring-1 ring-amber-950/10">
-      {/* Decorative grid pattern */}
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.07]"
-        style={{
-          backgroundImage:
-            "linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)",
-          backgroundSize: "32px 32px",
-          color: "white",
-        }}
-      />
-
-      {/* Decorative blobs */}
-      <div className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-amber-500/15 blur-3xl" />
-
-      {/* Center play element */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-card/95 shadow-xl ring-1 ring-white/20 transition-transform group-hover:scale-105">
-          <Play className="h-6 w-6 fill-primary text-primary" />
-        </div>
-        <p className="text-sm font-medium tracking-wide text-amber-50/90">
-          Démo en préparation
-        </p>
-      </div>
-
-      {/* Bottom-left pill */}
-      <div className="absolute bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full bg-card/95 px-3 py-1 text-[11px] font-semibold tracking-wide text-amber-950 shadow-sm">
-        <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
-        Démo · 28 sec
-      </div>
-    </div>
-  );
-}

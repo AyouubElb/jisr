@@ -136,7 +136,7 @@ export function FinalCta(): React.JSX.Element {
                 <strong className="text-stone-900">
                   99&nbsp;DH/mois à vie
                 </strong>{" "}
-                (au lieu de 199 DH). Laissez vos coordonnées — on vous écrit dès
+                (au lieu de 200 DH). Laissez vos coordonnées — on vous écrit dès
                 l&apos;ouverture des places.
               </p>
               <ul className="mt-6 space-y-2 text-sm text-stone-900/90">

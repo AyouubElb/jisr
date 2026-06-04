@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DataListCard, PAGE_SIZE_OPTIONS } from "@/components/admin/data-list-card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +28,6 @@ import {
   DollarSign,
   GraduationCap,
   MoreHorizontal,
-  Search,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -63,9 +62,20 @@ export function InstructorsContent(): React.JSX.Element {
   const { mutate: updateTier, isPending: isUpdatingTier } = useUpdateInstructorTier();
   const { mutate: updateStatus, isPending: isUpdatingStatus } = useUpdateInstructorStatus();
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE_OPTIONS[0]);
 
-  const filtered = (instructors ?? []).filter((i) =>
-    i.full_name.toLowerCase().includes(search.toLowerCase()),
+  const filtered = useMemo(
+    () =>
+      (instructors ?? []).filter((i) =>
+        i.full_name.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [instructors, search],
+  );
+
+  const pageItems = useMemo(
+    () => filtered.slice(page * pageSize, (page + 1) * pageSize),
+    [filtered, page, pageSize],
   );
 
   const totalCourses = (instructors ?? []).reduce((s, i) => s + i.course_count, 0);
@@ -116,62 +126,51 @@ export function InstructorsContent(): React.JSX.Element {
       </div>
 
       {/* ── SEARCH + TABLE ─────────────────────────────────────── */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="border-b p-4">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher un instructeur..."
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-0 divide-y">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex items-center gap-4 px-4 py-4">
-                  <Skeleton className="h-9 w-9 rounded-full" />
-                  <div className="flex-1 space-y-1.5">
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                  <Skeleton className="h-5 w-16" />
-                  <Skeleton className="h-5 w-12" />
-                </div>
-              ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <GraduationCap className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                {search ? "Aucun instructeur trouve" : "Aucun instructeur pour le moment"}
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {filtered.map((instructor) => (
-                <InstructorRow
-                  key={instructor.id}
-                  instructor={instructor}
-                  onTierChange={(tier) => updateTier({ id: instructor.id, tier })}
-                  onStatusToggle={() =>
-                    updateStatus({
-                      id: instructor.id,
-                      status: instructor.status === "active" ? "pending" : "active",
-                    })
-                  }
-                  isPending={isUpdatingTier || isUpdatingStatus}
-                  isUpdatingTier={isUpdatingTier}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <DataListCard
+        search={{
+          value: search,
+          onChange: (v) => {
+            setSearch(v);
+            setPage(0);
+          },
+          placeholder: "Rechercher un instructeur...",
+        }}
+        isLoading={isLoading}
+        isEmpty={filtered.length === 0}
+        emptyState={{
+          icon: <GraduationCap />,
+          message: search
+            ? "Aucun instructeur trouve"
+            : "Aucun instructeur pour le moment",
+        }}
+        pagination={{
+          page,
+          pageSize,
+          totalCount: filtered.length,
+          onPageChange: setPage,
+          onPageSizeChange: (size) => {
+            setPageSize(size);
+            setPage(0);
+          },
+          pageSizeOptions: PAGE_SIZE_OPTIONS,
+        }}
+      >
+        {pageItems.map((instructor) => (
+          <InstructorRow
+            key={instructor.id}
+            instructor={instructor}
+            onTierChange={(tier) => updateTier({ id: instructor.id, tier })}
+            onStatusToggle={() =>
+              updateStatus({
+                id: instructor.id,
+                status: instructor.status === "active" ? "pending" : "active",
+              })
+            }
+            isPending={isUpdatingTier || isUpdatingStatus}
+            isUpdatingTier={isUpdatingTier}
+          />
+        ))}
+      </DataListCard>
     </div>
   );
 }
