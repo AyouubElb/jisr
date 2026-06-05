@@ -1,10 +1,30 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Maximize2 } from "lucide-react";
 
 export function VideoPlayer(): React.JSX.Element {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Lazy load: only download/play the video once it scrolls near the viewport
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const handler = (): void => {
@@ -30,19 +50,24 @@ export function VideoPlayer(): React.JSX.Element {
   };
 
   return (
-    <div className="group relative aspect-video w-full overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-stone-900 shadow-2xl shadow-amber-950/20 ring-1 ring-amber-950/10">
-      <video
-        ref={videoRef}
-        src="/videos/demo.mp4"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        className="absolute inset-0 h-full w-full object-cover"
-      >
-        Votre navigateur ne supporte pas la lecture vidéo.
-      </video>
+    <div
+      ref={containerRef}
+      className="group relative aspect-video w-full overflow-hidden rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-stone-900 shadow-2xl shadow-amber-950/20 ring-1 ring-amber-950/10"
+    >
+      {isVisible && (
+        <video
+          ref={videoRef}
+          src="/videos/demo.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 h-full w-full object-cover"
+        >
+          Votre navigateur ne supporte pas la lecture vidéo.
+        </video>
+      )}
 
       <div className="pointer-events-none absolute bottom-4 left-4 inline-flex items-center gap-1.5 rounded-full bg-card/95 px-3 py-1 text-[11px] font-semibold tracking-wide text-amber-950 shadow-sm">
         <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
