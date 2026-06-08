@@ -7,7 +7,7 @@ import { FeaturesSection } from "@/components/home/features-section";
 import { HowItWorks } from "@/components/home/how-it-works";
 import { MoroccoSection } from "@/components/home/morocco-section";
 import { PricingSection } from "@/components/home/pricing-section";
-import { FounderOffer } from "@/components/home/founder-offer";
+// import { FounderOffer } from "@/components/home/founder-offer";
 import { FaqSection } from "@/components/home/faq-section";
 import { StakesSection } from "@/components/home/stakes-section";
 import { FinalCta } from "@/components/home/final-cta";
@@ -22,12 +22,12 @@ export default function HomePage(): React.JSX.Element {
         <PainSection />
         <ConvictionSection />
         <HowItWorks />
-        {/*<SpeakingGap />*/}
         <FeaturesSection />
+        <SpeakingGap />
         {/*<MoroccoSection />*/}
         {/*<PricingSection />*/}
         <FaqSection />
-        <FounderOffer />
+        {/*<FounderOffer />*/}
         <StakesSection />
         <FinalCta />
       </main>

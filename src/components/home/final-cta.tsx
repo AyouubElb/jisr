@@ -113,7 +113,7 @@ export function FinalCta(): React.JSX.Element {
       return;
     }
 
-    toast.success("C'est noté — on vous écrit dès l'ouverture des places.");
+    toast.success("C'est noté — on vous contacte dès le lancement.");
     setSubmitted(true);
     setIsPending(false);
   };
@@ -126,31 +126,26 @@ export function FinalCta(): React.JSX.Element {
             {/* Left — copy */}
             <div className="p-10 sm:p-12 lg:p-14">
               <p className="text-xs font-semibold uppercase tracking-widest text-stone-900/70">
-                Programme fondateur · 10 places
+                Accès anticipé · sur invitation
               </p>
               <h2 className="mt-3 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">
-                Soyez parmi les 10 premiers profs.
+                Essayez Jisr en avant-première.
               </h2>
               <p className="mt-4 text-stone-800/80">
-                1 mois offert, puis{" "}
-                <strong className="text-stone-900">
-                  99&nbsp;DH/mois à vie
-                </strong>{" "}
-                (au lieu de 200 DH). Laissez vos coordonnées — on vous écrit dès
-                l&apos;ouverture des places.
+                Laissez vos coordonnées — on vous contacte dès le lancement.
               </p>
               <ul className="mt-6 space-y-2 text-sm text-stone-900/90">
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-stone-900" />
-                  Tarif bloqué à vie — aucune augmentation
+                  Accompagnement personnalisé au démarrage
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-stone-900" />
-                  Onboarding personnalisé avec le fondateur
+                  Votre avis façonne directement le produit
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-stone-900" />
-                  Influence directe sur la roadmap
+                  Aucun engagement — vous testez à votre rythme
                 </li>
               </ul>
             </div>
@@ -164,7 +159,7 @@ export function FinalCta(): React.JSX.Element {
                     Vous êtes sur la liste.
                   </p>
                   <p className="max-w-sm text-sm text-muted-foreground">
-                    On vous écrit dès l&apos;ouverture des 10 places fondateur.
+                    On vous contacte dès le lancement.
                   </p>
                 </div>
               ) : (
@@ -286,8 +281,7 @@ export function FinalCta(): React.JSX.Element {
                       pendant l&apos;appel.
                     </p>
                     <p className="text-center text-xs text-muted-foreground">
-                      Pas de spam. Un seul message à l&apos;ouverture des
-                      places.
+                      Pas de spam. Un seul message au lancement.
                     </p>
                   </div>
                 </form>

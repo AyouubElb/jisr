@@ -10,7 +10,7 @@ export function Hero(): React.JSX.Element {
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-amber-950 shadow-sm">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Programme fondateur · 10 places ouvertes
+            Accès anticipé · sur invitation
           </div>
 
           <h1 className="mt-6 text-4xl font-bold tracking-tight text-amber-950 sm:text-5xl lg:text-6xl">
@@ -45,7 +45,7 @@ export function Hero(): React.JSX.Element {
           </div>
 
           <p className="mt-4 text-xs text-muted-foreground">
-            Sur invitation · 1er mois gratuit + 99 DH/mois à vie pour les 10 premiers profs
+            Sur invitation · on échange 15 min avant de vous ouvrir un accès
           </p>
         </div>
       </div>

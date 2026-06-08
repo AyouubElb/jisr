@@ -8,7 +8,7 @@ const faqs = [
   {
     question: "Pourquoi je ne peux pas créer un compte directement ?",
     answer:
-      "Jisr est en programme fondateur — on lance avec 10 profs choisis pour bien démarrer. On prend 15 minutes (sur WhatsApp ou par téléphone, comme vous préférez) pour comprendre votre contexte, puis on vous envoie une invitation si Jisr vous correspond. Pas de chichi, pas de vente forcée.",
+      "Jisr est en accès anticipé — on ouvre les comptes progressivement pour bien accompagner chaque prof. On prend 15 minutes (sur WhatsApp ou par téléphone, comme vous préférez) pour comprendre votre contexte, puis on vous envoie une invitation si Jisr vous correspond. Pas de chichi, pas de vente forcée.",
   },
   {
     question: "Comment ça fonctionne avec WhatsApp ?",

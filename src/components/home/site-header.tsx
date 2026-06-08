@@ -22,13 +22,16 @@ export function SiteHeader(): React.JSX.Element {
 
         <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
           <SmoothScrollLink
+            href="#comment-ca-marche"
+            className="hover:text-amber-950"
+          >
+            Comment ça marche
+          </SmoothScrollLink>
+          <SmoothScrollLink
             href="#fonctionnalites"
             className="hover:text-amber-950"
           >
             Les outils
-          </SmoothScrollLink>
-          <SmoothScrollLink href="#fondateur" className="hover:text-amber-950">
-            L&apos;offre fondateur
           </SmoothScrollLink>
           <SmoothScrollLink href="#faq" className="hover:text-amber-950">
             FAQ

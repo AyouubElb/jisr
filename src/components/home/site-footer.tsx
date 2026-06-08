@@ -43,14 +43,6 @@ export function SiteFooter(): React.JSX.Element {
                 </SmoothScrollLink>
               </li>
               <li>
-                <SmoothScrollLink
-                  href="#fondateur"
-                  className="hover:text-amber-950"
-                >
-                  L&apos;offre fondateur
-                </SmoothScrollLink>
-              </li>
-              <li>
                 <SmoothScrollLink href="#faq" className="hover:text-amber-950">
                   FAQ
                 </SmoothScrollLink>
@@ -123,7 +115,7 @@ export function SiteFooter(): React.JSX.Element {
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <span>Casablanca, Maroc</span>
+                <span>Rabat, Maroc</span>
               </li>
             </ul>
           </div>
@@ -131,7 +123,6 @@ export function SiteFooter(): React.JSX.Element {
 
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
           <span>© {new Date().getFullYear()} Jisr. Tous droits réservés.</span>
-          <span>Fait avec soin à Casablanca</span>
         </div>
       </div>
     </footer>
