@@ -1,11 +1,6 @@
--- ============================================================================
--- Migration: Add quizzes, quiz_blocks, student_attempts, student_answers
--- Run this in Supabase Dashboard → SQL Editor
--- ============================================================================
+-- Quizzes, quiz_blocks, student_attempts, student_answers.
 
--- ----------------------------------------------------------------------------
--- 1. CREATE NEW TABLES
--- ----------------------------------------------------------------------------
+-- Tables
 
 CREATE TABLE IF NOT EXISTS quizzes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,9 +46,7 @@ CREATE TABLE IF NOT EXISTS student_answers (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ----------------------------------------------------------------------------
--- 2. INDEXES
--- ----------------------------------------------------------------------------
+-- Indexes
 
 CREATE INDEX IF NOT EXISTS idx_quizzes_section ON quizzes(section_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_blocks_quiz ON quiz_blocks(quiz_id);
@@ -61,20 +54,14 @@ CREATE INDEX IF NOT EXISTS idx_student_attempts_quiz ON student_attempts(quiz_id
 CREATE INDEX IF NOT EXISTS idx_student_attempts_student ON student_attempts(student_id);
 CREATE INDEX IF NOT EXISTS idx_student_answers_attempt ON student_answers(attempt_id);
 
--- ----------------------------------------------------------------------------
--- 3. ENABLE RLS
--- ----------------------------------------------------------------------------
+-- RLS
 
 ALTER TABLE quizzes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quiz_blocks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_answers ENABLE ROW LEVEL SECURITY;
 
--- ----------------------------------------------------------------------------
--- 4. RLS POLICIES — QUIZZES
---    Instructor: full CRUD (via section → course ownership)
---    Student: SELECT only if enrolled
--- ----------------------------------------------------------------------------
+-- Quizzes: instructor full CRUD (via section → course); students SELECT if enrolled
 
 CREATE POLICY "quizzes_select_enrolled_or_owner"
   ON quizzes FOR SELECT
@@ -127,11 +114,7 @@ CREATE POLICY "quizzes_delete_owner"
     )
   );
 
--- ----------------------------------------------------------------------------
--- 5. RLS POLICIES — QUIZ BLOCKS
---    Instructor: full CRUD (via quiz → section → course ownership)
---    Student: SELECT only if enrolled
--- ----------------------------------------------------------------------------
+-- Quiz blocks: instructor full CRUD (via quiz → section → course); students SELECT if enrolled
 
 CREATE POLICY "quiz_blocks_select_enrolled_or_owner"
   ON quiz_blocks FOR SELECT
@@ -188,11 +171,7 @@ CREATE POLICY "quiz_blocks_delete_owner"
     )
   );
 
--- ----------------------------------------------------------------------------
--- 6. RLS POLICIES — STUDENT ATTEMPTS
---    Students: see own attempts, can start if enrolled, can update own
---    Instructor: see + update attempts for their courses (grading)
--- ----------------------------------------------------------------------------
+-- Student attempts: students see/start/update own (if enrolled); instructor sees + grades
 
 CREATE POLICY "student_attempts_select_own_or_owner"
   ON student_attempts FOR SELECT
@@ -237,11 +216,7 @@ CREATE POLICY "student_attempts_update_instructor"
     )
   );
 
--- ----------------------------------------------------------------------------
--- 7. RLS POLICIES — STUDENT ANSWERS
---    Students: see + insert + update own answers
---    Instructor: see + update answers for their courses (grading feedback)
--- ----------------------------------------------------------------------------
+-- Student answers: students CRUD own; instructor sees + grades
 
 CREATE POLICY "student_answers_select_own_or_owner"
   ON student_answers FOR SELECT

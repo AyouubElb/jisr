@@ -1,14 +1,9 @@
--- ----------------------------------------------------------------------------
--- Migration 006: Auto-touch enrollment.last_active_at via triggers
+-- Auto-touch enrollment.last_active_at via triggers.
 --
--- Problem: touch_enrollment_activity() RPC used SECURITY INVOKER but there
--- was no RLS UPDATE policy on enrollments for students, so the UPDATE silently
--- affected 0 rows.
---
--- Fix: triggers on student_attempts + lesson_completions that run as
--- SECURITY DEFINER, bypassing RLS. The WHERE clause scopes each update to
--- the inserting student's own enrollment row so there is no privilege escalation.
--- ----------------------------------------------------------------------------
+-- The previous touch_enrollment_activity() RPC used SECURITY INVOKER, but
+-- there's no RLS UPDATE policy on enrollments for students — so it silently
+-- updated 0 rows. Triggers below run SECURITY DEFINER, scoped to the student's
+-- own enrollment via the WHERE clause (no privilege escalation).
 
 -- Trigger function
 CREATE OR REPLACE FUNCTION update_enrollment_last_active()
@@ -50,7 +45,7 @@ CREATE OR REPLACE TRIGGER trg_completion_touch_activity
 AFTER INSERT ON lesson_completions
 FOR EACH ROW EXECUTE FUNCTION update_enrollment_last_active();
 
--- Also fix the existing RPC to SECURITY DEFINER as belt-and-suspenders
+-- Belt-and-suspenders: switch the RPC to SECURITY DEFINER too
 CREATE OR REPLACE FUNCTION touch_enrollment_activity(p_course_id UUID)
 RETURNS VOID
 LANGUAGE SQL

@@ -1,35 +1,18 @@
--- ============================================================================
--- Migration: shared ordering for section content (lessons + quizzes)
+-- Shared ordering for section content (lessons + quizzes).
 --
--- Rationale:
---   Lessons and quizzes each had their own `order` column, so a section
---   could not interleave them ("lesson 1 → quiz → lesson 2"). The UI had
---   to merge two arrays without a coherent sequence.
+-- Before this, lessons and quizzes each had their own `order` column, so a
+-- section couldn't interleave them ("lesson 1 → quiz → lesson 2"). `section_items`
+-- holds one shared `position` per section, maintained by triggers on lessons/quizzes
+-- (INSERT appends, DELETE removes + compacts siblings to keep positions 1..N).
+-- App code keeps using lessonsApi.create()/quizzesApi.create() — inserts unchanged.
 --
--- Design:
---   `section_items` is a small lookup table that holds ONE shared `position`
---   per section. Each row links to a lesson or a quiz (item_type + item_id).
---   Triggers maintain it automatically:
---     - INSERT lesson/quiz → AFTER trigger creates section_items row with
---       MAX(position)+1 in that section.
---     - DELETE lesson/quiz → AFTER trigger removes the section_items row
---       and compacts siblings (renumber so positions stay 1..N).
---   App code keeps using lessonsApi.create() / quizzesApi.create() — no
---   changes required for inserts. Reads gain a new `section.items[]` field
---   that returns the merged ordered list.
+-- Legacy lessons.order / quizzes.order stay populated (deprecated) for one release
+-- as a safety net.
 --
---   The legacy lessons.order / quizzes.order columns are NOT dropped here —
---   they stay populated (deprecated, ignored for ordering) for one release
---   as a safety net. A later migration can drop them once all UI consumers
---   have switched to section.items[].
---
--- Concurrency:
---   The UNIQUE (section_id, position) constraint is DEFERRABLE INITIALLY
---   DEFERRED so reorder/compact can shift many rows in one statement
---   without tripping the constraint mid-update.
--- ============================================================================
+-- The UNIQUE (section_id, position) constraint is DEFERRABLE INITIALLY DEFERRED so
+-- reorder can shift many rows in one statement without tripping the check mid-update.
 
--- ─── 1. Type + table ────────────────────────────────────────────────────────
+-- 1. Type + table
 
 CREATE TYPE section_item_type AS ENUM ('lesson', 'quiz');
 
@@ -53,13 +36,11 @@ CREATE INDEX section_items_lookup_idx
   ON section_items (item_type, item_id);
 
 COMMENT ON TABLE section_items IS
-  'Shared ordering for lessons + quizzes within a section. One row per lesson or quiz; position is unique within a section. Maintained by triggers on lessons/quizzes — app code does not touch this table directly.';
+  'Shared ordering for lessons + quizzes within a section. Maintained by triggers — app code does not touch this directly.';
 
--- ─── 2. Backfill from existing lessons + quizzes ────────────────────────────
--- Order strategy: by created_at across both tables (preserves the natural
--- chronological order in which the instructor built the section). Existing
--- order columns are not consulted because they were meaningless across
--- tables anyway.
+-- 2. Backfill — order by created_at across both tables (preserves the order in
+-- which the instructor actually built the section). The legacy `order` columns
+-- were meaningless across tables, so we ignore them.
 
 INSERT INTO section_items (section_id, item_type, item_id, position)
 SELECT
@@ -77,9 +58,9 @@ FROM (
 ) AS combined
 ON CONFLICT (item_type, item_id) DO NOTHING;
 
--- ─── 3. Triggers — auto-maintain section_items on lesson/quiz changes ──────
+-- 3. Triggers — auto-maintain section_items on lesson/quiz INSERT/DELETE
 
--- INSERT lesson → create matching section_items row.
+-- INSERT lesson → append section_items row
 CREATE OR REPLACE FUNCTION section_items_on_lesson_insert()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -105,7 +86,7 @@ CREATE TRIGGER lessons_after_insert_section_item
   AFTER INSERT ON lessons
   FOR EACH ROW EXECUTE FUNCTION section_items_on_lesson_insert();
 
--- INSERT quiz → create matching section_items row.
+-- INSERT quiz → append section_items row
 CREATE OR REPLACE FUNCTION section_items_on_quiz_insert()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -131,7 +112,7 @@ CREATE TRIGGER quizzes_after_insert_section_item
   AFTER INSERT ON quizzes
   FOR EACH ROW EXECUTE FUNCTION section_items_on_quiz_insert();
 
--- DELETE lesson → remove its section_items row, then compact siblings.
+-- DELETE lesson → remove its row, then compact siblings (positions stay 1..N)
 CREATE OR REPLACE FUNCTION section_items_on_lesson_delete()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -153,7 +134,7 @@ BEGIN
   DELETE FROM section_items
   WHERE item_type = 'lesson' AND item_id = OLD.id;
 
-  -- Compact: shift every higher position down by 1 so positions stay 1..N.
+  -- Shift higher positions down by 1
   UPDATE section_items
   SET position = position - 1
   WHERE section_id = v_section_id AND position > v_position;
@@ -166,7 +147,7 @@ CREATE TRIGGER lessons_after_delete_section_item
   AFTER DELETE ON lessons
   FOR EACH ROW EXECUTE FUNCTION section_items_on_lesson_delete();
 
--- DELETE quiz → remove its section_items row, then compact siblings.
+-- DELETE quiz → remove its row, then compact siblings
 CREATE OR REPLACE FUNCTION section_items_on_quiz_delete()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -200,7 +181,7 @@ CREATE TRIGGER quizzes_after_delete_section_item
   AFTER DELETE ON quizzes
   FOR EACH ROW EXECUTE FUNCTION section_items_on_quiz_delete();
 
--- ─── 4. RLS — students read, instructors write (matches sections policy) ───
+-- 4. RLS — students read, instructors write (matches sections policy)
 
 ALTER TABLE section_items ENABLE ROW LEVEL SECURITY;
 
@@ -218,10 +199,8 @@ CREATE POLICY "section_items_select_enrolled_or_owner" ON section_items
     )
   );
 
--- INSERT/UPDATE/DELETE happen through triggers (SECURITY DEFINER) and the
--- reorder RPC, so app users never write directly. We still grant the owner
--- explicit policies as a defense-in-depth and to allow manual fixes from
--- Supabase Studio if ever needed.
+-- Writes go through triggers and the reorder RPC (both SECURITY DEFINER).
+-- Owner policies below are defense-in-depth + escape hatch for Supabase Studio.
 
 CREATE POLICY "section_items_insert_owner" ON section_items
   FOR INSERT TO authenticated
@@ -253,7 +232,7 @@ CREATE POLICY "section_items_delete_owner" ON section_items
     )
   );
 
--- ─── 5. Reorder RPC — atomic move + sibling compaction ─────────────────────
+-- 5. Reorder RPC — atomic move + sibling compaction
 
 CREATE OR REPLACE FUNCTION reorder_section_item(
   p_section_item_id UUID,
@@ -270,7 +249,7 @@ DECLARE
   v_max_position INT;
   v_clamped      INT;
 BEGIN
-  -- Authorize: only the course owner can reorder.
+  -- Authorization: only the course owner can reorder
   SELECT si.section_id, si.position INTO v_section_id, v_old_position
   FROM section_items si
   JOIN sections s ON s.id = si.section_id
@@ -291,19 +270,18 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Defer the unique constraint so we can shift many rows in one go without
-  -- transient duplicates tripping the check.
+  -- Defer the unique constraint so transient duplicates during the shift don't trip it
   SET CONSTRAINTS section_items_position_unique DEFERRED;
 
   IF v_clamped > v_old_position THEN
-    -- Moving down: shift items in (old, new] up by -1.
+    -- Moving down: shift (old, new] up by -1
     UPDATE section_items
     SET position = position - 1
     WHERE section_id = v_section_id
       AND position > v_old_position
       AND position <= v_clamped;
   ELSE
-    -- Moving up: shift items in [new, old) down by +1.
+    -- Moving up: shift [new, old) down by +1
     UPDATE section_items
     SET position = position + 1
     WHERE section_id = v_section_id
@@ -311,7 +289,7 @@ BEGIN
       AND position < v_old_position;
   END IF;
 
-  -- Place the moved item at its new position.
+  -- Drop the moved item at its new position
   UPDATE section_items
   SET position = v_clamped
   WHERE id = p_section_item_id;
@@ -322,4 +300,4 @@ REVOKE ALL ON FUNCTION reorder_section_item(UUID, INT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION reorder_section_item(UUID, INT) TO authenticated;
 
 COMMENT ON FUNCTION reorder_section_item IS
-  'Move a section item to a new position. Atomically renumbers siblings so positions stay 1..N. Authorization: caller must own the parent course.';
+  'Move a section item, renumbering siblings to keep positions 1..N. Caller must own the parent course.';

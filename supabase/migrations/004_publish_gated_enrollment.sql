@@ -1,11 +1,5 @@
--- ============================================================================
--- Migration: Publish-gated enrollment
---   Instructors can only enroll students into a course that is already
---   published. Keeps the instructor and student dashboards in sync — a
---   student never sees a "ghost" draft course in their catalog they cannot
---   open from the browse page.
--- Run this in Supabase Dashboard -> SQL Editor
--- ============================================================================
+-- Publish-gated enrollment: instructors can only enroll students into a published course.
+-- Prevents "ghost" draft courses showing up in student catalogs.
 
 DROP POLICY IF EXISTS "enrollments_insert_instructor" ON enrollments;
 

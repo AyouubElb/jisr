@@ -1,24 +1,10 @@
--- ============================================================================
--- Migration: switch eval storage from columns on ai_generations to a separate
--- ai_evaluations table.
+-- Move eval storage from columns on ai_generations to a separate ai_evaluations table.
 --
--- Why:
---   - Each AI agent (quiz_gen, free_text_grade, lesson_outline...) needs its
---     own rubric. Hardcoding criterion columns on ai_generations doesn't scale.
---   - Multiple raters per generation later (you, an instructor, an LLM-judge)
---     each need their own row.
---   - Versioned rubrics (rubric_key e.g. 'quiz_gen_v1') let us evolve criteria
---     without invalidating prior evals.
---
--- Shape:
---   - One row per (generation, rubric, evaluator). Upsert on those.
---   - `scores` is JSONB so adding/removing criteria is a code change, not a
---     migration.
---   - Rubric definitions live in src/lib/ai/eval/rubrics.ts. The DB stores
---     only a key + the scores; the app validates against the rubric on write.
---
--- Run in Supabase Dashboard -> SQL Editor.
--- ============================================================================
+-- Why: each AI agent (quiz_gen, free_text_grade, lesson_outline, ...) needs its
+-- own rubric, and we want multiple raters per generation (human, LLM-judge, etc).
+-- Versioned `rubric_key` (e.g. 'quiz_gen_v1') lets criteria evolve without
+-- invalidating prior evals. Scores are JSONB so adding criteria is a code-only change.
+-- Rubric definitions live in src/lib/ai/eval/rubrics.ts; the app validates on write.
 
 -- 1. Drop the old eval columns (no rated rows yet — safe).
 ALTER TABLE ai_generations
@@ -46,20 +32,18 @@ CREATE TABLE IF NOT EXISTS ai_evaluations (
   evaluator_type TEXT NOT NULL DEFAULT 'human'
     CHECK (evaluator_type IN ('human', 'llm_judge')),
 
-  -- Versioned rubric identifier (e.g. 'quiz_gen_v1'). Source of truth for the
-  -- shape of `scores` lives in src/lib/ai/eval/rubrics.ts.
+  -- Versioned rubric key (e.g. 'quiz_gen_v1'). Shape of `scores` lives in
+  -- src/lib/ai/eval/rubrics.ts.
   rubric_key TEXT NOT NULL,
 
-  -- Per-criterion scores. Shape depends on rubric_key.
-  -- Example for quiz_gen_v1:
-  --   { "cefr_alignment": 4, "instruction_following": 5,
-  --     "pedagogical_quality": 3, "language_correctness": true }
+  -- Per-criterion scores, e.g. for quiz_gen_v1:
+  --   { "cefr_alignment": 4, "instruction_following": 5, ... }
   scores JSONB NOT NULL,
 
   notes TEXT,
 
-  -- One human evaluation per (generation, rubric). LLM-judge can have many
-  -- (different judge prompt versions), so we include evaluator_type in the key.
+  -- One human eval per (generation, rubric). LLM-judges can have many
+  -- (different judge prompt versions), hence evaluator_type in the key.
   UNIQUE (generation_id, rubric_key, evaluator_id, evaluator_type)
 );
 
@@ -126,8 +110,7 @@ CREATE POLICY "ai_evaluations_delete_admin"
     )
   );
 
--- 4. Admins also need to read every ai_generations row for the dashboard.
--- Existing policy is owner-only; add a read-all for admins.
+-- 4. Admin read-all on ai_generations (existing policy is owner-only).
 CREATE POLICY "ai_generations_select_admin"
   ON ai_generations FOR SELECT
   TO authenticated

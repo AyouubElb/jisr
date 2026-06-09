@@ -1,62 +1,47 @@
--- ============================================================================
--- Migration: tighten ownership model — `instructor_students` + `profiles` SELECT
+-- Tighten the ownership model — `instructor_students` policies + scoped `profiles` SELECT.
 --
--- Context:
---   `instructor_students` exists (since 011) and is populated by the
---   create_student_profile_and_enroll RPC (013), but it has RLS ON with
---   ZERO policies — so clients can never read it. Meanwhile `profiles`
---   SELECT was open to every authenticated user, which meant any instructor
---   could see every other instructor's students in the "pick a student"
---   dropdown.
+-- `instructor_students` existed (since 011) and was populated by the RPC in 013,
+-- but had RLS ON with zero policies — clients could never read it. Meanwhile
+-- profiles.SELECT was open to all authenticated users, which leaked every
+-- instructor's students into other instructors' "pick a student" dropdowns.
 --
--- This migration:
---   1. Backfills instructor_students from historical enrollments
---   2. Adds SELECT + DELETE policies to instructor_students
---   3. Replaces profiles SELECT policies with a scoped version:
---        self + admins + my students (as instructor) + my instructors (as student)
--- ============================================================================
+-- 1) Backfill instructor_students from enrollments
+-- 2) Add SELECT + DELETE policies to instructor_students
+-- 3) Replace profiles SELECT with a scoped policy (self + admins + my students + my instructors)
 
--- ─── 1. BACKFILL ─────────────────────────────────────────────────────────────
--- Every (instructor → student) pair implied by existing enrollments becomes
--- an ownership row. Safe because the RPC uses ON CONFLICT DO NOTHING.
+-- 1. Backfill from enrollments. Safe — the RPC uses ON CONFLICT DO NOTHING.
 INSERT INTO instructor_students (instructor_id, student_id)
 SELECT DISTINCT c.instructor_id, e.student_id
 FROM enrollments e
 JOIN courses c ON c.id = e.course_id
 ON CONFLICT DO NOTHING;
 
--- ─── 2. instructor_students policies ─────────────────────────────────────────
--- SELECT: instructor sees rows where they own the student; student sees
--- rows where they are the student (so a student can discover their teachers).
+-- 2. instructor_students policies
+-- SELECT: instructor sees their students; student sees their instructors.
 CREATE POLICY instructor_students_select_own ON instructor_students
   FOR SELECT
   TO authenticated
   USING (instructor_id = auth.uid() OR student_id = auth.uid());
 
--- DELETE: only the instructor can remove a student from their roster.
+-- DELETE: only the instructor can remove a student from their roster
 CREATE POLICY instructor_students_delete_own ON instructor_students
   FOR DELETE
   TO authenticated
   USING (instructor_id = auth.uid());
 
--- Admin escape hatch — read everything (matches profile/course admin policies).
+-- Admin read-all (matches profiles/courses admin policies)
 CREATE POLICY instructor_students_select_admin ON instructor_students
   FOR SELECT
   TO authenticated
   USING (is_admin());
 
--- Note: no INSERT policy on purpose. All inserts go through the
--- create_student_profile_and_enroll RPC (service-role, bypasses RLS).
+-- No INSERT policy on purpose. Inserts go through the RPC in 013 (service-role).
 
--- ─── 3. Tighten profiles SELECT ──────────────────────────────────────────────
+-- 3. Scoped profiles.SELECT
 DROP POLICY IF EXISTS profiles_select_authenticated ON profiles;
 DROP POLICY IF EXISTS profiles_select_admin ON profiles;
 
--- Single scoped SELECT policy:
---   - self                                      (always)
---   - admins                                    (is_admin())
---   - instructors → their students              (via instructor_students)
---   - students → their instructors              (via enrollments → courses)
+-- Self + admins + instructors→their students + students→their instructors
 CREATE POLICY profiles_select_scoped ON profiles
   FOR SELECT
   TO authenticated

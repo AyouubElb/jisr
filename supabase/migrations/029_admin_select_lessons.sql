@@ -1,22 +1,10 @@
--- ============================================================================
--- Migration 029: let admins read every lesson (for the AI generation detail
--- page).
+-- Admin read-all on lessons.
 --
--- Context:
---   The "Instructor request" panel on /admin/ai/generations/[id] resolves the
---   source lesson titles from input_context.lessonIds. The existing lessons
---   SELECT policy only allows the course owner or enrolled students, so an
---   admin viewing another instructor's generation gets an empty result and the
---   "Source lessons" row shows "—".
---
--- Fix:
---   Add an admin-only SELECT-all policy on lessons, mirroring the
---   ai_generations_select_admin policy added in migration 011. Admins already
---   have read-all on ai_generations + generation_evaluations; this completes
---   the picture so the detail page can render the lesson context.
---
--- Run in Supabase Dashboard -> SQL Editor.
--- ============================================================================
+-- The "Instructor request" panel on /admin/ai/generations/[id] resolves source
+-- lesson titles from input_context.lessonIds. The existing lessons SELECT
+-- policy only allows the course owner or enrolled students — so admins viewing
+-- another instructor's generation saw "—" for source lessons.
+-- Mirrors the admin read-all already in place for ai_generations + generation_evaluations.
 
 CREATE POLICY "lessons_select_admin"
   ON lessons FOR SELECT

@@ -1,16 +1,7 @@
--- ============================================================================
--- Migration: AI audio cache table + storage bucket
---
--- TTS is the slowest, most expensive part of audio quiz generation. We cache
--- generated audio files by content hash so that:
---   - Re-generating a quiz with an unchanged script is free
---   - Two blocks that happen to have the same script reuse the same MP3
---   - Instructor edits unrelated text without re-paying for audio
---
--- The cache key is sha256(script + voice_id + speed). Same input = same MP3.
---
--- Run this in Supabase Dashboard -> SQL Editor.
--- ============================================================================
+-- AI audio cache table + storage bucket.
+-- TTS is the slowest and most expensive part of audio quiz generation, so we
+-- cache generated MP3s by sha256(script + voice + speed). Re-generating a
+-- quiz with an unchanged script is free; identical scripts share an MP3.
 
 CREATE TABLE IF NOT EXISTS ai_audio_cache (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -38,11 +29,8 @@ CREATE TABLE IF NOT EXISTS ai_audio_cache (
 CREATE INDEX IF NOT EXISTS idx_ai_audio_cache_lookup
   ON ai_audio_cache (script_hash, voice_id, speed);
 
--- ----------------------------------------------------------------------------
--- RLS — read-only for authenticated users; writes happen server-side only.
--- The route handler runs with the user's session but the cache is global,
--- so we let any authenticated user read/insert (no user_id column).
--- ----------------------------------------------------------------------------
+-- RLS — cache is global (no user_id), so any authenticated user can read/insert.
+-- Writes happen server-side via route handlers using the user's session.
 
 ALTER TABLE ai_audio_cache ENABLE ROW LEVEL SECURITY;
 
@@ -56,17 +44,14 @@ CREATE POLICY "ai_audio_cache_insert_authenticated"
   TO authenticated
   WITH CHECK (true);
 
--- ----------------------------------------------------------------------------
 -- Storage bucket: public read, authenticated write.
--- Files are immutable (cache-keyed by hash) so public read is safe; the
--- audio_url that lands in quiz_blocks.content is just a CDN pointer.
--- ----------------------------------------------------------------------------
+-- Files are immutable (keyed by hash) so public read is safe.
 
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('quiz-audio', 'quiz-audio', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Authenticated users (instructors via route handler) can upload
+-- Authenticated upload (instructors via route handler)
 CREATE POLICY "quiz_audio_insert_authenticated"
   ON storage.objects FOR INSERT
   TO authenticated

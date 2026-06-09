@@ -1,14 +1,9 @@
--- ============================================================================
--- Migration: Phase 1 engagement tracking
---   * enrollments.last_active_at — rolling timestamp touched on student actions
---   * lesson_completions — student self-marks a lesson as done
---   * session_attendance — instructor marks who attended a live session
--- Run this in Supabase Dashboard → SQL Editor
--- ============================================================================
+-- Phase 1 engagement tracking.
+-- enrollments.last_active_at: rolling timestamp touched on student actions.
+-- lesson_completions: student self-marks a lesson as done.
+-- session_attendance: instructor marks who attended a live session.
 
--- ----------------------------------------------------------------------------
--- 1. ENROLLMENTS: add last_active_at
--- ----------------------------------------------------------------------------
+-- Enrollments: last_active_at
 
 ALTER TABLE enrollments
   ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ;
@@ -16,9 +11,7 @@ ALTER TABLE enrollments
 CREATE INDEX IF NOT EXISTS idx_enrollments_last_active
   ON enrollments(last_active_at DESC NULLS LAST);
 
--- ----------------------------------------------------------------------------
--- 2. LESSON COMPLETIONS
--- ----------------------------------------------------------------------------
+-- Lesson completions
 
 CREATE TABLE IF NOT EXISTS lesson_completions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,8 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_lesson_completions_lesson ON lesson_completions(l
 
 ALTER TABLE lesson_completions ENABLE ROW LEVEL SECURITY;
 
--- Students: see + manage their own completions (only if enrolled in the parent course)
--- Instructors: see completions for lessons in their own courses (read-only)
+-- Students: CRUD own (if enrolled). Instructors: read-only for their courses.
 
 CREATE POLICY "lesson_completions_select_own_or_owner"
   ON lesson_completions FOR SELECT
@@ -67,9 +59,7 @@ CREATE POLICY "lesson_completions_delete_own"
   TO authenticated
   USING (student_id = auth.uid());
 
--- ----------------------------------------------------------------------------
--- 3. SESSION ATTENDANCE
--- ----------------------------------------------------------------------------
+-- Session attendance
 
 CREATE TABLE IF NOT EXISTS session_attendance (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -85,8 +75,7 @@ CREATE INDEX IF NOT EXISTS idx_session_attendance_student ON session_attendance(
 
 ALTER TABLE session_attendance ENABLE ROW LEVEL SECURITY;
 
--- Students: see own rows (read-only; instructor is the source of truth)
--- Instructors: full CRUD for sessions in their courses
+-- Students: read own. Instructor is source of truth (full CRUD on their sessions).
 
 CREATE POLICY "session_attendance_select_own_or_owner"
   ON session_attendance FOR SELECT
@@ -133,11 +122,8 @@ CREATE POLICY "session_attendance_delete_owner"
     )
   );
 
--- ----------------------------------------------------------------------------
--- 4. TOUCH HELPER (optional convenience RPC)
---    Client code could call this to bump last_active_at without dealing with
---    the UPDATE + RLS check manually. Not required — regular UPDATE works too.
--- ----------------------------------------------------------------------------
+-- Optional convenience RPC for bumping last_active_at.
+-- Regular UPDATE works too — this just keeps the client side clean.
 
 CREATE OR REPLACE FUNCTION touch_enrollment_activity(p_course_id UUID)
 RETURNS VOID

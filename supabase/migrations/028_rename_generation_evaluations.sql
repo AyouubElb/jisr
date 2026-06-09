@@ -1,29 +1,23 @@
--- ============================================================================
--- Migration 028: rename ai_evaluations -> generation_evaluations + agreement view.
+-- Rename ai_evaluations → generation_evaluations + add agreement view.
 --
--- Why the rename: the table now holds BOTH human and llm_judge rows. "ai_"
--- implied the AI was the evaluator. The table is about evaluations of a
--- generation, by any evaluator. Tall shape (one row per evaluator) is kept.
+-- The table holds both human and llm_judge rows now, so "ai_" is misleading.
+-- Same tall shape (one row per evaluator) is kept.
 --
--- The new view generation_eval_agreement joins the human row and the llm_judge
--- row per (generation, rubric) so the admin can see them side by side and read
--- a derived agreement signal. Agreement is computed, never stored.
---
--- Run in Supabase Dashboard -> SQL Editor.
--- ============================================================================
+-- generation_eval_agreement joins the human and llm_judge rows per
+-- (generation, rubric) so the admin UI can render them side by side.
+-- Agreement is computed, never stored.
 
--- 1. Rename the table. Postgres rewires the FKs and the PK automatically; only
---    explicitly-named constraints/indexes/triggers/policies need renaming.
+-- 1. Rename table. Postgres rewires FKs + PK automatically; only explicitly-named
+-- constraints/indexes/triggers/policies need follow-up renames.
 ALTER TABLE IF EXISTS ai_evaluations RENAME TO generation_evaluations;
 
--- 2. Rename indexes.
+-- 2. Indexes
 ALTER INDEX IF EXISTS idx_ai_evaluations_generation
   RENAME TO idx_generation_evaluations_generation;
 ALTER INDEX IF EXISTS idx_ai_evaluations_rubric_created
   RENAME TO idx_generation_evaluations_rubric_created;
 
--- 3. Rename the updated_at trigger function + trigger.
---    ALTER FUNCTION has no IF EXISTS — guard with a DO block instead.
+-- 3. updated_at trigger function + trigger (ALTER FUNCTION has no IF EXISTS — DO block)
 DO $$
 BEGIN
   IF EXISTS (
@@ -39,8 +33,7 @@ CREATE TRIGGER trg_generation_evaluations_updated_at
   BEFORE UPDATE ON generation_evaluations
   FOR EACH ROW EXECUTE FUNCTION generation_evaluations_set_updated_at();
 
--- 4. Recreate policies under the new name (policy names don't auto-follow a
---    table rename in a readable way — drop + recreate keeps them legible).
+-- 4. Recreate policies under the new name (policy names don't follow table renames)
 DROP POLICY IF EXISTS "ai_evaluations_select_admin" ON generation_evaluations;
 DROP POLICY IF EXISTS "ai_evaluations_insert_admin" ON generation_evaluations;
 DROP POLICY IF EXISTS "ai_evaluations_update_admin" ON generation_evaluations;
@@ -75,8 +68,8 @@ CREATE POLICY "generation_evaluations_delete_admin"
     EXISTS (SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin')
   );
 
--- The fire-and-forget judge runs as the generation owner (an instructor), so it
--- needs a scoped INSERT path for llm_judge rows only.
+-- The judge runs as the generation owner (instructor), so it needs a scoped
+-- INSERT path for llm_judge rows only.
 CREATE POLICY "generation_evaluations_insert_llm_judge_owner"
   ON generation_evaluations FOR INSERT
   TO authenticated
@@ -90,10 +83,9 @@ CREATE POLICY "generation_evaluations_insert_llm_judge_owner"
     )
   );
 
--- 5. Agreement view. One row per (generation, rubric) that has BOTH a human and
---    an llm_judge evaluation. The view exposes both score blobs and notes so the
---    admin UI can render them side by side and compute per-criterion agreement
---    client-side (agreement is rubric-shaped, so we keep it out of SQL).
+-- 5. Agreement view. One row per (generation, rubric) with BOTH a human and an
+-- llm_judge evaluation. Admin UI renders side by side; per-criterion agreement
+-- is computed client-side (rubric-shaped, keep it out of SQL).
 CREATE OR REPLACE VIEW generation_eval_agreement AS
 SELECT
   h.generation_id,
@@ -112,5 +104,5 @@ JOIN generation_evaluations j
  AND j.evaluator_type = 'llm_judge'
 WHERE h.evaluator_type = 'human';
 
--- Views run with the querying user's RLS, so the admin-only SELECT policy on
--- the base table already gates this view. No extra policy needed.
+-- Views inherit the base table's RLS, so the admin-only SELECT policy on
+-- generation_evaluations already gates this view.

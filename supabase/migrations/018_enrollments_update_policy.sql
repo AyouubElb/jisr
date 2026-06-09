@@ -1,17 +1,12 @@
--- ============================================================================
--- Migration: add missing UPDATE policy on enrollments
+-- Missing UPDATE policy on enrollments.
 --
--- Bug: migration 017 introduced soft-remove via `removed_at`, but the
--- enrollments table never had an UPDATE policy. With RLS enabled and no
--- UPDATE policy, the UPDATE call silently affects 0 rows (no error).
--- Result: removeStudent does nothing; addStudent's reactivate path does
--- nothing; the student stays in whatever state they were in.
+-- Migration 017 introduced soft-remove via `removed_at`, but enrollments had
+-- no UPDATE policy. With RLS on and no UPDATE policy, the UPDATE silently
+-- affected 0 rows — removeStudent and the reactivate path both no-op'd.
 --
--- Fix: allow the course's instructor to UPDATE rows in their own enrollments.
--- Both USING (which row can be targeted) and WITH CHECK (what the new row
--- must look like) are gated by course ownership — so an instructor cannot
--- move an enrollment between courses or change its student_id.
--- ============================================================================
+-- Fix: instructor of the course can UPDATE rows in their own enrollments.
+-- Both USING and WITH CHECK gate on course ownership, so an instructor cannot
+-- move an enrollment between courses or change student_id.
 
 DROP POLICY IF EXISTS enrollments_update_instructor ON enrollments;
 

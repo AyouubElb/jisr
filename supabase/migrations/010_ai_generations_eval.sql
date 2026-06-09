@@ -1,18 +1,7 @@
--- ============================================================================
--- Migration: AI generations evaluation columns
---
--- Adds per-criterion eval scores + free-form notes to ai_generations so the
--- (future) admin dashboard can rate generations against a fixed rubric and
--- track quality over time as we change prompts/models.
---
--- Rubric (4 criteria) is documented in docs/AI-EVAL-CRITERIA.md. Keep that
--- file and these columns in sync.
---
--- Read access is admin-only (handled via a separate admin role check in the
--- Route handler — RLS here just gates writes to the owning user OR an admin).
---
--- Run this in Supabase Dashboard -> SQL Editor.
--- ============================================================================
+-- Per-criterion eval scores + notes on ai_generations.
+-- Lets the admin dashboard rate generations against a fixed rubric and track
+-- quality over time as prompts/models change.
+-- NOTE: superseded by migration 011 (moved to a separate ai_evaluations table).
 
 ALTER TABLE ai_generations
   ADD COLUMN IF NOT EXISTS eval_cefr_alignment SMALLINT
@@ -26,16 +15,14 @@ ALTER TABLE ai_generations
   ADD COLUMN IF NOT EXISTS evaluated_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS evaluated_by UUID REFERENCES profiles(id) ON DELETE SET NULL;
 
--- ----------------------------------------------------------------------------
 -- Indexes
--- ----------------------------------------------------------------------------
 
--- Admin dashboard: list rated generations newest first
+-- List rated generations newest first
 CREATE INDEX IF NOT EXISTS idx_ai_gen_evaluated_at
   ON ai_generations (evaluated_at DESC)
   WHERE evaluated_at IS NOT NULL;
 
--- Admin dashboard: surface lowest-quality generations per criterion
+-- Surface lowest-quality generations per criterion
 CREATE INDEX IF NOT EXISTS idx_ai_gen_eval_pedagogy
   ON ai_generations (eval_pedagogical_quality, created_at DESC)
   WHERE eval_pedagogical_quality IS NOT NULL;

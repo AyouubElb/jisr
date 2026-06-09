@@ -1,37 +1,27 @@
--- ============================================================================
--- Migration: soft-remove model for enrollments + backfill last_active_at
+-- Soft-remove model for enrollments + backfill last_active_at.
 --
--- Why:
---   "Removing a student" used to DELETE the enrollment row, which wiped
---   `last_active_at` (and broke any future "active 3 days ago" badge after
---   re-enroll). Meanwhile attempts/completions/attendance survive — they FK
---   to profiles + content tables, not to enrollments. Result: a re-enrolled
---   student showed "Jamais actif" while their detail page showed years of
---   history. Contradictory.
+-- "Removing a student" used to DELETE the enrollment row, which wiped
+-- `last_active_at` while attempts/completions/attendance survived (those FK
+-- to profiles, not enrollments). Re-enrolled students showed "Jamais actif"
+-- but their detail page had years of history.
 --
--- Fix: soft-remove. `enrollments.removed_at` set to NOW() instead of DELETE.
--- All access RLS routes through `is_actively_enrolled()` which requires
--- removed_at IS NULL. Re-enroll = clear removed_at; old activity preserved.
+-- Fix: soft-remove via `enrollments.removed_at`. All access routes through
+-- `is_actively_enrolled()` (requires removed_at IS NULL). Re-enroll clears it.
 --
--- This migration:
---   1. Adds enrollments.removed_at + partial index
---   2. Adds is_actively_enrolled() helper function (single source of truth)
---   3. Updates all enrollment-gated RLS policies to use the helper
---   4. Backfills last_active_at for current NULL rows from historical activity
--- ============================================================================
+-- 1) Add enrollments.removed_at + partial index
+-- 2) Add is_actively_enrolled() helper (single source of truth)
+-- 3) Update enrollment-gated RLS policies to use the helper
+-- 4) Backfill last_active_at for NULL rows from historical activity
 
--- ─── 1. Schema change ──────────────────────────────────────────────────────
+-- 1. Schema
 ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS removed_at TIMESTAMPTZ;
 
--- Most queries care about active enrollments only — partial index keeps
--- lookups cheap regardless of historical removal volume.
+-- Partial index keeps active-enrollment lookups cheap regardless of removal volume
 CREATE INDEX IF NOT EXISTS idx_enrollments_active_student_course
   ON enrollments(student_id, course_id)
   WHERE removed_at IS NULL;
 
--- ─── 2. Helper function ────────────────────────────────────────────────────
--- One function, one definition of "actively enrolled". Future changes to the
--- soft-remove model only need to update this one place.
+-- 2. Helper — single source of truth for "actively enrolled"
 CREATE OR REPLACE FUNCTION is_actively_enrolled(p_student_id UUID, p_course_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -49,12 +39,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION is_actively_enrolled(UUID, UUID) TO authenticated;
 
--- ─── 3. Update all enrollment-gated policies ───────────────────────────────
--- Using DROP+CREATE instead of ALTER POLICY because some live policies may
--- reference student_is_enrolled() (manual prod change pre-dating this repo)
--- whose definition we don't have. DROP+CREATE is idempotent.
+-- 3. Re-write enrollment-gated policies via the helper.
+-- DROP+CREATE because some live policies may reference a legacy
+-- student_is_enrolled() function whose definition we don't have here.
 
--- profiles: students see instructors of courses they are *actively* enrolled in
+-- profiles: students see only instructors of courses they're *actively* enrolled in
 DROP POLICY IF EXISTS profiles_select_scoped ON profiles;
 CREATE POLICY profiles_select_scoped ON profiles
   FOR SELECT TO authenticated
@@ -180,7 +169,7 @@ CREATE POLICY sessions_select_enrolled_or_owner ON live_sessions
     )
   );
 
--- student_attempts: cannot start a new attempt if removed
+-- student_attempts: no new attempts after soft-remove
 DROP POLICY IF EXISTS student_attempts_insert_enrolled ON student_attempts;
 CREATE POLICY student_attempts_insert_enrolled ON student_attempts
   FOR INSERT TO authenticated
@@ -194,7 +183,7 @@ CREATE POLICY student_attempts_insert_enrolled ON student_attempts
     )
   );
 
--- lesson_completions: cannot mark complete if removed
+-- lesson_completions: no new completions after soft-remove
 DROP POLICY IF EXISTS lesson_completions_insert_own_if_enrolled ON lesson_completions;
 CREATE POLICY lesson_completions_insert_own_if_enrolled ON lesson_completions
   FOR INSERT TO authenticated
@@ -208,7 +197,7 @@ CREATE POLICY lesson_completions_insert_own_if_enrolled ON lesson_completions
     )
   );
 
--- course_questions: cannot ask if removed
+-- course_questions: can't ask after soft-remove
 DROP POLICY IF EXISTS course_questions_insert_enrolled_student ON course_questions;
 CREATE POLICY course_questions_insert_enrolled_student ON course_questions
   FOR INSERT TO authenticated
@@ -217,15 +206,12 @@ CREATE POLICY course_questions_insert_enrolled_student ON course_questions
     AND is_actively_enrolled(auth.uid(), course_questions.course_id)
   );
 
--- enrollments_insert_instructor: instructor must own the published course.
--- Reactivation is handled in the API (UPDATE removed_at = NULL on existing
--- soft-removed row), not via INSERT — UNIQUE(student_id, course_id) prevents
--- duplicate INSERT anyway.
+-- Note: reactivation goes through API UPDATE (removed_at = NULL), not INSERT.
+-- UNIQUE(student_id, course_id) prevents duplicate INSERT anyway.
 
--- ─── 4. Backfill last_active_at for current NULL rows ──────────────────────
--- Pulls latest of (quiz submitted, lesson completed, attended session) per
--- (student, course) so the "Actif il y a X jours" badge is accurate after
--- this migration runs — including for the user's existing remove/re-add case.
+-- 4. Backfill last_active_at from historical activity
+-- Pulls MAX(quiz submitted, lesson completed, attended session) per (student, course)
+-- so the activity badge is accurate immediately after this migration runs.
 UPDATE enrollments e
 SET last_active_at = sub.activity
 FROM (

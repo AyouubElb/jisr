@@ -1,20 +1,9 @@
--- ----------------------------------------------------------------------------
--- Migration 007: Course Q&A
---
--- Private threaded questions between a student and the course instructor.
--- Visibility is always private (student ↔ instructor only). Questions belong
--- to a course; replies are flat and chronological.
---
--- Design notes:
--- - No 'visibility' column: every question is private by design.
--- - `status` lets either party mark a thread as resolved.
--- - `last_activity_at` drives sort order (newest activity first) without a
---   subquery on replies.
--- - RLS restricts read/write to (asker) or (course instructor). Non-parties
---   cannot see the thread at all.
--- ----------------------------------------------------------------------------
+-- Course Q&A: private threaded questions between a student and the course instructor.
+-- Visibility is always private — no third party can see threads.
+-- `status` toggles open/resolved; `last_activity_at` drives sort order without
+-- subqueries on replies. RLS restricts everything to the asker or the instructor.
 
--- ==== TABLES ================================================================
+-- Tables
 
 CREATE TABLE IF NOT EXISTS course_questions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -36,13 +25,13 @@ CREATE TABLE IF NOT EXISTS course_question_replies (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ==== INDEXES ===============================================================
+-- Indexes
 
--- Listing questions for a course, sorted by recent activity
+-- Course questions list, newest activity first
 CREATE INDEX IF NOT EXISTS idx_course_questions_course_activity
   ON course_questions(course_id, last_activity_at DESC);
 
--- Student-side "my questions" queries
+-- Student-side "my questions"
 CREATE INDEX IF NOT EXISTS idx_course_questions_student
   ON course_questions(student_id);
 
@@ -50,7 +39,7 @@ CREATE INDEX IF NOT EXISTS idx_course_questions_student
 CREATE INDEX IF NOT EXISTS idx_course_question_replies_question
   ON course_question_replies(question_id, created_at);
 
--- ==== TRIGGER: bump last_activity_at on new reply ===========================
+-- Trigger: bump last_activity_at on new reply
 
 CREATE OR REPLACE FUNCTION bump_question_activity()
 RETURNS TRIGGER
@@ -71,14 +60,12 @@ CREATE TRIGGER on_reply_bump_activity
   AFTER INSERT ON course_question_replies
   FOR EACH ROW EXECUTE FUNCTION bump_question_activity();
 
--- ==== RLS ===================================================================
+-- RLS
 
 ALTER TABLE course_questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE course_question_replies ENABLE ROW LEVEL SECURITY;
 
--- ---- course_questions ------------------------------------------------------
-
--- Visible only to the asker or the course instructor
+-- course_questions: visible only to the asker or the course instructor
 CREATE POLICY "course_questions_select_parties"
   ON course_questions FOR SELECT
   TO authenticated
@@ -90,7 +77,7 @@ CREATE POLICY "course_questions_select_parties"
     )
   );
 
--- A student can post a question only if enrolled in the course, as themselves
+-- Students can post only if enrolled, and only as themselves
 CREATE POLICY "course_questions_insert_enrolled_student"
   ON course_questions FOR INSERT
   TO authenticated
@@ -102,7 +89,7 @@ CREATE POLICY "course_questions_insert_enrolled_student"
     )
   );
 
--- Either party can update (to toggle resolved status, bump last_activity_at via trigger)
+-- Either party can update (toggle resolved, bump last_activity_at via trigger)
 CREATE POLICY "course_questions_update_parties"
   ON course_questions FOR UPDATE
   TO authenticated
@@ -114,7 +101,7 @@ CREATE POLICY "course_questions_update_parties"
     )
   );
 
--- Either party can delete their own thread
+-- Either party can delete the thread
 CREATE POLICY "course_questions_delete_parties"
   ON course_questions FOR DELETE
   TO authenticated
@@ -126,9 +113,7 @@ CREATE POLICY "course_questions_delete_parties"
     )
   );
 
--- ---- course_question_replies ----------------------------------------------
-
--- Replies inherit question visibility: asker or course instructor
+-- course_question_replies: inherit question visibility (asker or instructor)
 CREATE POLICY "course_question_replies_select_parties"
   ON course_question_replies FOR SELECT
   TO authenticated
@@ -146,7 +131,7 @@ CREATE POLICY "course_question_replies_select_parties"
     )
   );
 
--- Either party can reply; author must be themselves
+-- Either party can reply; author must equal auth.uid()
 CREATE POLICY "course_question_replies_insert_parties"
   ON course_question_replies FOR INSERT
   TO authenticated

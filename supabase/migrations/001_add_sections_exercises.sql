@@ -1,11 +1,8 @@
--- ============================================================================
--- Migration: Add sections + exercises, restructure lessons + materials
--- Run this in Supabase Dashboard → SQL Editor
--- ============================================================================
+-- Add sections + exercises, restructure lessons + materials.
+-- Lessons now hang off sections instead of courses.
+-- Materials can attach to either a lesson or an exercise (XOR via CHECK).
 
--- ----------------------------------------------------------------------------
--- 1. CREATE NEW TABLES
--- ----------------------------------------------------------------------------
+-- 1. New tables
 
 CREATE TABLE IF NOT EXISTS sections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,9 +21,7 @@ CREATE TABLE IF NOT EXISTS exercises (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ----------------------------------------------------------------------------
--- 2. DROP OLD RLS POLICIES (they reference lessons.course_id — must drop before column)
--- ----------------------------------------------------------------------------
+-- 2. Drop old RLS policies (reference lessons.course_id — must go before the column does)
 
 DROP POLICY IF EXISTS "lessons_select_enrolled_or_owner" ON lessons;
 DROP POLICY IF EXISTS "lessons_insert_owner" ON lessons;
@@ -38,71 +33,49 @@ DROP POLICY IF EXISTS "materials_insert_owner" ON materials;
 DROP POLICY IF EXISTS "materials_update_owner" ON materials;
 DROP POLICY IF EXISTS "materials_delete_owner" ON materials;
 
--- ----------------------------------------------------------------------------
--- 3. MIGRATE LESSONS: course_id → section_id
--- ----------------------------------------------------------------------------
+-- 3. Migrate lessons: course_id → section_id
 
--- 3a. For each course that has lessons, create a default section
+-- Create a default "Section 1" for each course that has lessons
 INSERT INTO sections (course_id, title, "order")
 SELECT DISTINCT course_id, 'Section 1', 1
 FROM lessons;
 
--- 3b. Add section_id column (nullable first)
 ALTER TABLE lessons ADD COLUMN section_id UUID REFERENCES sections(id) ON DELETE CASCADE;
 
--- 3c. Populate section_id from the default sections we just created
+-- Backfill section_id from the default sections
 UPDATE lessons
 SET section_id = s.id
 FROM sections s
 WHERE s.course_id = lessons.course_id;
 
--- 3d. Make section_id NOT NULL and drop course_id
 ALTER TABLE lessons ALTER COLUMN section_id SET NOT NULL;
 ALTER TABLE lessons DROP COLUMN course_id;
-
--- 3e. Set default content for lessons that have empty content
 ALTER TABLE lessons ALTER COLUMN content SET DEFAULT '';
 
--- ----------------------------------------------------------------------------
--- 4. MIGRATE MATERIALS: add exercise_id column
--- ----------------------------------------------------------------------------
+-- 4. Materials: add exercise_id, allow lesson_id OR exercise_id (XOR)
 
--- Make lesson_id nullable (was NOT NULL)
 ALTER TABLE materials ALTER COLUMN lesson_id DROP NOT NULL;
-
--- Add exercise_id column
 ALTER TABLE materials ADD COLUMN exercise_id UUID REFERENCES exercises(id) ON DELETE CASCADE;
-
--- Add constraint: exactly one of lesson_id or exercise_id must be set
 ALTER TABLE materials ADD CONSTRAINT materials_parent_check CHECK (
   (lesson_id IS NOT NULL AND exercise_id IS NULL) OR
   (lesson_id IS NULL AND exercise_id IS NOT NULL)
 );
 
--- ----------------------------------------------------------------------------
--- 5. NEW INDEXES
--- ----------------------------------------------------------------------------
+-- 5. Indexes
 
 CREATE INDEX IF NOT EXISTS idx_sections_course ON sections(course_id);
 CREATE INDEX IF NOT EXISTS idx_lessons_section ON lessons(section_id);
 CREATE INDEX IF NOT EXISTS idx_exercises_section ON exercises(section_id);
 CREATE INDEX IF NOT EXISTS idx_materials_exercise ON materials(exercise_id);
 
--- Drop old index that referenced lessons.course_id
 DROP INDEX IF EXISTS idx_lessons_course;
 
--- ----------------------------------------------------------------------------
--- 6. ENABLE RLS ON NEW TABLES
--- ----------------------------------------------------------------------------
+-- 6. RLS
 
 ALTER TABLE sections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exercises ENABLE ROW LEVEL SECURITY;
 
--- ----------------------------------------------------------------------------
--- 7. RLS POLICIES — SECTIONS
---    Instructor: full CRUD on their own courses
---    Student: SELECT only if enrolled
--- ----------------------------------------------------------------------------
+-- Sections: instructor full CRUD on their courses; students SELECT if enrolled
 
 CREATE POLICY "sections_select_enrolled_or_owner"
   ON sections FOR SELECT
@@ -151,11 +124,7 @@ CREATE POLICY "sections_delete_owner"
     )
   );
 
--- ----------------------------------------------------------------------------
--- 8. RLS POLICIES — EXERCISES
---    Instructor: full CRUD (via section → course ownership)
---    Student: SELECT only if enrolled
--- ----------------------------------------------------------------------------
+-- Exercises: instructor full CRUD (via section → course); students SELECT if enrolled
 
 CREATE POLICY "exercises_select_enrolled_or_owner"
   ON exercises FOR SELECT
@@ -208,11 +177,7 @@ CREATE POLICY "exercises_delete_owner"
     )
   );
 
--- ----------------------------------------------------------------------------
--- 9. NEW LESSONS RLS — now goes through sections instead of courses
---    Instructor: full CRUD (via section → course ownership)
---    Student: SELECT only if enrolled
--- ----------------------------------------------------------------------------
+-- Lessons (new): goes through sections instead of courses
 
 CREATE POLICY "lessons_select_enrolled_or_owner"
   ON lessons FOR SELECT
@@ -265,11 +230,7 @@ CREATE POLICY "lessons_delete_owner"
     )
   );
 
--- ----------------------------------------------------------------------------
--- 10. NEW MATERIALS RLS — now supports lesson_id OR exercise_id
---    Instructor: full CRUD (via section → course ownership)
---    Student: SELECT only if enrolled
--- ----------------------------------------------------------------------------
+-- Materials (new): supports lesson_id OR exercise_id parent
 
 CREATE POLICY "materials_select_enrolled_or_owner"
   ON materials FOR SELECT

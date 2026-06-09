@@ -1,16 +1,7 @@
--- ============================================================================
--- Migration: Waitlist for pre-launch
---
--- Pre-launch signup list for the Founder Program (10 spots at 99 DH/mo).
--- Anonymous public can INSERT one row; only admins can read.
---
--- Form collects 5 fields:
---   - full_name, email, phone (contact)
---   - current_situation (qualifier: which prof profile?)
---   - time_sink         (qualifier: which pain to lead with on the call?)
--- Plus an internal `source` tag so future entry points (e.g. blog, ads) are
--- distinguishable.
--- ============================================================================
+-- Pre-launch waitlist for the Founder Program.
+-- Public can INSERT, only admins can SELECT.
+-- `current_situation` + `time_sink` are qualifiers used to triage founder calls.
+-- `source` tags the entry point (homepage, future blog/ads, etc).
 
 CREATE TABLE IF NOT EXISTS waitlist (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -25,8 +16,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
 
 CREATE INDEX IF NOT EXISTS waitlist_created_at_idx ON waitlist (created_at DESC);
 
--- Indexes on the two qualifier columns so the admin dashboard can filter and
--- count by profile / pain quickly when triaging the founder calls.
+-- Filter + count by qualifier in the admin dashboard
 CREATE INDEX IF NOT EXISTS waitlist_current_situation_idx
   ON waitlist (current_situation);
 

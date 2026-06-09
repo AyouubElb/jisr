@@ -1,11 +1,6 @@
--- ============================================================================
--- Migration: lesson-images public storage bucket
---
--- Instructor uploads images into lesson HTML via the rich-text editor.
--- Public bucket because lesson HTML embeds many images at once — signed URLs
--- would force one round-trip per image on every page render.
--- See docs/AI-AGENTS.md (Lesson images section) for rationale.
--- ============================================================================
+-- lesson-images public storage bucket.
+-- Lesson HTML embeds many images at once; signed URLs would force a round-trip
+-- per image on every render, so the bucket is public.
 
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('lesson-images', 'lesson-images', true)

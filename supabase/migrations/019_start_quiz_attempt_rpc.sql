@@ -1,22 +1,13 @@
--- ============================================================================
--- Migration: server-side enforcement of quizzes.max_attempts
+-- Server-side enforcement of quizzes.max_attempts.
 --
--- Rationale:
---   The previous client-side check in attemptsApi.start() could be bypassed by
---   a determined student calling supabase.from("student_attempts").insert(...)
---   directly from devtools — RLS lets a student insert their own attempt row,
---   so the cap was only a UI behavior.
+-- The client-side check in attemptsApi.start() could be bypassed by inserting
+-- into student_attempts directly from devtools (RLS allows students to insert
+-- their own attempt row). This RPC moves the cap into a SECURITY DEFINER
+-- function that validates + inserts atomically.
 --
---   This migration moves the check into a SECURITY DEFINER function that runs
---   with elevated privileges and atomically validates + inserts. Clients now
---   call supabase.rpc("start_quiz_attempt", { p_quiz_id }).
---
--- Counting policy (intentional):
---   ALL attempt statuses count toward the cap — in_progress + submitted +
---   pending_review + graded. Instructors who set max_attempts=1 mean "one
---   chance, abandonment included". A student who clicks Commencer and closes
---   the tab has used their attempt. The student-side UI warns about this.
--- ============================================================================
+-- Counting policy: ALL statuses count (in_progress + submitted + pending_review
+-- + graded). max_attempts=1 means "one chance, abandonment included". The
+-- student UI warns about this.
 
 CREATE OR REPLACE FUNCTION start_quiz_attempt(p_quiz_id UUID)
 RETURNS student_attempts
@@ -36,7 +27,7 @@ BEGIN
     RAISE EXCEPTION 'Non authentifie' USING ERRCODE = '42501';
   END IF;
 
-  -- Resolve the course this quiz belongs to (quiz → section → course).
+  -- Resolve the course this quiz belongs to (quiz → section → course)
   SELECT s.course_id, q.max_attempts
     INTO v_course_id, v_max_attempts
   FROM quizzes q
@@ -47,12 +38,12 @@ BEGIN
     RAISE EXCEPTION 'Quiz introuvable' USING ERRCODE = '42704';
   END IF;
 
-  -- Verify active enrollment (uses the existing helper).
+  -- Active-enrollment check
   IF NOT is_actively_enrolled(v_user_id, v_course_id) THEN
     RAISE EXCEPTION 'Vous n''etes pas inscrit a ce cours' USING ERRCODE = '42501';
   END IF;
 
-  -- Cap check (NULL max_attempts = unlimited).
+  -- Cap check (NULL = unlimited)
   IF v_max_attempts IS NOT NULL THEN
     SELECT COUNT(*) INTO v_used_count
     FROM student_attempts
@@ -64,7 +55,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- Insert and return the new row.
+  -- Insert and return the new attempt
   INSERT INTO student_attempts (quiz_id, student_id, started_at, status)
   VALUES (p_quiz_id, v_user_id, NOW(), 'in_progress')
   RETURNING * INTO v_attempt;
@@ -77,4 +68,4 @@ REVOKE ALL ON FUNCTION start_quiz_attempt(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION start_quiz_attempt(UUID) TO authenticated;
 
 COMMENT ON FUNCTION start_quiz_attempt IS
-  'Atomically checks quizzes.max_attempts and creates an in_progress attempt. Replaces the client-side check in attemptsApi.start() so the cap cannot be bypassed via direct table inserts.';
+  'Atomically checks quizzes.max_attempts and inserts the new attempt. Replaces the client-side cap check so it cannot be bypassed via direct table inserts.';

@@ -1,31 +1,17 @@
--- ============================================================================
--- Migration: atomic, transactional save for quiz_blocks
+-- Atomic, transactional save for quiz_blocks.
 --
--- Replaces the client-side 4-pass diff in src/lib/api/quizzes.api.ts:saveBlocks.
--- Today's path makes ~3N round-trips per save and offers no atomicity — a
--- partial failure can leave the DB half-written, and two concurrent saves
--- interleave unpredictably. This RPC does the same diff inside a single
--- transaction with one client call, so saves are fast (1 round-trip),
--- all-or-nothing, and serializable.
+-- Replaces the client-side 4-pass diff in quizzes.api.ts:saveBlocks, which
+-- made ~3N round-trips per save with no atomicity (partial failures left the
+-- DB half-written, concurrent saves interleaved). This RPC does the diff in
+-- one transaction: 1 round-trip, all-or-nothing, serializable.
 --
--- Inputs:
---   p_quiz_id  uuid       — the quiz being edited.
---   p_blocks   jsonb      — array of block objects in their final state.
---                           Each: { id, type, content, weight, order }.
---                           Client supplies the uuid (real, generated via
---                           crypto.randomUUID for newly-added blocks).
+-- Inputs: p_quiz_id and p_blocks (jsonb array of { id, type, content, weight, order }).
+-- Client supplies the UUIDs (crypto.randomUUID for new blocks).
 --
--- Behaviour:
---   - DELETE every existing quiz_blocks row whose id is NOT in p_blocks.
---   - UPSERT every row in p_blocks by id (INSERT new, UPDATE existing).
---   - Preserve `model_answer` and `grading_notes` when the client omits them
---     (COALESCE keeps the existing value).
+-- Behavior: DELETE rows not in p_blocks; UPSERT every row by id.
+-- model_answer and grading_notes are preserved when the client omits them.
 --
--- Auth:
---   SECURITY DEFINER so the function bypasses RLS, but the caller MUST own
---   the course this quiz belongs to. We check ownership explicitly before
---   doing anything.
--- ============================================================================
+-- SECURITY DEFINER bypasses RLS; ownership is checked explicitly up front.
 
 CREATE OR REPLACE FUNCTION save_quiz_blocks(p_quiz_id UUID, p_blocks JSONB)
 RETURNS SETOF quiz_blocks
@@ -85,7 +71,7 @@ BEGIN
     content = EXCLUDED.content,
     weight = EXCLUDED.weight,
     "order" = EXCLUDED."order",
-    -- Preserve existing values when client omits these.
+    -- Preserve existing values when the client omits them
     model_answer = COALESCE(EXCLUDED.model_answer, quiz_blocks.model_answer),
     grading_notes = COALESCE(EXCLUDED.grading_notes, quiz_blocks.grading_notes);
 
@@ -101,4 +87,4 @@ REVOKE ALL ON FUNCTION save_quiz_blocks(UUID, JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION save_quiz_blocks(UUID, JSONB) TO authenticated;
 
 COMMENT ON FUNCTION save_quiz_blocks IS
-  'Atomic save of all quiz_blocks for a quiz. Owner-only via explicit check. Replaces the client-side 4-pass diff in quizzes.api.ts:saveBlocks.';
+  'Atomic save of all quiz_blocks for a quiz. Owner-only. Replaces the client-side 4-pass diff in quizzes.api.ts:saveBlocks.';
