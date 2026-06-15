@@ -2,39 +2,27 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
-const faqs = [
-  {
-    question: "Pourquoi je ne peux pas créer un compte directement ?",
-    answer:
-      "Jisr est en accès anticipé — on ouvre les comptes progressivement pour bien accompagner chaque prof. On prend 15 minutes (sur WhatsApp ou par téléphone, comme vous préférez) pour comprendre votre contexte, puis on vous envoie une invitation si Jisr vous correspond. Pas de chichi, pas de vente forcée.",
-  },
-  {
-    question: "Comment ça fonctionne avec WhatsApp ?",
-    answer:
-      "Jisr complète WhatsApp, il ne le remplace pas. Gardez WhatsApp pour la communication rapide, utilisez Jisr pour les cours, quiz et suivi.",
-  },
-  {
-    question: "Mes élèves actuels doivent-ils s'inscrire eux-mêmes ?",
-    answer:
-      "Non. Vous ajoutez manuellement vos élèves depuis votre tableau de bord. Ils reçoivent un accès sans avoir à chercher votre profil.",
-  },
-];
-
 export function FaqSection(): React.JSX.Element {
+  const t = useTranslations("home.faq");
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+
+  const faqs = [
+    { question: t("q1Question"), answer: t("q1Answer") },
+    { question: t("q2Question"), answer: t("q2Answer") },
+    { question: t("q3Question"), answer: t("q3Answer") },
+  ];
 
   return (
     <section id="faq" className="border-b border-border/60">
       <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight text-amber-950 sm:text-4xl">
-            Questions fréquentes
+            {t("title")}
           </h2>
-          <p className="mt-4 text-muted-foreground">
-            Tout ce que vous voulez savoir avant de commencer.
-          </p>
+          <p className="mt-4 text-muted-foreground">{t("subtitle")}</p>
         </div>
 
         <div className="mt-10 space-y-3">

@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Lock, Mail, User } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ export function SignupForm({
   defaultFullName,
   initialError,
 }: SignupFormProps): React.JSX.Element {
+  const t = useTranslations("auth.instructorSignup");
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -41,7 +43,7 @@ export function SignupForm({
   }, [initialError]);
 
   const onPasswordSubmit = async (
-    data: InstructorSignupInput
+    data: InstructorSignupInput,
   ): Promise<void> => {
     setIsLoading(true);
     const res = await fetch("/api/auth/instructor-signup", {
@@ -54,25 +56,23 @@ export function SignupForm({
       const body = (await res.json().catch(() => null)) as {
         error?: string;
       } | null;
-      toast.error(body?.error ?? "Erreur lors de la creation du compte.");
+      toast.error(body?.error ?? t("errorCreate"));
       setIsLoading(false);
       return;
     }
 
-    // Server has created the user + activated the profile. Now sign in
-    // client-side so the session cookies are set in the browser.
     const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password: data.password,
     });
     if (signInError) {
-      toast.error("Compte cree, mais la connexion automatique a echoue.");
+      toast.error(t("errorAutoLogin"));
       router.push("/login");
       return;
     }
 
-    toast.success("Compte cree avec succes");
+    toast.success(t("successCreated"));
     router.push("/instructor");
     router.refresh();
   };
@@ -80,8 +80,6 @@ export function SignupForm({
   const onGoogleSignup = async (): Promise<void> => {
     setIsLoading(true);
     const supabase = createClient();
-    // We pass the invite token through redirectTo (NOT via the OAuth `state`
-    // param — Supabase reserves `state` for PKCE).
     const callbackUrl = new URL(`${window.location.origin}/auth/callback`);
     callbackUrl.searchParams.set("invite_token", token);
 
@@ -90,7 +88,7 @@ export function SignupForm({
       options: { redirectTo: callbackUrl.toString() },
     });
     if (error) {
-      toast.error("Erreur lors de la connexion avec Google");
+      toast.error(t("errorGoogle"));
       setIsLoading(false);
     }
   };
@@ -98,7 +96,7 @@ export function SignupForm({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="email">Adresse e-mail</Label>
+        <Label htmlFor="email">{t("labelEmail")}</Label>
         <div className="relative">
           <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
@@ -109,9 +107,7 @@ export function SignupForm({
             className="pl-10"
           />
         </div>
-        <p className="text-xs text-muted-foreground">
-          Cette invitation est liee a cette adresse.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("emailLockedNote")}</p>
       </div>
 
       <Button
@@ -123,7 +119,7 @@ export function SignupForm({
         disabled={isLoading}
       >
         <GoogleIcon />
-        Continuer avec Google
+        {t("continueWithGoogle")}
       </Button>
 
       <div className="relative">
@@ -131,7 +127,9 @@ export function SignupForm({
           <span className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-3 text-muted-foreground">ou</span>
+          <span className="bg-background px-3 text-muted-foreground">
+            {t("or")}
+          </span>
         </div>
       </div>
 
@@ -140,13 +138,13 @@ export function SignupForm({
         className="space-y-5"
       >
         <div className="space-y-2">
-          <Label htmlFor="full_name">Nom complet</Label>
+          <Label htmlFor="full_name">{t("labelFullName")}</Label>
           <div className="relative">
             <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
               id="full_name"
               type="text"
-              placeholder="Votre nom complet"
+              placeholder={t("placeholderFullName")}
               className="pl-10"
               {...form.register("full_name")}
             />
@@ -159,13 +157,13 @@ export function SignupForm({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Mot de passe</Label>
+          <Label htmlFor="password">{t("labelPassword")}</Label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
               id="password"
               type="password"
-              placeholder="Au moins 8 caracteres"
+              placeholder={t("placeholderPassword")}
               className="pl-10"
               {...form.register("password")}
             />
@@ -178,7 +176,7 @@ export function SignupForm({
         </div>
 
         <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
-          {isLoading ? "Creation en cours..." : "Creer mon compte"}
+          {isLoading ? t("submitting") : t("submit")}
           {!isLoading && <ArrowRight className="ml-1 h-4 w-4" />}
         </Button>
       </form>

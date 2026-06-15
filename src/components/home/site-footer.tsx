@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Mail, Phone, MapPin } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { SmoothScrollLink } from "@/components/home/smooth-scroll-link";
 import {
   CONTACT_EMAIL,
@@ -8,7 +9,9 @@ import {
   CONTACT_WHATSAPP_URL,
 } from "@/lib/constants/contact";
 
-export function SiteFooter(): React.JSX.Element {
+export async function SiteFooter(): Promise<React.JSX.Element> {
+  const t = await getTranslations("home.footer");
+
   return (
     <footer className="bg-background">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
@@ -27,24 +30,26 @@ export function SiteFooter(): React.JSX.Element {
               </span>
             </Link>
             <p className="mt-3 text-xs text-muted-foreground">
-              Le pont entre vous et vos élèves. Sans intermédiaire.
+              {t("tagline")}
             </p>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-amber-950">Produit</h3>
+            <h3 className="text-sm font-semibold text-amber-950">
+              {t("sectionProduct")}
+            </h3>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
               <li>
                 <SmoothScrollLink
                   href="#fonctionnalites"
                   className="hover:text-amber-950"
                 >
-                  Les outils
+                  {t("linkTools")}
                 </SmoothScrollLink>
               </li>
               <li>
                 <SmoothScrollLink href="#faq" className="hover:text-amber-950">
-                  FAQ
+                  {t("linkFaq")}
                 </SmoothScrollLink>
               </li>
               <li>
@@ -52,7 +57,7 @@ export function SiteFooter(): React.JSX.Element {
                   href="#waitlist"
                   className="hover:text-amber-950"
                 >
-                  Rejoindre la liste
+                  {t("linkJoinWaitlist")}
                 </SmoothScrollLink>
               </li>
               <li>
@@ -62,18 +67,20 @@ export function SiteFooter(): React.JSX.Element {
                   rel="noopener noreferrer"
                   className="hover:text-amber-950"
                 >
-                  Nous contacter
+                  {t("linkContact")}
                 </a>
               </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-amber-950">Légal</h3>
+            <h3 className="text-sm font-semibold text-amber-950">
+              {t("sectionLegal")}
+            </h3>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
               <li>
                 <Link href="/legal/conditions" className="hover:text-amber-950">
-                  Conditions d&apos;utilisation
+                  {t("linkTerms")}
                 </Link>
               </li>
               <li>
@@ -81,19 +88,21 @@ export function SiteFooter(): React.JSX.Element {
                   href="/legal/confidentialite"
                   className="hover:text-amber-950"
                 >
-                  Politique de confidentialité
+                  {t("linkPrivacy")}
                 </Link>
               </li>
               <li>
                 <Link href="/legal/cookies" className="hover:text-amber-950">
-                  Cookies
+                  {t("linkCookies")}
                 </Link>
               </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-amber-950">Contact</h3>
+            <h3 className="text-sm font-semibold text-amber-950">
+              {t("sectionContact")}
+            </h3>
             <ul className="mt-3 space-y-2.5 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -115,14 +124,14 @@ export function SiteFooter(): React.JSX.Element {
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <span>Rabat, Maroc</span>
+                <span>{t("city")}</span>
               </li>
             </ul>
           </div>
         </div>
 
         <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
-          <span>© {new Date().getFullYear()} Jisr. Tous droits réservés.</span>
+          <span>{t("copyright", { year: new Date().getFullYear() })}</span>
         </div>
       </div>
     </footer>

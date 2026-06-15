@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,29 +18,25 @@ import { toast } from "sonner";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const SITUATION_OPTIONS = [
-  { value: "indep_online", label: "Prof indépendant·e (cours en ligne)" },
-  {
-    value: "indep_inperson",
-    label: "Prof indépendant·e (cours en présentiel)",
-  },
-  { value: "school", label: "Prof dans une école ou centre de langues" },
-  { value: "student_teacher", label: "Étudiant·e qui enseigne en parallèle" },
-  { value: "other", label: "Autre profil" },
-] as const;
-
-const TIME_SINK_OPTIONS = [
-  { value: "correction", label: "Correction des copies et quiz" },
-  { value: "prep", label: "Préparation des cours et supports" },
-  {
-    value: "whatsapp",
-    label: "Communication WhatsApp avec élèves et parents",
-  },
-  { value: "admin", label: "Suivi des paiements et de l'administration" },
-  { value: "acquisition", label: "Trouver de nouveaux élèves" },
-] as const;
-
 export function FinalCta(): React.JSX.Element {
+  const t = useTranslations("home.finalCta");
+
+  const SITUATION_OPTIONS = [
+    { value: "indep_online", label: t("situationIndepOnline") },
+    { value: "indep_inperson", label: t("situationIndepInperson") },
+    { value: "school", label: t("situationSchool") },
+    { value: "student_teacher", label: t("situationStudentTeacher") },
+    { value: "other", label: t("situationOther") },
+  ] as const;
+
+  const TIME_SINK_OPTIONS = [
+    { value: "correction", label: t("timeSinkCorrection") },
+    { value: "prep", label: t("timeSinkPrep") },
+    { value: "whatsapp", label: t("timeSinkWhatsapp") },
+    { value: "admin", label: t("timeSinkAdmin") },
+    { value: "acquisition", label: t("timeSinkAcquisition") },
+  ] as const;
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -57,29 +54,28 @@ export function FinalCta(): React.JSX.Element {
     const cleanPhone = phone.trim();
 
     if (cleanName.length < 2) {
-      toast.error("Veuillez entrer votre nom complet");
+      toast.error(t("errorName"));
       return;
     }
     if (!EMAIL_RE.test(cleanEmail)) {
-      toast.error("Adresse e-mail invalide");
+      toast.error(t("errorEmail"));
       return;
     }
     if (cleanPhone.length < 6) {
-      toast.error("Veuillez entrer votre numéro WhatsApp");
+      toast.error(t("errorPhone"));
       return;
     }
     if (!situation) {
-      toast.error("Sélectionnez votre situation actuelle");
+      toast.error(t("errorSituation"));
       return;
     }
     if (!timeSink) {
-      toast.error("Sélectionnez ce qui vous prend le plus de temps");
+      toast.error(t("errorTimeSink"));
       return;
     }
 
     setIsPending(true);
     const supabase = createClient();
-    // `waitlist` table not yet in generated Database types — cast through unknown.
     const { error } = await (
       supabase.from("waitlist" as never) as unknown as {
         insert: (values: {
@@ -102,18 +98,16 @@ export function FinalCta(): React.JSX.Element {
 
     if (error) {
       if (error.code === "23505") {
-        toast.success(
-          "Vous êtes déjà sur la liste — on vous tient au courant.",
-        );
+        toast.success(t("alreadyOnList"));
         setSubmitted(true);
       } else {
-        toast.error("Une erreur est survenue. Réessayez dans un instant.");
+        toast.error(t("submitError"));
       }
       setIsPending(false);
       return;
     }
 
-    toast.success("C'est noté — on vous contacte dès le lancement.");
+    toast.success(t("success"));
     setSubmitted(true);
     setIsPending(false);
   };
@@ -123,55 +117,51 @@ export function FinalCta(): React.JSX.Element {
       <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6">
         <div className="overflow-hidden rounded-2xl bg-primary">
           <div className="grid gap-0 lg:grid-cols-2">
-            {/* Left — copy */}
             <div className="p-10 sm:p-12 lg:p-14">
               <p className="text-xs font-semibold uppercase tracking-widest text-stone-900/70">
-                Accès anticipé · sur invitation
+                {t("badge")}
               </p>
               <h2 className="mt-3 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">
-                Essayez Jisr en avant-première.
+                {t("title")}
               </h2>
-              <p className="mt-4 text-stone-800/80">
-                Laissez vos coordonnées — on vous contacte dès le lancement.
-              </p>
+              <p className="mt-4 text-stone-800/80">{t("subtitle")}</p>
               <ul className="mt-6 space-y-2 text-sm text-stone-900/90">
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-stone-900" />
-                  Accompagnement personnalisé au démarrage
+                  {t("bullet1")}
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-stone-900" />
-                  Votre avis façonne directement le produit
+                  {t("bullet2")}
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-stone-900" />
-                  Aucun engagement — vous testez à votre rythme
+                  {t("bullet3")}
                 </li>
               </ul>
             </div>
 
-            {/* Right — form card */}
             <div className="border-t border-stone-900/10 bg-card p-8 sm:p-10 lg:border-l lg:border-t-0 lg:p-12">
               {submitted ? (
                 <div className="flex h-full flex-col items-center justify-center gap-3 py-12 text-center">
                   <CheckCircle2 className="h-10 w-10 text-emerald-600" />
                   <p className="text-lg font-semibold text-amber-950">
-                    Vous êtes sur la liste.
+                    {t("successTitle")}
                   </p>
                   <p className="max-w-sm text-sm text-muted-foreground">
-                    On vous contacte dès le lancement.
+                    {t("successSubtitle")}
                   </p>
                 </div>
               ) : (
                 <form onSubmit={onSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="waitlist-name">Nom complet</Label>
+                    <Label htmlFor="waitlist-name">{t("labelName")}</Label>
                     <Input
                       id="waitlist-name"
                       type="text"
                       required
                       autoComplete="name"
-                      placeholder="Fatima Benali"
+                      placeholder={t("placeholderName")}
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       disabled={isPending}
@@ -180,13 +170,13 @@ export function FinalCta(): React.JSX.Element {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="waitlist-email">Adresse e-mail</Label>
+                    <Label htmlFor="waitlist-email">{t("labelEmail")}</Label>
                     <Input
                       id="waitlist-email"
                       type="email"
                       required
                       autoComplete="email"
-                      placeholder="vous@exemple.com"
+                      placeholder={t("placeholderEmail")}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={isPending}
@@ -195,13 +185,13 @@ export function FinalCta(): React.JSX.Element {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="waitlist-phone">WhatsApp / Téléphone</Label>
+                    <Label htmlFor="waitlist-phone">{t("labelPhone")}</Label>
                     <Input
                       id="waitlist-phone"
                       type="tel"
                       required
                       autoComplete="tel"
-                      placeholder="+212 6XX XXX XXX"
+                      placeholder={t("placeholderPhone")}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       disabled={isPending}
@@ -211,7 +201,7 @@ export function FinalCta(): React.JSX.Element {
 
                   <div className="space-y-2">
                     <Label htmlFor="waitlist-situation">
-                      Votre situation actuelle
+                      {t("labelSituation")}
                     </Label>
                     <Select
                       value={situation}
@@ -222,7 +212,7 @@ export function FinalCta(): React.JSX.Element {
                         id="waitlist-situation"
                         className="h-11! w-full"
                       >
-                        <SelectValue placeholder="Choisissez une option…" />
+                        <SelectValue placeholder={t("selectPlaceholder")} />
                       </SelectTrigger>
                       <SelectContent>
                         {SITUATION_OPTIONS.map((opt) => (
@@ -236,7 +226,7 @@ export function FinalCta(): React.JSX.Element {
 
                   <div className="space-y-2">
                     <Label htmlFor="waitlist-timesink">
-                      Ce qui vous prend le plus de temps en dehors du cours
+                      {t("labelTimeSink")}
                     </Label>
                     <Select
                       value={timeSink}
@@ -247,7 +237,7 @@ export function FinalCta(): React.JSX.Element {
                         id="waitlist-timesink"
                         className="h-11! w-full"
                       >
-                        <SelectValue placeholder="Choisissez une option…" />
+                        <SelectValue placeholder={t("selectPlaceholder")} />
                       </SelectTrigger>
                       <SelectContent>
                         {TIME_SINK_OPTIONS.map((opt) => (
@@ -266,10 +256,10 @@ export function FinalCta(): React.JSX.Element {
                     className="w-full"
                   >
                     {isPending ? (
-                      "Envoi..."
+                      t("submitting")
                     ) : (
                       <>
-                        Rejoindre la liste
+                        {t("submit")}
                         <ArrowRight className="ml-1 h-4 w-4" />
                       </>
                     )}
@@ -277,11 +267,10 @@ export function FinalCta(): React.JSX.Element {
 
                   <div className="space-y-1.5">
                     <p className="text-center text-xs text-muted-foreground">
-                      Une particularité à mentionner&nbsp;? Vous nous le direz
-                      pendant l&apos;appel.
+                      {t("footnote1")}
                     </p>
                     <p className="text-center text-xs text-muted-foreground">
-                      Pas de spam. Un seul message au lancement.
+                      {t("footnote2")}
                     </p>
                   </div>
                 </form>

@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { buttonVariants } from "@/components/ui/button";
 import { SmoothScrollLink } from "@/components/home/smooth-scroll-link";
+import { LocaleToggle } from "@/components/layout/locale-toggle";
+import { MobileMenu } from "@/components/layout/mobile-menu";
 
-export function SiteHeader(): React.JSX.Element {
+export async function SiteHeader(): Promise<React.JSX.Element> {
+  const t = await getTranslations("home.header");
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -25,33 +30,50 @@ export function SiteHeader(): React.JSX.Element {
             href="#comment-ca-marche"
             className="hover:text-amber-950"
           >
-            Comment ça marche
+            {t("navHowItWorks")}
           </SmoothScrollLink>
           <SmoothScrollLink
             href="#fonctionnalites"
             className="hover:text-amber-950"
           >
-            Les outils
+            {t("navTools")}
           </SmoothScrollLink>
           <SmoothScrollLink href="#faq" className="hover:text-amber-950">
-            FAQ
+            {t("navFaq")}
           </SmoothScrollLink>
         </nav>
 
-        <div className="flex items-center gap-2">
+        {/* Desktop actions: locale + login + CTA */}
+        <div className="hidden items-center gap-1 md:flex">
+          <LocaleToggle />
           <Link
             href="/login"
             className={buttonVariants({ variant: "ghost", size: "sm" })}
           >
-            Se connecter
+            {t("login")}
           </Link>
           <SmoothScrollLink
             href="#waitlist"
             className={buttonVariants({ size: "sm" })}
           >
-            Rejoindre la liste
+            {t("joinWaitlist")}
             <ArrowRight className="h-4 w-4" />
           </SmoothScrollLink>
+        </div>
+
+        {/* Mobile: single hamburger that opens a sheet with nav + locale + auth */}
+        <div className="flex items-center md:hidden">
+          <MobileMenu
+            labels={{
+              menu: t("menu"),
+              navHowItWorks: t("navHowItWorks"),
+              navTools: t("navTools"),
+              navFaq: t("navFaq"),
+              login: t("login"),
+              joinWaitlist: t("joinWaitlist"),
+              language: t("language"),
+            }}
+          />
         </div>
       </div>
     </header>

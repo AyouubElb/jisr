@@ -1,35 +1,34 @@
-const steps = [
-  {
-    number: "01",
-    title: "Une discussion (15 min)",
-    description:
-      "Sur WhatsApp ou par téléphone, on comprend votre contexte : nombre d'élèves, niveaux, ce qui vous prend le plus de temps aujourd'hui.",
-  },
-  {
-    number: "02",
-    title: "Votre invitation arrive",
-    description:
-      "Si Jisr vous correspond, vous recevez votre lien d'accès personnel sous 48h.",
-  },
-  {
-    number: "03",
-    title: "Vous prenez la main",
-    description:
-      "Ajoutez vos élèves, créez votre premier cours, planifiez vos sessions — depuis votre tableau de bord, sans intermédiaire.",
-  },
-];
+import { getTranslations } from "next-intl/server";
 
-export function HowItWorks(): React.JSX.Element {
+export async function HowItWorks(): Promise<React.JSX.Element> {
+  const t = await getTranslations("home.howItWorks");
+
+  const steps = [
+    {
+      number: "01",
+      title: t("step1Title"),
+      description: t("step1Description"),
+    },
+    {
+      number: "02",
+      title: t("step2Title"),
+      description: t("step2Description"),
+    },
+    {
+      number: "03",
+      title: t("step3Title"),
+      description: t("step3Description"),
+    },
+  ];
+
   return (
     <section id="comment-ca-marche" className="border-b border-border/60 bg-card/50">
       <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight text-amber-950 sm:text-4xl">
-            Comment ça marche
+            {t("title")}
           </h2>
-          <p className="mt-4 text-muted-foreground">
-            Du premier message à votre première classe — trois étapes.
-          </p>
+          <p className="mt-4 text-muted-foreground">{t("subtitle")}</p>
         </div>
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">

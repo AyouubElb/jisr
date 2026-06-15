@@ -17,16 +17,16 @@ export function SmoothScrollLink({
   const pathname = usePathname();
   const id = href.slice(1);
 
-  // On a sub-page (e.g. /legal/*) the anchor target lives on the homepage, so
-  // point the href at /#id and let the browser do a real navigation + jump.
-  const resolvedHref = pathname === "/" ? href : `/${href}`;
+  // Home matches both the legacy "/" and the locale-prefixed "/en", "/fr"
+  // (no trailing segment). Sub-pages (e.g. /en/legal/*) anchor back to home.
+  const isHome = pathname === "/" || /^\/(en|fr)\/?$/.test(pathname);
+  const resolvedHref = isHome ? href : `/${href}`;
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>): void => {
     onClick?.(e);
     if (e.defaultPrevented) return;
 
-    // Off the homepage: let the plain /#id navigation happen (browser scrolls).
-    if (pathname !== "/") return;
+    if (!isHome) return;
 
     const target = document.getElementById(id);
     if (!target) return;

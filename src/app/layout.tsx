@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
+import { getLocale } from "next-intl/server";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SplashRemover } from "@/components/layout/splash-remover";
@@ -11,20 +12,24 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+// Fallback for non-localized routes; localized pages override via generateMetadata.
 export const metadata: Metadata = {
-  title: "Jisr — Enseignez plus, sans y laisser vos dimanches",
-  description:
-    "L'IA qui travaille avec les profs d'anglais marocains, pas à leur place. Correction, quiz, suivi d'élèves — Jisr s'occupe des heures perdues, vous gardez la pédagogie.",
+  title: {
+    default: "Jisr",
+    template: "%s · Jisr",
+  },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>): React.JSX.Element {
+}>): Promise<React.JSX.Element> {
+  const locale = await getLocale();
+
   return (
     <html
-      lang="fr"
+      lang={locale}
       data-scroll-behavior="smooth"
       className={`${inter.variable} h-full antialiased`}
     >

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { SignupForm } from "./signup-form";
 
@@ -6,72 +7,84 @@ interface SignupPageProps {
   searchParams: Promise<{ token?: string; error?: string }>;
 }
 
-const SIGNUP_ERROR_MESSAGES: Record<string, string> = {
-  email_mismatch:
-    "L'adresse Google utilisee ne correspond pas a celle de votre invitation.",
-  invite_invalid: "Cette invitation est invalide ou a deja ete utilisee.",
-  consume_failed:
-    "Une erreur est survenue lors de la finalisation de votre compte. Veuillez reessayer.",
-};
-
 export default async function InstructorSignupPage({
   searchParams,
 }: SignupPageProps): Promise<React.JSX.Element> {
+  const t = await getTranslations("auth.instructorSignup");
   const { token, error } = await searchParams;
 
   if (!token) {
-    return <InvalidInvite message="Lien d'invitation manquant." />;
+    return <InvalidInvite title={t("invalidTitle")} message={t("missingToken")} backLabel={t("backToLogin")} />;
   }
 
-  // Anon-callable lookup: returns rows only if invite is unconsumed and unexpired.
   const supabase = await createServerSupabase();
   const { data: rows, error: lookupError } = await supabase.rpc(
     "get_invite_by_token",
-    { p_token: token }
+    { p_token: token },
   );
 
   const invite = rows?.[0];
   if (lookupError || !invite) {
     return (
-      <InvalidInvite message="Cette invitation est invalide, expiree ou deja utilisee. Contactez la personne qui vous l'a envoyee." />
+      <InvalidInvite
+        title={t("invalidTitle")}
+        message={t("invalidInvite")}
+        backLabel={t("backToLogin")}
+      />
     );
   }
 
   if (invite.kind !== "instructor") {
     return (
-      <InvalidInvite message="Ce lien n'est pas une invitation instructeur." />
+      <InvalidInvite
+        title={t("invalidTitle")}
+        message={t("wrongInviteKind")}
+        backLabel={t("backToLogin")}
+      />
     );
   }
 
-  const errorMessage = error ? SIGNUP_ERROR_MESSAGES[error] : null;
+  const signupErrorMessages: Record<string, string> = {
+    email_mismatch: t("errorEmailMismatch"),
+    invite_invalid: t("errorInviteInvalid"),
+    consume_failed: t("errorConsumeFailed"),
+  };
+
+  const errorMessage = error ? signupErrorMessages[error] : null;
 
   return (
     <div className="space-y-8">
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight text-amber-950">
-          Bienvenue
+          {t("welcomeTitle")}
         </h1>
-        <p className="text-muted-foreground">
-          Creez votre compte instructeur pour commencer.
-        </p>
+        <p className="text-muted-foreground">{t("welcomeSubtitle")}</p>
       </div>
 
       <SignupForm
         token={token}
         email={invite.email}
         defaultFullName={invite.full_name ?? ""}
-        initialError={errorMessage}
+        initialError={errorMessage ?? null}
       />
     </div>
   );
 }
 
-function InvalidInvite({ message }: { message: string }): React.JSX.Element {
+function InvalidInvite({
+  title,
+  message,
+  backLabel,
+}: {
+  title: string;
+  message: string;
+  backLabel: string;
+}): React.JSX.Element {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight text-amber-950">
-          Invitation invalide
+          {title}
         </h1>
         <p className="text-muted-foreground">{message}</p>
       </div>
@@ -79,7 +92,7 @@ function InvalidInvite({ message }: { message: string }): React.JSX.Element {
         href="/login"
         className="inline-flex items-center text-sm font-medium text-primary hover:underline"
       >
-        Retour a la connexion
+        {backLabel}
       </Link>
     </div>
   );

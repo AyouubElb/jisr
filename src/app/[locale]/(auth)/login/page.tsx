@@ -8,18 +8,10 @@ import { createClient } from "@/lib/supabase/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-
-const OAUTH_ERROR_MESSAGES: Record<string, string> = {
-  no_account:
-    "Aucun compte associe a cette adresse Google. Demandez une invitation a votre instructeur ou contactez-nous.",
-  oauth_failed: "Echec de la connexion Google. Veuillez reessayer.",
-  oauth_cancelled: "Connexion annulee.",
-  missing_code: "Lien d'authentification invalide.",
-  session_invalid: "Session invalide. Veuillez reessayer.",
-};
 
 export default function LoginPage(): React.JSX.Element {
   return (
@@ -30,22 +22,31 @@ export default function LoginPage(): React.JSX.Element {
 }
 
 function LoginPageContent(): React.JSX.Element {
+  const t = useTranslations("auth.login");
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const oauthErrorMessages: Record<string, string> = {
+    no_account: t("oauthNoAccount"),
+    oauth_failed: t("oauthFailed"),
+    oauth_cancelled: t("oauthCancelled"),
+    missing_code: t("oauthMissingCode"),
+    session_invalid: t("oauthSessionInvalid"),
+  };
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
 
-  // Show OAuth callback errors and strip the param from the URL
   useEffect(() => {
     const errorCode = searchParams.get("error");
     if (!errorCode) return;
-    toast.error(OAUTH_ERROR_MESSAGES[errorCode] ?? "Une erreur est survenue.");
+    toast.error(oauthErrorMessages[errorCode] ?? t("errorGeneric"));
     router.replace("/login");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, router]);
 
   const onSubmit = async (data: LoginInput): Promise<void> => {
@@ -57,12 +58,14 @@ function LoginPageContent(): React.JSX.Element {
     });
 
     if (error) {
-      toast.error("Identifiants invalides");
+      toast.error(t("errorInvalidCredentials"));
       setIsLoading(false);
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (user) {
       const { data: profile } = await supabase
         .from("profiles")
@@ -70,7 +73,7 @@ function LoginPageContent(): React.JSX.Element {
         .eq("id", user.id)
         .single();
 
-      toast.success("Connexion reussie");
+      toast.success(t("successLogin"));
       const dashboard =
         profile?.role === "admin"
           ? "/admin"
@@ -92,19 +95,18 @@ function LoginPageContent(): React.JSX.Element {
       },
     });
     if (error) {
-      toast.error("Erreur lors de la connexion avec Google");
+      toast.error(t("errorGoogle"));
       setIsLoading(false);
     }
-    // Success path: browser is redirected to Google, no further client work
   };
 
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-amber-950">Bon retour</h1>
-        <p className="text-muted-foreground">
-          Connectez-vous pour continuer votre apprentissage
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-amber-950">
+          {t("title")}
+        </h1>
+        <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
 
       <Button
@@ -116,7 +118,7 @@ function LoginPageContent(): React.JSX.Element {
         disabled={isLoading}
       >
         <GoogleIcon />
-        Continuer avec Google
+        {t("continueWithGoogle")}
       </Button>
 
       <div className="relative">
@@ -124,38 +126,42 @@ function LoginPageContent(): React.JSX.Element {
           <span className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-3 text-muted-foreground">ou</span>
+          <span className="bg-background px-3 text-muted-foreground">
+            {t("or")}
+          </span>
         </div>
       </div>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="email">Adresse e-mail</Label>
+          <Label htmlFor="email">{t("labelEmail")}</Label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
               id="email"
               type="email"
-              placeholder="vous@exemple.com"
+              placeholder={t("placeholderEmail")}
               className="pl-10"
               {...form.register("email")}
             />
           </div>
           {form.formState.errors.email && (
-            <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+            <p className="text-xs text-destructive">
+              {form.formState.errors.email.message}
+            </p>
           )}
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Mot de passe</Label>
+            <Label htmlFor="password">{t("labelPassword")}</Label>
           </div>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              placeholder="Votre mot de passe"
+              placeholder={t("placeholderPassword")}
               className="pl-10 pr-10"
               {...form.register("password")}
             />
@@ -164,18 +170,26 @@ function LoginPageContent(): React.JSX.Element {
               onClick={() => setShowPassword((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               tabIndex={-1}
-              aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+              aria-label={
+                showPassword ? t("hidePassword") : t("showPassword")
+              }
             >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
             </button>
           </div>
           {form.formState.errors.password && (
-            <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
+            <p className="text-xs text-destructive">
+              {form.formState.errors.password.message}
+            </p>
           )}
         </div>
 
         <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
-          {isLoading ? "Connexion en cours..." : "Se connecter"}
+          {isLoading ? t("submitting") : t("submit")}
           {!isLoading && <ArrowRight className="ml-1 h-4 w-4" />}
         </Button>
       </form>

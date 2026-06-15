@@ -29,22 +29,29 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
 
   const { pathname } = request.nextUrl;
 
+  // Strip locale prefix (e.g. "/en/login" -> "/login") for route matching.
+  const pathWithoutLocale = pathname.replace(/^\/(en|fr)(?=\/|$)/, "") || "/";
+
   // Public routes that don't require auth
-  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/register");
+  const isAuthRoute =
+    pathWithoutLocale.startsWith("/login") ||
+    pathWithoutLocale.startsWith("/register");
   const isCallbackRoute = pathname.startsWith("/auth/callback");
-  const isInstructorSignup = pathname.startsWith("/instructor/signup");
+  const isInstructorSignup = pathWithoutLocale.startsWith("/instructor/signup");
   const isInstructorSignupApi = pathname.startsWith("/api/auth/instructor-signup");
+  const isLegalRoute = pathWithoutLocale.startsWith("/legal");
   const isPublicRoute =
-    pathname === "/" ||
+    pathWithoutLocale === "/" ||
     isAuthRoute ||
     isCallbackRoute ||
     isInstructorSignup ||
-    isInstructorSignupApi;
+    isInstructorSignupApi ||
+    isLegalRoute;
 
   // Not logged in and trying to access protected route
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/en/login";
     return NextResponse.redirect(url);
   }
 

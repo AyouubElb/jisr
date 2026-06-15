@@ -1,28 +1,29 @@
 import { ArrowRight, MessageCircle, Sparkles } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { buttonVariants } from "@/components/ui/button";
 import { SmoothScrollLink } from "@/components/home/smooth-scroll-link";
 import { CONTACT_WHATSAPP_URL } from "@/lib/constants/contact";
 
-export function Hero(): React.JSX.Element {
+export async function Hero(): Promise<React.JSX.Element> {
+  const t = await getTranslations("home.hero");
+
   return (
     <section className="relative overflow-hidden">
       <div className="mx-auto max-w-6xl px-4 pt-20 pb-24 sm:px-6 sm:pt-28 sm:pb-32 lg:pt-32 lg:pb-40">
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-amber-950 shadow-sm">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Accès anticipé · sur invitation
+            {t("badge")}
           </div>
 
           <h1 className="mt-6 text-4xl font-bold tracking-tight text-amber-950 sm:text-5xl lg:text-6xl">
-            Votre classe d&apos;anglais en ligne.
+            {t("titleLine1")}
             <br />
-            <span className="text-amber-950/70">Dans un seul outil.</span>
+            <span className="text-amber-950/70">{t("titleLine2")}</span>
           </h1>
 
           <p className="mt-6 text-lg text-muted-foreground sm:text-xl">
-            Jisr réunit vos cours, vos quiz et le suivi de vos élèves. Une IA
-            prend le travail répétitif. Vous gardez l&apos;essentiel&nbsp;: la
-            pédagogie et la relation avec vos élèves.
+            {t("subtitle")}
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -30,7 +31,7 @@ export function Hero(): React.JSX.Element {
               href="#waitlist"
               className={buttonVariants({ size: "lg" })}
             >
-              Rejoindre la liste
+              {t("ctaPrimary")}
               <ArrowRight className="h-4 w-4" />
             </SmoothScrollLink>
             <a
@@ -40,12 +41,12 @@ export function Hero(): React.JSX.Element {
               className={buttonVariants({ variant: "outline", size: "lg" })}
             >
               <MessageCircle className="h-4 w-4" />
-              Nous contacter
+              {t("ctaSecondary")}
             </a>
           </div>
 
           <p className="mt-4 text-xs text-muted-foreground">
-            Sur invitation · on échange 15 min avant de vous ouvrir un accès
+            {t("ctaNote")}
           </p>
         </div>
       </div>

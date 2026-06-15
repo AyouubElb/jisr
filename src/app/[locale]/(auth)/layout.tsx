@@ -1,16 +1,18 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { getTranslations } from "next-intl/server";
+import { LocaleToggle } from "@/components/layout/locale-toggle";
 
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
 }: {
   children: ReactNode;
-}): React.JSX.Element {
+}): Promise<React.JSX.Element> {
+  const t = await getTranslations("auth.layout");
+
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-background">
-      {/* Left side: Branded cream panel */}
       <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-stone-100 p-12">
-        {/* Decorative oversized Arabic watermark */}
         <span
           aria-hidden
           className="pointer-events-none absolute -bottom-16 -right-8 select-none text-[20rem] font-bold leading-none text-amber-950/[0.04]"
@@ -19,10 +21,9 @@ export default function AuthLayout({
           جسر
         </span>
 
-        {/* Logo */}
         <Link
           href="/"
-          aria-label="Retour à l'accueil Jisr"
+          aria-label={t("backToHomeLabel")}
           className="relative z-10 inline-flex w-fit items-baseline gap-0.5 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <span className="text-2xl font-bold tracking-tight text-amber-950">
@@ -37,40 +38,39 @@ export default function AuthLayout({
           </span>
         </Link>
 
-        {/* Main content */}
         <div className="relative z-10 space-y-10">
           <div className="space-y-4">
             <h2 className="text-4xl font-bold leading-[1.1] tracking-tight text-amber-950">
-              L&apos;espace de travail
+              {t("panelHeadingLine1")}
               <br />
-              du prof d&apos;anglais.
+              {t("panelHeadingLine2")}
             </h2>
             <p className="max-w-md text-base text-amber-950/70">
-              Vos cours, vos élèves, vos quiz, votre suivi — au même endroit.
+              {t("panelSubtitle")}
             </p>
           </div>
 
-          {/* Feature highlights with left-rail tick mark */}
           <div className="space-y-5">
-            <Bullet>Quiz générés en quelques secondes — audio compris.</Bullet>
-            <Bullet>Corrections automatiques. Vous validez en 2 minutes.</Bullet>
-            <Bullet>Alerte quand un élève décroche.</Bullet>
+            <Bullet>{t("bullet1")}</Bullet>
+            <Bullet>{t("bullet2")}</Bullet>
+            <Bullet>{t("bullet3")}</Bullet>
           </div>
         </div>
 
-        {/* Footer note */}
         <div className="relative z-10 text-sm text-amber-950/60">
-          Étudiant ? Connectez-vous — votre instructeur vous a inscrit.
+          {t("studentNote")}
         </div>
       </div>
 
-      {/* Right side: Auth form */}
-      <div className="flex items-center justify-center p-6 sm:p-12">
-        <div className="w-full max-w-md">
-          {/* Mobile logo (only shown on small screens) */}
+      <div className="flex flex-col">
+        <div className="flex items-center justify-end px-4 py-3 sm:px-6">
+          <LocaleToggle />
+        </div>
+        <div className="flex flex-1 items-center justify-center px-6 pb-12 sm:px-12 sm:pb-16">
+          <div className="w-full max-w-md">
           <Link
             href="/"
-            aria-label="Retour à l'accueil Jisr"
+            aria-label={t("backToHomeLabel")}
             className="mb-8 flex items-baseline justify-center gap-0.5 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 lg:hidden"
           >
             <span className="text-2xl font-bold tracking-tight text-amber-950">
@@ -85,6 +85,7 @@ export default function AuthLayout({
             </span>
           </Link>
           {children}
+          </div>
         </div>
       </div>
     </div>
