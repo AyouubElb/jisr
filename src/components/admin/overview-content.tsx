@@ -1,7 +1,7 @@
 "use client";
 
 import { useAdminStats } from "@/lib/hooks/useAdmin";
-import { StatCard } from "@/components/admin/stat-card";
+import { StatCard } from "@/components/ui/stat-card";
 import { RecentInvitesCard } from "@/components/admin/recent-invites-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, GraduationCap, Mail, Users } from "lucide-react";

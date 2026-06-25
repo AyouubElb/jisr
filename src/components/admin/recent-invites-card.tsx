@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useAdminRecentInvites } from "@/lib/hooks/useAdmin";
 import { Mail, Plus } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -46,10 +47,7 @@ export function RecentInvitesCard(): React.JSX.Element {
             ))}
           </div>
         ) : !invites?.length ? (
-          <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <Mail className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Aucune invitation pour le moment</p>
-          </div>
+          <EmptyState icon={Mail} label="Aucune invitation pour le moment" />
         ) : (
           <div className="space-y-2">
             {invites.map((invite) => {

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useMyEnrollments } from "@/lib/hooks/useEnrollments";
 import { useUpcomingSessions } from "@/lib/hooks/useSessions";
 import { LEVEL_BADGE_COLORS } from "@/lib/constants/levels";
@@ -92,13 +93,12 @@ export default function StudentDashboardPage(): React.JSX.Element {
                 {[1, 2].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
               </div>
             ) : !enrolledCourses.length ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <BookOpen className="h-10 w-10 text-muted-foreground" />
-                <p className="text-muted-foreground">Vous n&apos;etes inscrit a aucun cours</p>
-                <p className="text-sm text-muted-foreground">
-                  Contactez votre instructeur pour etre inscrit.
-                </p>
-              </div>
+              <EmptyState
+                icon={BookOpen}
+                iconClassName="h-10 w-10"
+                label="Vous n'etes inscrit a aucun cours"
+                description="Contactez votre instructeur pour etre inscrit."
+              />
             ) : (
               <div className="space-y-2">
                 {enrolledCourses.map((enrollment) => (
@@ -143,10 +143,7 @@ export default function StudentDashboardPage(): React.JSX.Element {
                   {[1, 2].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
                 </div>
               ) : !sessions?.length ? (
-                <div className="flex flex-col items-center gap-2 py-6 text-center">
-                  <Calendar className="h-8 w-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Aucune session a venir</p>
-                </div>
+                <EmptyState icon={Calendar} label="Aucune session a venir" className="py-6" />
               ) : (
                 <div className="space-y-2">
                   {sessions.map((session, index) => {

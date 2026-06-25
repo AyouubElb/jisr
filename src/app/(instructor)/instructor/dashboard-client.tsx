@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/stat-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useMyCourses } from "@/lib/hooks/useCourses";
 import { useUpcomingSessions } from "@/lib/hooks/useSessions";
 import { useInstructorStudents } from "@/lib/hooks/useEnrollments";
@@ -279,12 +281,11 @@ export function InstructorDashboardClient(): React.JSX.Element {
                 ))}
               </div>
             ) : atRisk.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <CheckCircle2 className="h-8 w-8 text-emerald-500" />
-                <p className="text-sm text-muted-foreground">
-                  All your students are active
-                </p>
-              </div>
+              <EmptyState
+                icon={CheckCircle2}
+                iconClassName="text-emerald-500"
+                label="All your students are active"
+              />
             ) : (
               <div className="space-y-2">
                 {atRisk.map((s) => {
@@ -343,12 +344,7 @@ export function InstructorDashboardClient(): React.JSX.Element {
                 ))}
               </div>
             ) : !activity?.length ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <ClipboardCheck className="h-8 w-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  No activity yet
-                </p>
-              </div>
+              <EmptyState icon={ClipboardCheck} label="No activity yet" />
             ) : (
               <div className="max-h-[320px] space-y-1 overflow-y-auto pr-1">
                 {activity.map((item) => (
@@ -414,16 +410,19 @@ export function InstructorDashboardClient(): React.JSX.Element {
                 ))}
               </div>
             ) : !courses?.length ? (
-              <div className="flex flex-col items-center gap-3 py-8 text-center">
-                <BookOpen className="h-10 w-10 text-muted-foreground" />
-                <p className="text-muted-foreground">No courses yet</p>
+              <EmptyState
+                icon={BookOpen}
+                iconClassName="h-10 w-10"
+                label="No courses yet"
+                className="gap-3"
+              >
                 <Link href="/instructor/courses/new">
                   <Button variant="outline" size="sm">
                     <Plus className="mr-2 h-4 w-4" />
                     Create a course
                   </Button>
                 </Link>
-              </div>
+              </EmptyState>
             ) : (
               <div className="space-y-2">
                 {courses.slice(0, 5).map((course) => (
@@ -467,10 +466,7 @@ export function InstructorDashboardClient(): React.JSX.Element {
                 ))}
               </div>
             ) : !sessions?.length ? (
-              <div className="flex flex-col items-center gap-3 py-8 text-center">
-                <Calendar className="h-8 w-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">No sessions scheduled</p>
-              </div>
+              <EmptyState icon={Calendar} label="No sessions scheduled" />
             ) : (
               <div className="space-y-2">
                 {sessions.slice(0, 5).map((session) => (
@@ -513,38 +509,5 @@ export function InstructorDashboardClient(): React.JSX.Element {
         />
       )}
     </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  icon,
-  loading,
-  variant,
-}: {
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  loading: boolean;
-  variant?: "hero";
-}): React.JSX.Element {
-  const isHero = variant === "hero";
-  return (
-    <Card className={isHero ? "bg-primary/8 ring-1 ring-primary/20" : undefined}>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className={`text-sm font-medium ${isHero ? "text-amber-950" : ""}`}>
-          {label}
-        </CardTitle>
-        <span className={isHero ? "text-primary" : "text-muted-foreground"}>{icon}</span>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <Skeleton className="h-8 w-16" />
-        ) : (
-          <p className={`text-2xl font-bold ${isHero ? "text-amber-950" : ""}`}>{value}</p>
-        )}
-      </CardContent>
-    </Card>
   );
 }
