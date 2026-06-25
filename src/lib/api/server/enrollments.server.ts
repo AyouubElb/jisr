@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types/database";
+import type { Enrollment, CourseWithInstructor } from "@/lib/types";
 
 export interface InstructorCourseRoster {
   courseId: string;
@@ -54,4 +55,18 @@ export async function listForInstructorServer(
         lastActiveAt: e.last_active_at,
       })),
   }));
+}
+
+/** Server twin of enrollmentsApi.listMine — current student's enrollments via RLS. */
+export async function listMyEnrollmentsServer(
+  supabase: SupabaseClient<Database>,
+): Promise<(Enrollment & { courses: CourseWithInstructor })[]> {
+  const { data, error } = await supabase
+    .from("enrollments")
+    .select("*, courses(*, profiles(full_name, avatar_url))")
+    .is("removed_at", null)
+    .order("enrolled_at", { ascending: false });
+
+  if (error) throw error;
+  return data as unknown as (Enrollment & { courses: CourseWithInstructor })[];
 }
