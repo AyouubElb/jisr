@@ -20,6 +20,13 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { LessonDialog } from "@/components/course/lesson/lesson-dialog";
@@ -60,6 +67,7 @@ import { format } from "date-fns";
 import { enUS } from "date-fns/locale";
 import {
   ArrowLeft,
+  BarChart3,
   BookOpen,
   Calendar,
   ChevronDown,
@@ -74,6 +82,7 @@ import {
   FolderPlus,
   GraduationCap,
   MessageCircle,
+  MoreHorizontal,
   Pencil,
   Plus,
   Settings,
@@ -498,6 +507,9 @@ export default function InstructorCourseDetailPage(): React.JSX.Element {
                     })
                   }
                   onPreviewQuiz={(quiz) => setPreviewQuizId(quiz.id)}
+                  onViewResults={(quiz) =>
+                    router.push(`/instructor/courses/${courseId}/quizzes/${quiz.id}/results`)
+                  }
                   onEditQuiz={(quiz) =>
                     router.push(`/instructor/courses/${courseId}/quizzes/${quiz.id}/edit`)
                   }
@@ -889,6 +901,7 @@ function SectionCard({
   onAIQuiz,
   onEditLesson,
   onPreviewQuiz,
+  onViewResults,
   onEditQuiz,
   onDuplicateQuiz,
   onDeleteLesson,
@@ -905,6 +918,7 @@ function SectionCard({
   onAIQuiz: () => void;
   onEditLesson: (lesson: Lesson) => void;
   onPreviewQuiz: (quiz: QuizWithBlocks) => void;
+  onViewResults: (quiz: QuizWithBlocks) => void;
   onEditQuiz: (quiz: QuizWithBlocks) => void;
   onDuplicateQuiz: (quiz: QuizWithBlocks) => void;
   onDeleteLesson: (id: string) => void;
@@ -1065,42 +1079,45 @@ function SectionCard({
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-0.5 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
+                      <div className="flex items-center gap-1">
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          title="Student preview"
-                          onClick={() => onPreviewQuiz(quiz)}
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1.5 text-xs"
+                          onClick={() => onViewResults(quiz)}
                         >
-                          <Eye className="h-3.5 w-3.5" />
+                          <BarChart3 className="h-3.5 w-3.5" />
+                          Results
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          title="Edit quiz"
-                          onClick={() => onEditQuiz(quiz)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          title="Duplicate quiz"
-                          onClick={() => onDuplicateQuiz(quiz)}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => onDeleteQuiz(quiz.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={
+                            <Button variant="ghost" size="icon" className="h-7 w-7" />
+                          }>
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onClick={() => onPreviewQuiz(quiz)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Student preview
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onEditQuiz(quiz)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit quiz
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onDuplicateQuiz(quiz)}>
+                              <Copy className="mr-2 h-4 w-4" />
+                              Duplicate
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={() => onDeleteQuiz(quiz.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   );

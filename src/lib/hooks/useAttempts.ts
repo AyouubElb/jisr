@@ -131,6 +131,24 @@ export function usePendingGradingCount() {
   });
 }
 
+/** Instructor per-quiz results — every submitted attempt + score for one quiz */
+export function useQuizResults(quizId: string) {
+  return useQuery({
+    queryKey: attemptKeys.quizResults(quizId),
+    queryFn: () => attemptsApi.listQuizResults(quizId),
+    enabled: !!quizId,
+  });
+}
+
+/** One attempt's full blocks + answers for the read-only results review sheet */
+export function useAttemptReview(attemptId: string | null) {
+  return useQuery({
+    queryKey: attemptKeys.detail(attemptId ?? ""),
+    queryFn: () => attemptsApi.attemptReviewForInstructor(attemptId as string),
+    enabled: !!attemptId,
+  });
+}
+
 /** Batch-save grades for every manual answer on one attempt; auto-finalizes if complete */
 export function useGradeAttempt() {
   const queryClient = useQueryClient();

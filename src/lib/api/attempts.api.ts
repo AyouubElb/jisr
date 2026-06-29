@@ -114,6 +114,30 @@ export interface MyAttemptReview extends MyAttemptSummary {
   answers: GradingAnswer[];
 }
 
+/** One row of the instructor per-quiz results table — summary, no answers embedded */
+export interface QuizResultRow {
+  attempt_id: string;
+  status: StudentAttempt["status"];
+  submitted_at: string;
+  auto_score: number | null;
+  final_score: number | null;
+  graded_at: string | null;
+  student_id: string;
+  student_name: string;
+  manual_count: number;
+  pending_count: number;
+}
+
+/** Header + rows for one quiz's results */
+export interface QuizResults {
+  quiz_id: string;
+  quiz_title: string;
+  course_id: string;
+  course_title: string;
+  course_level: CEFRLevel;
+  attempts: QuizResultRow[];
+}
+
 /**
  * Student's response to a single block, before server-side grading.
  * Shape depends on block type:
@@ -471,6 +495,169 @@ export const attemptsApi = {
 
     if (error) throw error;
     return count ?? 0;
+  },
+
+  // ── Instructor per-quiz results ────────────────────────────────────
+
+  /**
+   * Every submitted attempt for one quiz, with student + manual-grading counts.
+   * Unlike listGradingInbox this keeps fully auto-graded quizzes — it's a
+   * results view, not a grading queue. Summary only; no blocks/answers.
+   */
+  listQuizResults: async (quizId: string): Promise<QuizResults> => {
+    const supabase = createClient();
+
+    const { data: quiz, error: quizError } = await supabase
+      .from("quizzes")
+      .select(
+        "id, title, quiz_blocks(id, type), section:sections!inner(course:courses!inner(id, title, level))",
+      )
+      .eq("id", quizId)
+      .single();
+
+    if (quizError) throw quizError;
+
+    type QuizRow = {
+      id: string;
+      title: string;
+      quiz_blocks: { id: string; type: BlockType }[];
+      section: { course: { id: string; title: string; level: CEFRLevel } };
+    };
+    const q = quiz as unknown as QuizRow;
+    const manualBlockIds = new Set(
+      q.quiz_blocks.filter((b) => isManualBlock(b.type)).map((b) => b.id),
+    );
+
+    const { data, error } = await supabase
+      .from("student_attempts")
+      .select(
+        `
+        id, status, submitted_at, auto_score, final_score, graded_at,
+        student:profiles!student_attempts_student_id_fkey(id, full_name),
+        student_answers(block_id, graded_at)
+        `,
+      )
+      .eq("quiz_id", quizId)
+      .not("submitted_at", "is", null)
+      .order("submitted_at", { ascending: false });
+
+    if (error) throw error;
+
+    type Row = {
+      id: string;
+      status: StudentAttempt["status"];
+      submitted_at: string;
+      auto_score: number | null;
+      final_score: number | null;
+      graded_at: string | null;
+      student: { id: string; full_name: string };
+      student_answers: { block_id: string; graded_at: string | null }[];
+    };
+
+    const attempts: QuizResultRow[] = (data as unknown as Row[]).map((r) => {
+      const manualAnswers = r.student_answers.filter((a) =>
+        manualBlockIds.has(a.block_id),
+      );
+      const pendingCount = manualAnswers.filter((a) => a.graded_at === null).length;
+
+      return {
+        attempt_id: r.id,
+        status: r.status,
+        submitted_at: r.submitted_at,
+        auto_score: r.auto_score,
+        final_score: r.final_score,
+        graded_at: r.graded_at,
+        student_id: r.student.id,
+        student_name: r.student.full_name,
+        manual_count: manualBlockIds.size,
+        pending_count: pendingCount,
+      };
+    });
+
+    return {
+      quiz_id: q.id,
+      quiz_title: q.title,
+      course_id: q.section.course.id,
+      course_title: q.section.course.title,
+      course_level: q.section.course.level,
+      attempts,
+    };
+  },
+
+  /**
+   * One attempt's full quiz (blocks + answers) for the instructor results
+   * review sheet. Same shape as mineReview but RLS-scoped to the course owner.
+   */
+  attemptReviewForInstructor: async (attemptId: string): Promise<MyAttemptReview> => {
+    const supabase = createClient();
+
+    const { data, error } = await supabase
+      .from("student_attempts")
+      .select(
+        `
+        id, status, submitted_at, auto_score, final_score, graded_at,
+        quiz:quizzes!inner(
+          id, title,
+          quiz_blocks(*),
+          section:sections!inner(
+            course:courses!inner(id, title, level)
+          )
+        ),
+        student_answers(
+          id, block_id, answer, is_correct, earned_weight,
+          instructor_feedback, graded_at,
+          ai_score, ai_is_correct, ai_rationale, ai_errors, ai_graded_at
+        )
+        `,
+      )
+      .eq("id", attemptId)
+      .single();
+
+    if (error) throw error;
+
+    type Row = {
+      id: string;
+      status: StudentAttempt["status"];
+      submitted_at: string;
+      auto_score: number | null;
+      final_score: number | null;
+      graded_at: string | null;
+      quiz: {
+        id: string;
+        title: string;
+        quiz_blocks: QuizBlock[];
+        section: { course: { id: string; title: string; level: CEFRLevel } };
+      };
+      student_answers: GradingAnswer[];
+    };
+
+    const r = data as unknown as Row;
+    const blocks = [...r.quiz.quiz_blocks].sort((a, b) => a.order - b.order);
+    const manualBlockIds = new Set(
+      blocks.filter((b) => isManualBlock(b.type as BlockType)).map((b) => b.id),
+    );
+    const manualAnswers = r.student_answers.filter((a) =>
+      manualBlockIds.has(a.block_id),
+    );
+    const pendingCount = manualAnswers.filter((a) => a.graded_at === null).length;
+
+    return {
+      attempt_id: r.id,
+      status: r.status,
+      submitted_at: r.submitted_at,
+      auto_score: r.auto_score,
+      final_score: r.final_score,
+      graded_at: r.graded_at,
+      quiz_id: r.quiz.id,
+      quiz_title: r.quiz.title,
+      course_id: r.quiz.section.course.id,
+      course_title: r.quiz.section.course.title,
+      course_level: r.quiz.section.course.level,
+      manual_count: manualBlockIds.size,
+      pending_count: pendingCount,
+      blocks,
+      answers: r.student_answers,
+    };
   },
 
   /**

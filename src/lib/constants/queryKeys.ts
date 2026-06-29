@@ -55,6 +55,7 @@ export const attemptKeys = {
   inbox: (filter: "pending" | "all" | "graded") =>
     [...attemptKeys.all, "inbox", filter] as const,
   pendingCount: () => [...attemptKeys.all, "pending-count"] as const,
+  quizResults: (quizId: string) => [...attemptKeys.all, "quiz-results", quizId] as const,
 };
 
 export const profileKeys = {

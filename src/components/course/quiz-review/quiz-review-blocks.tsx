@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RichTextViewer } from "@/components/ui/rich-text-viewer";
 import { materialsApi } from "@/lib/api/materials.api";
 import { isManualBlock, type BlockType } from "@/lib/schemas/quiz.schema";
+import type { QuizBlock } from "@/lib/types";
 
 /**
  * Minimal answer shape for review rendering. Compatible with both the
@@ -394,4 +396,65 @@ export function useSignedUrl(storagePath: string): string | null {
   }, [storagePath]);
 
   return signedUrl;
+}
+
+/** Read-only card for one block: prompt + student answer + instructor feedback. */
+export function ReviewBlockCard({
+  block,
+  index,
+  answer,
+}: {
+  block: QuizBlock;
+  index: number;
+  answer: ReviewAnswer | null;
+}): React.JSX.Element {
+  const type = block.type as BlockType;
+  const content = block.content as Record<string, unknown>;
+  const weight = Number(block.weight ?? 0);
+  const isQuestion =
+    type === "mcq" ||
+    type === "fill_blank" ||
+    type === "free_text" ||
+    type === "voice";
+
+  return (
+    <Card id={`question-${block.id}`} className="scroll-mt-20">
+      {isQuestion && (
+        <QuestionHeader index={index} weight={weight} type={type} answer={answer} />
+      )}
+
+      <CardContent className="space-y-3 py-4">
+        {type === "section" && (
+          <div className="flex items-center gap-3 py-1">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {(content.title as string) || ""}
+            </span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+        )}
+        {type === "text" && <TextBlockView content={content} />}
+        {type === "audio" && <AudioBlockView content={content} />}
+        {type === "image" && <ImageBlockView content={content} />}
+        {type === "mcq" && <McqReviewView content={content} answer={answer} />}
+        {type === "fill_blank" && (
+          <FillBlankReviewView content={content} answer={answer} />
+        )}
+        {type === "free_text" && (
+          <>
+            <FreeTextPromptView content={content} />
+            <FreeTextAnswerView answer={answer} />
+            <InstructorFeedbackView feedback={answer?.instructor_feedback ?? null} />
+          </>
+        )}
+        {type === "voice" && (
+          <>
+            <VoicePromptView content={content} />
+            <VoiceAnswerView answer={answer} />
+            <InstructorFeedbackView feedback={answer?.instructor_feedback ?? null} />
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
