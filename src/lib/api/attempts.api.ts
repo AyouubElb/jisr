@@ -454,10 +454,23 @@ export const attemptsApi = {
     return out;
   },
 
-  /** Sidebar badge — number of attempts with at least one pending manual answer */
+  /** Sidebar badge — count of the instructor's attempts still awaiting manual grading */
   pendingGradingCount: async (): Promise<number> => {
-    const rows = await attemptsApi.listGradingInbox("pending");
-    return rows.length;
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Non authentifie");
+
+    const { count, error } = await supabase
+      .from("student_attempts")
+      .select(
+        "id, quiz:quizzes!inner(section:sections!inner(course:courses!inner(instructor_id)))",
+        { count: "exact", head: true },
+      )
+      .eq("quiz.section.course.instructor_id", user.id)
+      .eq("status", "pending_review");
+
+    if (error) throw error;
+    return count ?? 0;
   },
 
   /**

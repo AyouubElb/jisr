@@ -1,17 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  ClipboardCheck,
-} from "lucide-react";
+import { CheckCircle2, ClipboardCheck } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { enUS } from "date-fns/locale";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
@@ -20,8 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DataListCard, PAGE_SIZE_OPTIONS } from "@/components/admin/data-list-card";
 import { LEVEL_BADGE_COLORS } from "@/lib/constants/levels";
-import { useGradingInbox } from "@/lib/hooks/useAttempts";
+import { useGradingInbox, usePendingGradingCount } from "@/lib/hooks/useAttempts";
 import { AttemptGradingPane } from "./attempt-grading-pane";
 import type { GradingAttempt } from "@/lib/api/attempts.api";
 import type { CEFRLevel } from "@/lib/types";
@@ -31,11 +25,15 @@ type Filter = "pending" | "all" | "graded";
 export function GradingInbox(): React.JSX.Element {
   const [filter, setFilter] = useState<Filter>("pending");
   const [courseId, setCourseId] = useState<string>("all");
+  const [quizId, setQuizId] = useState<string>("all");
   const [studentId, setStudentId] = useState<string>("all");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE_OPTIONS[0]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [paneOpen, setPaneOpen] = useState(false);
 
   const { data: attempts, isLoading } = useGradingInbox(filter);
+  const { data: pendingCount } = usePendingGradingCount();
 
   const selected = useMemo(
     () => attempts?.find((a) => a.attempt_id === selectedId) ?? null,
@@ -57,58 +55,77 @@ export function GradingInbox(): React.JSX.Element {
     return Array.from(map.values()).sort((a, b) => a.title.localeCompare(b.title));
   }, [attempts]);
 
+  // Quiz options follow the selected course, so the dropdown only offers
+  // quizzes that can actually appear in the filtered list.
+  const quizOptions = useMemo(() => {
+    if (!attempts) return [];
+    const map = new Map<string, { id: string; title: string; level: CEFRLevel }>();
+    for (const a of attempts) {
+      if (courseId !== "all" && a.course_id !== courseId) continue;
+      if (!map.has(a.quiz_id)) {
+        map.set(a.quiz_id, { id: a.quiz_id, title: a.quiz_title, level: a.course_level });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.title.localeCompare(b.title));
+  }, [attempts, courseId]);
+
   const studentOptions = useMemo(() => {
     if (!attempts) return [];
     const map = new Map<string, { id: string; name: string }>();
     for (const a of attempts) {
       if (courseId !== "all" && a.course_id !== courseId) continue;
+      if (quizId !== "all" && a.quiz_id !== quizId) continue;
       if (!map.has(a.student_id)) {
         map.set(a.student_id, { id: a.student_id, name: a.student_name });
       }
     }
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [attempts, courseId]);
+  }, [attempts, courseId, quizId]);
 
-  const grouped = useMemo(() => {
+  // Flat list: apply all filters, then newest-first.
+  const filtered = useMemo(() => {
     if (!attempts) return [];
-    const filtered = attempts.filter((a) => {
-      if (courseId !== "all" && a.course_id !== courseId) return false;
-      if (studentId !== "all" && a.student_id !== studentId) return false;
-      return true;
-    });
+    return attempts
+      .filter((a) => {
+        if (courseId !== "all" && a.course_id !== courseId) return false;
+        if (quizId !== "all" && a.quiz_id !== quizId) return false;
+        if (studentId !== "all" && a.student_id !== studentId) return false;
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime(),
+      );
+  }, [attempts, courseId, quizId, studentId]);
 
-    const byQuiz = new Map<
-      string,
-      {
-        quiz_id: string;
-        quiz_title: string;
-        course_title: string;
-        course_level: CEFRLevel;
-        attempts: GradingAttempt[];
-      }
-    >();
+  const pageItems = useMemo(
+    () => filtered.slice(page * pageSize, (page + 1) * pageSize),
+    [filtered, page, pageSize],
+  );
 
-    for (const a of filtered) {
-      const existing = byQuiz.get(a.quiz_id);
-      if (existing) {
-        existing.attempts.push(a);
-      } else {
-        byQuiz.set(a.quiz_id, {
-          quiz_id: a.quiz_id,
-          quiz_title: a.quiz_title,
-          course_title: a.course_title,
-          course_level: a.course_level,
-          attempts: [a],
-        });
-      }
-    }
+  const handleFilterChange = (next: Filter): void => {
+    setFilter(next);
+    setPage(0);
+  };
 
-    return Array.from(byQuiz.values()).sort(
-      (a, b) =>
-        Math.min(...a.attempts.map((x) => new Date(x.submitted_at).getTime())) -
-        Math.min(...b.attempts.map((x) => new Date(x.submitted_at).getTime())),
-    );
-  }, [attempts, courseId, studentId]);
+  // Course narrows quiz + student, so reset both downstream filters with it.
+  const handleCourseChange = (next: string | null): void => {
+    setCourseId(next ?? "all");
+    setQuizId("all");
+    setStudentId("all");
+    setPage(0);
+  };
+
+  const handleQuizChange = (next: string | null): void => {
+    setQuizId(next ?? "all");
+    setStudentId("all");
+    setPage(0);
+  };
+
+  const handleStudentChange = (next: string | null): void => {
+    setStudentId(next ?? "all");
+    setPage(0);
+  };
 
   const openAttempt = (a: GradingAttempt): void => {
     setSelectedId(a.attempt_id);
@@ -124,93 +141,110 @@ export function GradingInbox(): React.JSX.Element {
         </p>
       </div>
 
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
-        <div className="flex flex-wrap items-center gap-3">
-          <TabsList className="w-fit justify-start gap-1 rounded-xl border border-border bg-muted/40 p-2">
-            <TabsTrigger
-              value="pending"
-              className="group gap-2 rounded-lg px-5 py-4 data-active:bg-background data-active:shadow-md data-active:ring-1 data-active:ring-border/60"
-            >
-              <ClipboardCheck className="h-4 w-4" />
-              <span>Pending</span>
-              {attempts !== undefined && (
-                <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground group-data-active:bg-primary/10 group-data-active:text-primary">
-                  {attempts.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger
-              value="all"
-              className="gap-2 rounded-lg px-5 py-4 data-active:bg-background data-active:shadow-md data-active:ring-1 data-active:ring-border/60"
-            >
-              <span>All</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="graded"
-              className="gap-2 rounded-lg px-5 py-4 data-active:bg-background data-active:shadow-md data-active:ring-1 data-active:ring-border/60"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              <span>Graded</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="ml-auto flex flex-wrap gap-2">
-            <Select
-              value={courseId}
-              onValueChange={(v) => {
-                setCourseId(v ?? "all");
-                setStudentId("all");
-              }}
-            >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Course" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All courses</SelectItem>
-                {courseOptions.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    [{c.level}] {c.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={studentId} onValueChange={(v) => setStudentId(v ?? "all")}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Student" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All students</SelectItem>
-                {studentOptions.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+      <Tabs value={filter} onValueChange={(v) => handleFilterChange(v as Filter)}>
+        <TabsList className="w-fit justify-start gap-1 rounded-xl border border-border bg-muted/40 p-2">
+          <TabsTrigger
+            value="pending"
+            className="group gap-2 rounded-lg px-5 py-4 data-active:bg-background data-active:shadow-md data-active:ring-1 data-active:ring-border/60"
+          >
+            <ClipboardCheck className="h-4 w-4" />
+            <span>Pending</span>
+            {pendingCount !== undefined && (
+              <span className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground group-data-active:bg-primary/10 group-data-active:text-primary">
+                {pendingCount}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger
+            value="all"
+            className="gap-2 rounded-lg px-5 py-4 data-active:bg-background data-active:shadow-md data-active:ring-1 data-active:ring-border/60"
+          >
+            <span>All</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="graded"
+            className="gap-2 rounded-lg px-5 py-4 data-active:bg-background data-active:shadow-md data-active:ring-1 data-active:ring-border/60"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            <span>Graded</span>
+          </TabsTrigger>
+        </TabsList>
 
         <TabsContent value={filter} className="mt-4">
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-24 w-full" />
-              ))}
-            </div>
-          ) : grouped.length === 0 ? (
-            <EmptyState filter={filter} />
-          ) : (
-            <div className="space-y-3">
-              {grouped.map((group) => (
-                <QuizGroup
-                  key={group.quiz_id}
-                  group={group}
-                  onAttemptClick={openAttempt}
-                />
-              ))}
-            </div>
-          )}
+          <DataListCard
+            isLoading={isLoading}
+            isEmpty={filtered.length === 0}
+            loadingRowCount={5}
+            emptyState={{
+              icon: <ClipboardCheck />,
+              message:
+                filter === "pending"
+                  ? "No attempts awaiting review"
+                  : filter === "graded"
+                    ? "No graded attempts"
+                    : "No attempts",
+            }}
+            filters={
+              <div className="flex flex-wrap gap-2">
+                <Select value={courseId} onValueChange={handleCourseChange}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Course" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All courses</SelectItem>
+                    {courseOptions.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        [{c.level}] {c.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={quizId} onValueChange={handleQuizChange}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Quiz" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All quizzes</SelectItem>
+                    {quizOptions.map((q) => (
+                      <SelectItem key={q.id} value={q.id}>
+                        {q.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={studentId} onValueChange={handleStudentChange}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Student" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All students</SelectItem>
+                    {studentOptions.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            }
+            pagination={{
+              page,
+              pageSize,
+              totalCount: filtered.length,
+              onPageChange: setPage,
+              onPageSizeChange: (size) => {
+                setPageSize(size);
+                setPage(0);
+              },
+              pageSizeOptions: PAGE_SIZE_OPTIONS,
+            }}
+          >
+            {pageItems.map((a) => (
+              <AttemptRow key={a.attempt_id} attempt={a} onClick={() => openAttempt(a)} />
+            ))}
+          </DataListCard>
         </TabsContent>
       </Tabs>
 
@@ -219,70 +253,7 @@ export function GradingInbox(): React.JSX.Element {
   );
 }
 
-// ── Collapsible quiz group ──────────────────────────────────────────
-
-interface QuizGroupData {
-  quiz_id: string;
-  quiz_title: string;
-  course_title: string;
-  course_level: CEFRLevel;
-  attempts: GradingAttempt[];
-}
-
-function QuizGroup({
-  group,
-  onAttemptClick,
-}: {
-  group: QuizGroupData;
-  onAttemptClick: (a: GradingAttempt) => void;
-}): React.JSX.Element {
-  const [expanded, setExpanded] = useState(true);
-  const pendingCount = group.attempts.filter((a) => a.pending_count > 0).length;
-
-  return (
-    <Card className="gap-0! py-0!">
-      <CardContent className="p-0!">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/40 md:px-4 md:py-4"
-        >
-          {expanded ? (
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-          )}
-          <Badge className={LEVEL_BADGE_COLORS[group.course_level]}>{group.course_level}</Badge>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{group.quiz_title}</p>
-            <p className="truncate text-xs text-muted-foreground">{group.course_title}</p>
-          </div>
-          {pendingCount > 0 && (
-            <Badge variant="secondary" className="shrink-0">
-              {pendingCount} pending
-            </Badge>
-          )}
-          <Badge variant="outline" className="shrink-0">
-            {group.attempts.length}{" "}
-            {group.attempts.length === 1 ? "attempt" : "attempts"}
-          </Badge>
-        </button>
-
-        {expanded && (
-          <div className="divide-y border-t">
-            {group.attempts.map((a) => (
-              <AttemptRow
-                key={a.attempt_id}
-                attempt={a}
-                onClick={() => onAttemptClick(a)}
-              />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+// ── Attempt row ─────────────────────────────────────────────────────
 
 function ageInDays(isoDate: string): number {
   return (Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24);
@@ -309,6 +280,11 @@ function AttemptRow({
       onClick={onClick}
       className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/30 md:px-4 md:py-4"
     >
+      <Badge
+        className={`${LEVEL_BADGE_COLORS[attempt.course_level]} shrink-0`}
+      >
+        {attempt.course_level}
+      </Badge>
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
         {attempt.student_name.charAt(0).toUpperCase()}
       </div>
@@ -331,6 +307,11 @@ function AttemptRow({
             </span>
           )}
         </div>
+        <p className="truncate text-xs text-muted-foreground">
+          {attempt.quiz_title}
+          {" · "}
+          {attempt.course_title}
+        </p>
         <p className={`text-xs ${isStale ? "text-rose-600" : "text-muted-foreground"}`}>
           Submitted {submitted}
         </p>
@@ -341,22 +322,5 @@ function AttemptRow({
         </span>
       )}
     </button>
-  );
-}
-
-function EmptyState({ filter }: { filter: Filter }): React.JSX.Element {
-  const message =
-    filter === "pending"
-      ? "No attempts awaiting review"
-      : filter === "graded"
-        ? "No graded attempts"
-        : "No attempts";
-  return (
-    <Card>
-      <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-        <ClipboardCheck className="h-10 w-10 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">{message}</p>
-      </CardContent>
-    </Card>
   );
 }

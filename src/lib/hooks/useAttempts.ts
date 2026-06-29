@@ -123,14 +123,11 @@ export function useGradingInbox(filter: "pending" | "all" | "graded") {
   });
 }
 
-/** Pending-count badge for the sidebar */
+/** Pending-count badge for the sidebar — invalidated on grade-submit */
 export function usePendingGradingCount() {
   return useQuery({
     queryKey: attemptKeys.pendingCount(),
     queryFn: () => attemptsApi.pendingGradingCount(),
-    // Refresh every minute so the badge stays roughly current while the
-    // instructor is on other pages
-    refetchInterval: 60_000,
   });
 }
 
