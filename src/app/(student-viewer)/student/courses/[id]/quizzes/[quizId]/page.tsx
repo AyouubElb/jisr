@@ -17,7 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import { RichTextViewer } from "@/components/ui/rich-text-viewer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ViewerShell } from "@/components/layout/viewer-shell";
@@ -38,7 +37,12 @@ import {
 } from "@/lib/hooks/useAttempts";
 import { materialsApi } from "@/lib/api/materials.api";
 import type { BlockType } from "@/lib/schemas/quiz.schema";
-import type { QuizBlock, QuizWithBlocks, Lesson, StudentAttempt } from "@/lib/types";
+import type {
+  QuizBlock,
+  QuizWithBlocks,
+  Lesson,
+  StudentAttempt,
+} from "@/lib/types";
 import type { SubmittedAnswerInput } from "@/lib/api/attempts.api";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -60,7 +64,10 @@ function draftKey(attemptId: string): string {
   return `${STORAGE_PREFIX}${attemptId}`;
 }
 
-function saveDraft(attemptId: string, answers: Record<string, AnswerState>): void {
+function saveDraft(
+  attemptId: string,
+  answers: Record<string, AnswerState>,
+): void {
   try {
     localStorage.setItem(draftKey(attemptId), JSON.stringify(answers));
   } catch {
@@ -87,9 +94,13 @@ function clearDraft(attemptId: string): void {
 }
 
 /** Check if a timed attempt has passed its deadline */
-function isAttemptExpired(attempt: StudentAttempt, timeLimitMinutes: number | null): boolean {
+function isAttemptExpired(
+  attempt: StudentAttempt,
+  timeLimitMinutes: number | null,
+): boolean {
   if (!timeLimitMinutes) return false;
-  const deadline = new Date(attempt.started_at).getTime() + timeLimitMinutes * 60 * 1000;
+  const deadline =
+    new Date(attempt.started_at).getTime() + timeLimitMinutes * 60 * 1000;
   return Date.now() >= deadline;
 }
 
@@ -121,41 +132,21 @@ export default function StudentQuizPage(): React.JSX.Element {
   const [answers, setAnswers] = useState<Record<string, AnswerState>>({});
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
-  const [resultAttempt, setResultAttempt] = useState<StudentAttempt | null>(null);
-  const [activeAttempt, setActiveAttempt] = useState<StudentAttempt | null>(null);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [resultAttempt, setResultAttempt] = useState<StudentAttempt | null>(
+    null,
+  );
+  const [activeAttempt, setActiveAttempt] = useState<StudentAttempt | null>(
+    null,
+  );
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(),
+  );
   // Guards against double-submit when the timer expires while the user is
   // already submitting manually (or vice versa).
   const submittedRef = useRef(false);
   // Tracks whether we already ran the resume-attempt logic to avoid
   // re-triggering on every `attempts` refetch.
   const resumedRef = useRef(false);
-
-  // ── Resume existing in-progress attempt on page load ───────────────
-  useEffect(() => {
-    if (!attempts || !quiz || resumedRef.current) return;
-    const inProgress = attempts.find((a) => a.status === "in_progress");
-    if (!inProgress) return;
-
-    resumedRef.current = true;
-    const savedAnswers = loadDraft(inProgress.id);
-
-    if (isAttemptExpired(inProgress, quiz.time_limit_minutes)) {
-      // Case 2: came back after deadline — auto-submit with saved answers
-      setActiveAttempt(inProgress);
-      if (savedAnswers) setAnswers(savedAnswers);
-      // We can't call handleSubmit here because it depends on state that
-      // hasn't flushed yet. Instead, set a flag and let a separate effect
-      // handle the auto-submit after state has settled.
-      submittedRef.current = false;
-    } else {
-      // Case 1: came back before deadline — resume quiz
-      setActiveAttempt(inProgress);
-      if (savedAnswers) setAnswers(savedAnswers);
-    }
-  }, [attempts, quiz]);
-
-  const autoSubmitFiredRef = useRef(false);
 
   const completedLessonIds = useMemo(
     () => new Set(completions?.map((c) => c.lesson_id) ?? []),
@@ -263,12 +254,14 @@ export default function StudentQuizPage(): React.JSX.Element {
       : `/student/courses/${courseId}/quizzes/${item.id}`;
 
   const handleAnswerChange = (blockId: string, patch: AnswerState): void => {
-    setAnswers((prev) => ({ ...prev, [blockId]: { ...prev[blockId], ...patch } }));
+    setAnswers((prev) => ({
+      ...prev,
+      [blockId]: { ...prev[blockId], ...patch },
+    }));
   };
 
   const handleStart = (): void => {
     submittedRef.current = false;
-    autoSubmitFiredRef.current = false;
     startAttempt(quizId, {
       onSuccess: (attempt) => {
         setActiveAttempt(attempt);
@@ -276,69 +269,81 @@ export default function StudentQuizPage(): React.JSX.Element {
     });
   };
 
+  // Takes attempt + answers as args so callers don't depend on state flushing.
+  const submitAttempt = useCallback(
+    (attempt: StudentAttempt, answersMap: Record<string, AnswerState>): void => {
+      if (!quiz || submittedRef.current) return;
+      submittedRef.current = true;
+
+      const payload: SubmittedAnswerInput[] = questionBlocks.map((b) => {
+        const a = answersMap[b.id] ?? {};
+        let answerShape: Record<string, unknown> = {};
+        if (b.type === "mcq") {
+          const content = b.content as { allow_multiple?: boolean };
+          answerShape = content.allow_multiple
+            ? { selected: a.selected_option_ids ?? [] }
+            : { selected: a.selected_option_id ?? "" };
+        } else if (b.type === "fill_blank") {
+          answerShape = { selected: a.selected_option_id ?? "" };
+        } else if (b.type === "free_text") {
+          answerShape = { text: a.text_answer ?? "" };
+        } else if (b.type === "voice") {
+          answerShape = {
+            audio_url: a.audio_url ?? "",
+            duration_seconds: a.duration_seconds ?? 0,
+          };
+        }
+        return { block_id: b.id, answer: answerShape };
+      });
+
+      submitQuiz(
+        {
+          attemptId: attempt.id,
+          quizId,
+          blocks: quiz.quiz_blocks,
+          answers: payload,
+          courseId,
+        },
+        {
+          onSuccess: (result) => {
+            clearDraft(attempt.id);
+            setResultAttempt(result);
+            setActiveAttempt(null);
+            setConfirmSubmit(false);
+          },
+          onError: () => {
+            submittedRef.current = false;
+          },
+        },
+      );
+    },
+    [quiz, questionBlocks, submitQuiz, quizId, courseId],
+  );
+
   const handleSubmit = useCallback((): void => {
-    if (!quiz || !activeAttempt) return;
-    if (submittedRef.current) return;
-    submittedRef.current = true;
+    if (!activeAttempt) return;
+    submitAttempt(activeAttempt, answers);
+  }, [activeAttempt, answers, submitAttempt]);
 
-    const payload: SubmittedAnswerInput[] = questionBlocks.map((b) => {
-      const a = answers[b.id] ?? {};
-      let answerShape: Record<string, unknown> = {};
-      if (b.type === "mcq") {
-        const content = b.content as { allow_multiple?: boolean };
-        answerShape = content.allow_multiple
-          ? { selected: a.selected_option_ids ?? [] }
-          : { selected: a.selected_option_id ?? "" };
-      } else if (b.type === "fill_blank") {
-        answerShape = { selected: a.selected_option_id ?? "" };
-      } else if (b.type === "free_text") {
-        answerShape = { text: a.text_answer ?? "" };
-      } else if (b.type === "voice") {
-        answerShape = {
-          audio_url: a.audio_url ?? "",
-          duration_seconds: a.duration_seconds ?? 0,
-        };
-      }
-      return { block_id: b.id, answer: answerShape };
-    });
-
-    submitQuiz(
-      {
-        attemptId: activeAttempt.id,
-        quizId,
-        blocks: quiz.quiz_blocks,
-        answers: payload,
-        courseId,
-      },
-      {
-        onSuccess: (attempt) => {
-          if (activeAttempt) clearDraft(activeAttempt.id);
-          setResultAttempt(attempt);
-          setActiveAttempt(null);
-          setConfirmSubmit(false);
-        },
-        onError: () => {
-          // Allow retry if the submit failed
-          submittedRef.current = false;
-        },
-      },
-    );
-  }, [quiz, activeAttempt, questionBlocks, answers, submitQuiz, quizId, courseId]);
-
-  // ── Auto-submit expired attempt after state has settled ─────────────
-  // This runs after the resume effect sets activeAttempt + answers for an
-  // expired attempt. We check expiry again here to be safe.
+  // ── Resume existing in-progress attempt on page load ───────────────
   useEffect(() => {
-    if (!activeAttempt || !quiz || autoSubmitFiredRef.current) return;
-    if (activeAttempt.status !== "in_progress") return;
-    if (!isAttemptExpired(activeAttempt, quiz.time_limit_minutes)) return;
-    autoSubmitFiredRef.current = true;
-    // Defer to next tick so all state is stable
-    const id = setTimeout(() => {
-      handleSubmit();
-    }, 0);
-    return () => clearTimeout(id);
-  }, [activeAttempt, quiz, handleSubmit]);
+    if (!attempts || !quiz || resumedRef.current) return;
+    const inProgress = attempts.find((a) => a.status === "in_progress");
+    if (!inProgress) return;
+
+    resumedRef.current = true;
+    const savedAnswers = loadDraft(inProgress.id);
+
+    if (isAttemptExpired(inProgress, quiz.time_limit_minutes)) {
+      // Deadline already passed — auto-submit with whatever draft exists on
+      // this device. Submitting from the locals avoids a state-flush round-trip.
+      submitAttempt(inProgress, savedAnswers ?? {});
+    } else {
+      // Still time left — resume the quiz.
+      setActiveAttempt(inProgress);
+      if (savedAnswers) setAnswers(savedAnswers);
+    }
+  }, [attempts, quiz, submitAttempt]);
 
   // ── Persist answers to localStorage on every change ─────────────────
   useEffect(() => {
@@ -401,7 +406,6 @@ export default function StudentQuizPage(): React.JSX.Element {
             setResultAttempt(null);
             setAnswers({});
             resumedRef.current = false;
-            autoSubmitFiredRef.current = false;
           }}
         />
       </ViewerShell>
@@ -476,7 +480,6 @@ export default function StudentQuizPage(): React.JSX.Element {
         )}
       </div>
 
-
       {/* Pre-start gate — show quiz intro + confirmation before creating the attempt */}
       {!activeAttempt ? (
         sortedBlocks.length === 0 ? (
@@ -494,9 +497,10 @@ export default function StudentQuizPage(): React.JSX.Element {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-amber-950">
-                Vous êtes sur le point de commencer <strong>{quiz.title}</strong>.
-                Une fois démarré, le compte à rebours commence et le quiz doit
-                être terminé avant la fin du temps imparti.
+                Vous êtes sur le point de commencer{" "}
+                <strong>{quiz.title}</strong>. Une fois démarré, le compte à
+                rebours commence et le quiz doit être terminé avant la fin du
+                temps imparti.
               </p>
 
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -606,7 +610,9 @@ export default function StudentQuizPage(): React.JSX.Element {
                   block={block}
                   questionIndex={currentIndex}
                   answer={answers[block.id]}
-                  onAnswerChange={(patch) => handleAnswerChange(block.id, patch)}
+                  onAnswerChange={(patch) =>
+                    handleAnswerChange(block.id, patch)
+                  }
                   courseId={courseId}
                   quizId={quizId}
                   attemptId={activeAttempt.id}
@@ -632,34 +638,40 @@ export default function StudentQuizPage(): React.JSX.Element {
         onConfirm={handleSubmit}
       />
 
-      {quiz && quiz.max_attempts != null && (() => {
-        const used = attempts?.length ?? 0;
-        const cap = quiz.max_attempts;
-        const remaining = Math.max(cap - used, 0);
-        return (
-          <ConfirmDialog
-            open={confirmStart}
-            onOpenChange={setConfirmStart}
-            title={cap === 1 ? "Une seule tentative" : "Commencer le quiz ?"}
-            description={
-              cap === 1
-                ? "Vous n'avez qu'une seule tentative. Une fois commencé, fermer le navigateur sans soumettre comptera comme votre tentative. Êtes-vous prêt(e) ?"
-                : `Ceci utilisera 1 de vos ${remaining} tentative${remaining !== 1 ? "s" : ""} restante${remaining !== 1 ? "s" : ""}. Une tentative non terminée compte aussi. Continuer ?`
-            }
-            confirmLabel="Commencer"
-            cancelLabel="Annuler"
-            isPending={isStarting}
-            onConfirm={handleStart}
-          />
-        );
-      })()}
+      {quiz &&
+        quiz.max_attempts != null &&
+        (() => {
+          const used = attempts?.length ?? 0;
+          const cap = quiz.max_attempts;
+          const remaining = Math.max(cap - used, 0);
+          return (
+            <ConfirmDialog
+              open={confirmStart}
+              onOpenChange={setConfirmStart}
+              title={cap === 1 ? "Une seule tentative" : "Commencer le quiz ?"}
+              description={
+                cap === 1
+                  ? "Vous n'avez qu'une seule tentative. Une fois commencé, fermer le navigateur sans soumettre comptera comme votre tentative. Êtes-vous prêt(e) ?"
+                  : `Ceci utilisera 1 de vos ${remaining} tentative${remaining !== 1 ? "s" : ""} restante${remaining !== 1 ? "s" : ""}. Une tentative non terminée compte aussi. Continuer ?`
+              }
+              confirmLabel="Commencer"
+              cancelLabel="Annuler"
+              isPending={isStarting}
+              onConfirm={handleStart}
+            />
+          );
+        })()}
     </ViewerShell>
   );
 }
 
 // ── Previous attempts (compact collapsible) ───────────────────────────
 
-function PreviousAttempts({ attempts }: { attempts: StudentAttempt[] }): React.JSX.Element {
+function PreviousAttempts({
+  attempts,
+}: {
+  attempts: StudentAttempt[];
+}): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const submitted = attempts.filter((a) => a.submitted_at);
   const scores = submitted
@@ -676,7 +688,8 @@ function PreviousAttempts({ attempts }: { attempts: StudentAttempt[] }): React.J
       >
         <History className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className="flex-1 text-muted-foreground">
-          {attempts.length} tentative{attempts.length !== 1 ? "s" : ""} précédente{attempts.length !== 1 ? "s" : ""}
+          {attempts.length} tentative{attempts.length !== 1 ? "s" : ""}{" "}
+          précédente{attempts.length !== 1 ? "s" : ""}
           {best !== null && (
             <span className="ml-1.5 font-medium text-foreground">
               · meilleur score {best}%
@@ -697,11 +710,14 @@ function PreviousAttempts({ attempts }: { attempts: StudentAttempt[] }): React.J
             >
               <span className="text-muted-foreground">
                 {a.submitted_at
-                  ? format(new Date(a.submitted_at), "d MMM yyyy 'a' HH:mm", { locale: fr })
+                  ? format(new Date(a.submitted_at), "d MMM yyyy 'a' HH:mm", {
+                      locale: fr,
+                    })
                   : "En cours"}
               </span>
               <div className="flex items-center gap-2">
-                {(a.status === "submitted" || a.status === "pending_review") && (
+                {(a.status === "submitted" ||
+                  a.status === "pending_review") && (
                   <span className="text-muted-foreground">En attente</span>
                 )}
                 <span className="font-medium tabular-nums">
@@ -746,10 +762,10 @@ function QuizResultView({
     percentage === null
       ? "text-muted-foreground"
       : percentage >= 70
-      ? "text-emerald-600"
-      : percentage >= 50
-      ? "text-amber-600"
-      : "text-rose-600";
+        ? "text-emerald-600"
+        : percentage >= 50
+          ? "text-amber-600"
+          : "text-rose-600";
 
   const isPending = status === "pending_review" || status === "submitted";
 
@@ -819,7 +835,10 @@ function StudentBlockView({
   const type = block.type as BlockType;
   const content = block.content as Record<string, unknown>;
   const isQuestion =
-    type === "mcq" || type === "fill_blank" || type === "free_text" || type === "voice";
+    type === "mcq" ||
+    type === "fill_blank" ||
+    type === "free_text" ||
+    type === "voice";
 
   if (type === "section") {
     const title = (content.title as string) || "";
@@ -834,7 +853,9 @@ function StudentBlockView({
           <div className="h-px flex-1 bg-border" />
         </div>
         {description && (
-          <p className="mt-1 text-center text-xs text-muted-foreground">{description}</p>
+          <p className="mt-1 text-center text-xs text-muted-foreground">
+            {description}
+          </p>
         )}
       </div>
     );
@@ -934,13 +955,22 @@ function VoiceView({
   );
 }
 
-function TextView({ content }: { content: Record<string, unknown> }): React.JSX.Element {
+function TextView({
+  content,
+}: {
+  content: Record<string, unknown>;
+}): React.JSX.Element {
   const html = (content.html as string) || "";
-  if (!html) return <p className="text-sm italic text-muted-foreground">Passage vide</p>;
+  if (!html)
+    return <p className="text-sm italic text-muted-foreground">Passage vide</p>;
   return <RichTextViewer content={html} />;
 }
 
-function AudioView({ content }: { content: Record<string, unknown> }): React.JSX.Element {
+function AudioView({
+  content,
+}: {
+  content: Record<string, unknown>;
+}): React.JSX.Element {
   const storagePath = (content.audio_url as string) || "";
   const caption = (content.caption as string) || "";
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -951,14 +981,19 @@ function AudioView({ content }: { content: Record<string, unknown> }): React.JSX
     materialsApi.getSignedUrl(storagePath).then((url) => {
       if (!cancelled) setSignedUrl(url);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [storagePath]);
 
-  if (!storagePath) return <p className="text-sm italic text-muted-foreground">Aucun audio</p>;
+  if (!storagePath)
+    return <p className="text-sm italic text-muted-foreground">Aucun audio</p>;
 
   return (
     <div className="space-y-2">
-      {caption && <p className="text-sm font-medium text-amber-950">{caption}</p>}
+      {caption && (
+        <p className="text-sm font-medium text-amber-950">{caption}</p>
+      )}
       {signedUrl ? (
         <audio controls className="w-full">
           <source src={signedUrl} />
@@ -970,7 +1005,11 @@ function AudioView({ content }: { content: Record<string, unknown> }): React.JSX
   );
 }
 
-function ImageView({ content }: { content: Record<string, unknown> }): React.JSX.Element {
+function ImageView({
+  content,
+}: {
+  content: Record<string, unknown>;
+}): React.JSX.Element {
   const storagePath = (content.image_url as string) || "";
   const alt = (content.alt as string) || "";
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -981,10 +1020,13 @@ function ImageView({ content }: { content: Record<string, unknown> }): React.JSX
     materialsApi.getSignedUrl(storagePath).then((url) => {
       if (!cancelled) setSignedUrl(url);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [storagePath]);
 
-  if (!storagePath) return <p className="text-sm italic text-muted-foreground">Aucune image</p>;
+  if (!storagePath)
+    return <p className="text-sm italic text-muted-foreground">Aucune image</p>;
 
   return (
     <div className="space-y-2">
@@ -1019,7 +1061,9 @@ function McqView({
   const prompt = (content.prompt as string) || "";
   const allowMultiple = content.allow_multiple === true;
   // Strip is_correct before rendering to student — never leak correct answer
-  const options = ((content.options as { id: string; label: string }[]) || []).map((o) => ({
+  const options = (
+    (content.options as { id: string; label: string }[]) || []
+  ).map((o) => ({
     id: o.id,
     label: o.label,
   }));
@@ -1109,7 +1153,9 @@ function FillBlankView({
                     : "border-muted-foreground/40 text-muted-foreground"
                 }`}
               >
-                {selectedOption ? selectedOption.label : "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"}
+                {selectedOption
+                  ? selectedOption.label
+                  : "\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0"}
               </span>
             )}
           </span>
@@ -1153,7 +1199,9 @@ function FreeTextView({
   // Block paste + drag-drop so students write their own answers (deterrent, not a lock).
   const blockPaste = (e: React.ClipboardEvent | React.DragEvent): void => {
     e.preventDefault();
-    toast.warning("Coller du texte est désactivé. Saisissez votre réponse directement.");
+    toast.warning(
+      "Coller du texte est désactivé. Saisissez votre réponse directement.",
+    );
   };
 
   return (

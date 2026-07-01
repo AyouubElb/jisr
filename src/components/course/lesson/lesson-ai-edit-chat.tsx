@@ -85,13 +85,6 @@ export function LessonAIEditChat({
     const trimmed = instruction.trim();
     if (!trimmed || isProposing) return;
     const formattedHistory = formatHistory(history);
-    if (formattedHistory) {
-      console.groupCollapsed(
-        `[AI lesson edit] chat history sent (${history.length} turns)`,
-      );
-      console.log(formattedHistory);
-      console.groupEnd();
-    }
     propose(
       {
         lessonId,

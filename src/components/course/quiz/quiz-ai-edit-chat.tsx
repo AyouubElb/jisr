@@ -154,15 +154,6 @@ export function QuizAIEditChat({
     const trimmed = instruction.trim();
     if (!trimmed || isProposing || aiPhase !== "idle") return;
     const formattedHistory = formatHistory(history);
-    if (formattedHistory) {
-      console.groupCollapsed(
-        `[AI quiz edit] chat history sent (${history.length} turns)`,
-      );
-      console.log(formattedHistory);
-      console.groupEnd();
-    } else {
-      console.log("[AI quiz edit] chat history sent: (empty — first turn)");
-    }
 
     // Persist pending manual edits so the AI reads the right state.
     if (onPreSubmitSave) {

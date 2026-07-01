@@ -169,9 +169,6 @@ export function RichTextEditor({
     onUpdate: ({ editor: e }) => {
       const html = e.getHTML();
       if (html === lastSyncedHtml.current) return;
-      console.log(
-        `[rich-text-editor] onUpdate | last="${lastSyncedHtml.current.slice(0, 80)}" → new="${html.slice(0, 80)}"`,
-      );
       lastSyncedHtml.current = html;
       onChangeRef.current(html);
     },
@@ -196,9 +193,6 @@ export function RichTextEditor({
     editor.setEditable(!isDiffMode);
     const next = isDiffMode ? (diffContent ?? "") : content;
     if (editor.getHTML() === next) return;
-    console.log(
-      `[rich-text-editor] setContent | mode=${isDiffMode ? "diff" : "edit"} | from="${editor.getHTML().slice(0, 80)}" | to="${next.slice(0, 80)}"`,
-    );
     editor.commands.setContent(next, { emitUpdate: false });
     // Snapshot what the editor actually shows after Tiptap normalizes the
     // HTML, so the next onUpdate (which may report this normalized form)
