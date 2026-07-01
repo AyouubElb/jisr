@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import createIntlMiddleware from "next-intl/middleware";
-import { updateSession } from "@/lib/supabase/proxy";
+import { updateSession, redirectIfAuthedOnAuthPage } from "@/lib/supabase/proxy";
 import { routing } from "@/i18n/routing";
 
 const intlProxy = createIntlMiddleware(routing);
@@ -12,12 +12,23 @@ const PUBLIC_LOCALIZED_PATTERNS = [
   /^(?:\/(en|fr))?\/(login|register|legal)(\/|$)/,
 ];
 
+// Auth pages a logged-in user should be redirected away from (any locale prefix).
+const AUTH_PATH_PATTERN = /^(?:\/(en|fr))?\/(login|register)(\/|$)/;
+
 function isPublicLocalizedPath(pathname: string): boolean {
   return PUBLIC_LOCALIZED_PATTERNS.some((re) => re.test(pathname));
 }
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
-  if (isPublicLocalizedPath(request.nextUrl.pathname)) {
+  const { pathname } = request.nextUrl;
+
+  if (isPublicLocalizedPath(pathname)) {
+    // Auth pages route through i18n (skipping updateSession), so the
+    // "already logged in → dashboard" redirect must run here explicitly.
+    if (AUTH_PATH_PATTERN.test(pathname)) {
+      const redirect = await redirectIfAuthedOnAuthPage(request);
+      if (redirect) return redirect;
+    }
     return intlProxy(request);
   }
 
