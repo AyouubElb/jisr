@@ -7,7 +7,8 @@ import { loginSchema, type LoginInput } from "@/lib/schemas/auth.schema";
 import { createClient } from "@/lib/supabase/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -28,14 +29,6 @@ function LoginPageContent(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const oauthErrorMessages: Record<string, string> = {
-    no_account: t("oauthNoAccount"),
-    oauth_failed: t("oauthFailed"),
-    oauth_cancelled: t("oauthCancelled"),
-    missing_code: t("oauthMissingCode"),
-    session_invalid: t("oauthSessionInvalid"),
-  };
-
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -44,10 +37,17 @@ function LoginPageContent(): React.JSX.Element {
   useEffect(() => {
     const errorCode = searchParams.get("error");
     if (!errorCode) return;
-    toast.error(oauthErrorMessages[errorCode] ?? t("errorGeneric"));
+    const messages: Record<string, string> = {
+      no_account: t("oauthNoAccount"),
+      oauth_failed: t("oauthFailed"),
+      oauth_cancelled: t("oauthCancelled"),
+      missing_code: t("oauthMissingCode"),
+      session_invalid: t("oauthSessionInvalid"),
+    };
+    toast.error(messages[errorCode] ?? t("errorGeneric"));
+    // Locale-aware router re-adds the /en or /fr prefix.
     router.replace("/login");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, router]);
+  }, [searchParams, router, t]);
 
   const onSubmit = async (data: LoginInput): Promise<void> => {
     setIsLoading(true);
