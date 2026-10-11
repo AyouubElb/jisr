@@ -4,7 +4,7 @@
  * orchestration stay uniform as we add more agents.
  */
 
-export const AI_PROVIDERS = ["google", "anthropic", "vercel-gateway"] as const;
+export const AI_PROVIDERS = ["google", "anthropic", "openai", "vercel-gateway"] as const;
 export type AIProvider = (typeof AI_PROVIDERS)[number];
 
 export const AI_FEATURES = [

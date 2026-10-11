@@ -61,11 +61,11 @@ export const MODELS = {
     supportsCaching: true,
   },
   "gpt-5.4-mini": {
-    provider: "vercel-gateway",
-    modelId: "openai/gpt-5.4-mini",
+    provider: "openai",
+    modelId: "gpt-5.4-mini",
     inputCostPerMTokens: 0.75,
     outputCostPerMTokens: 4.5,
-    cacheReadCostPerMTokens: 0.07,
+    cacheReadCostPerMTokens: 0.075,
     supportsCaching: true,
   },
   "claude-sonnet-4-6": {
@@ -142,25 +142,25 @@ export const MAX_OUTPUT_TOKENS: Record<AIFeature, number> = {
   lesson_tts: 0,
 };
 
-// Default model per feature. Claude Haiku 4.5 across the board for
-// consistency; env overrides let us A/B without editing this file.
+// Default model per feature. GPT-5.4 mini across the board; env overrides
+// let us A/B without editing this file.
 export const DEFAULT_MODEL: Record<AIFeature, ModelKey> = {
-  quiz_gen: isModelKey(envQuizModel) ? envQuizModel : "claude-haiku-4-5",
+  quiz_gen: isModelKey(envQuizModel) ? envQuizModel : "gpt-5.4-mini",
   quiz_edit: isModelKey(envQuizEditModel)
     ? envQuizEditModel
-    : "claude-haiku-4-5",
-  quiz_judge: "claude-haiku-4-5",
-  free_text_grade: isModelKey(envGradeModel) ? envGradeModel : "claude-haiku-4-5",
+    : "gpt-5.4-mini",
+  quiz_judge: "gpt-5.4-mini",
+  free_text_grade: isModelKey(envGradeModel) ? envGradeModel : "gpt-5.4-mini",
   voice_grade: isModelKey(envVoiceGradeModel) ? envVoiceGradeModel : "gemini-2-5-flash",
-  intervention_suggest: "claude-haiku-4-5",
-  lesson_outline: "claude-haiku-4-5",
+  intervention_suggest: "gpt-5.4-mini",
+  lesson_outline: "gpt-5.4-mini",
   lesson_edit: isModelKey(envLessonEditModel)
     ? envLessonEditModel
-    : "claude-haiku-4-5",
+    : "gpt-5.4-mini",
   lesson_gen: isModelKey(envLessonGenModel)
     ? envLessonGenModel
-    : "claude-haiku-4-5",
-  // Cross-provider judge — kills self-enhancement bias vs the generator.
+    : "gpt-5.4-mini",
+  // Same model as the generator (not cross-provider).
   lesson_judge: isModelKey(envLessonJudgeModel)
     ? envLessonJudgeModel
     : "gpt-5.4-mini",

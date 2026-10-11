@@ -5,7 +5,7 @@ import { gradeStudentAudio } from "@/lib/ai/generators/student-grade-audio.gener
 import { assertQuota } from "@/lib/ai/quotas";
 import { logGeneration } from "@/lib/ai/telemetry";
 import { computeCostCents } from "@/lib/ai/cost";
-import { AIGenerationError } from "@/lib/ai/types";
+import { AIGenerationError, type AIProvider } from "@/lib/ai/types";
 import { DEFAULT_MODEL } from "@/lib/ai/constants";
 import type {
   StudentGradeAnswer,
@@ -238,6 +238,7 @@ export const gradeAttempt = async (
   const textPromise: Promise<{
     grades: Map<string, StudentGradePerBlock>;
     model: string;
+    provider: AIProvider;
     promptVersion: string;
     usage: { inputTokens: number | null; outputTokens: number | null; cacheReadTokens: number | null };
   } | null> = textInputs.length === 0
@@ -254,6 +255,7 @@ export const gradeAttempt = async (
         return {
           grades: map,
           model: result.model,
+          provider: result.provider,
           promptVersion: result.promptVersion,
           usage: result.usage,
         };
@@ -430,7 +432,7 @@ export const gradeAttempt = async (
         usage: textResult.usage,
         latencyMs: 0,
         model: textResult.model,
-        provider: "vercel-gateway",
+        provider: textResult.provider,
         promptVersion: textResult.promptVersion,
         retryCount: 0,
         schemaValid: true,

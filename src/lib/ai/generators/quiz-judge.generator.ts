@@ -14,7 +14,7 @@ import { computeCostCents } from "../cost";
 import { logGeneration } from "../telemetry";
 import type { Database } from "@/lib/types/database";
 
-// Cross-model judging: generator is Claude, judge is OpenAI.
+// Same model as the generator (not cross-model).
 const JUDGE_MODEL_KEY = "gpt-5.4-mini" as const;
 const RUBRIC_KEY = "quiz_gen_v2";
 
