@@ -59,6 +59,9 @@ export function RichTextViewer({
       }),
     [content],
   );
+  // Stable identity: React 19 re-applies innerHTML whenever this object changes,
+  // which would wipe the audio buttons on every parent re-render.
+  const innerHtml = useMemo(() => ({ __html: clean }), [clean]);
 
   const sentenceUrlByText = useMemo(() => {
     const map = new Map<string, string>();
@@ -84,7 +87,8 @@ export function RichTextViewer({
     const root = containerRef.current;
     if (!root) return;
 
-    root.querySelectorAll("[data-lesson-audio-btn]").forEach((n) => n.remove());
+    // Start from the sanitized HTML: earlier runs regrouped the blockquotes.
+    root.innerHTML = clean;
 
     const normalize = (s: string): string =>
       s
@@ -167,7 +171,7 @@ export function RichTextViewer({
     <div
       ref={containerRef}
       className={cn("prose prose-sm max-w-none", className)}
-      dangerouslySetInnerHTML={{ __html: clean }}
+      dangerouslySetInnerHTML={innerHtml}
     />
   );
 }
