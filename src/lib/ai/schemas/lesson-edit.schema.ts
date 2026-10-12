@@ -27,17 +27,23 @@ export const lessonBlockChangeSchema = z.discriminatedUnion("op", [
   deleteChange,
 ]);
 
-export const aiLessonEditOutputSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("reply"),
+// OpenAI rejects a union at the schema root, so the model fills one flat
+// object; the transform narrows it back to the reply | edit union.
+export const aiLessonEditOutputSchema = z
+  .object({
+    kind: z.enum(["reply", "edit"]),
     summary: z.string().min(1).max(800),
-  }),
-  z.object({
-    kind: z.literal("edit"),
-    summary: z.string().min(1).max(800),
-    changes: z.array(lessonBlockChangeSchema).min(1).max(40),
-  }),
-]);
+    changes: z.array(lessonBlockChangeSchema).max(40).optional(),
+  })
+  .refine((o) => o.kind === "reply" || (o.changes?.length ?? 0) > 0, {
+    message: 'kind "edit" needs at least one change',
+    path: ["changes"],
+  })
+  .transform((o) =>
+    o.kind === "edit"
+      ? { kind: "edit" as const, summary: o.summary, changes: o.changes ?? [] }
+      : { kind: "reply" as const, summary: o.summary },
+  );
 
 export type AILessonEditOutput = z.infer<typeof aiLessonEditOutputSchema>;
 export type AILessonBlockChange = z.infer<typeof lessonBlockChangeSchema>;
