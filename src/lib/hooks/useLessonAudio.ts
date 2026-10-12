@@ -25,5 +25,10 @@ export function useLessonAudio(lessonId: string | undefined) {
     queryFn: () => aiApi.fetchLessonAudio({ lessonId: lessonId! }),
     enabled: !!lessonId,
     staleTime: 5 * 60 * 1000,
+    // Right after a save the audio is still generating — poll (~2 min max) until it's all there.
+    refetchInterval: (query) =>
+      (query.state.data?.missing ?? 0) > 0 && query.state.dataUpdateCount < 24
+        ? 5000
+        : false,
   });
 }

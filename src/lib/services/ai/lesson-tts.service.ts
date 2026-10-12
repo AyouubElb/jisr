@@ -9,6 +9,8 @@ const TTS_MODEL = "gpt-4o-mini-tts";
 
 const DEFAULT_VOICE = "nova";
 const SPEED = 1.0;
+// Parallel TTS calls per save: ~6 × 1.5s clips ≈ 240 RPM, under OpenAI's tier-1 500 RPM.
+const TTS_CONCURRENCY = 6;
 
 const MALE_VOICES = ["onyx", "echo", "ash", "ballad"] as const;
 const FEMALE_VOICES = ["nova", "shimmer", "coral", "sage"] as const;
@@ -44,6 +46,8 @@ export interface SynthesizeLessonAudioResult {
   entries: LessonAudioEntry[];
   generated: number;
   reused: number;
+  /** Clips with no audio yet — still generating, or failed. */
+  missing: number;
 }
 
 const hashFor = (voice: string, text: string): string =>
@@ -406,6 +410,60 @@ const collectHashes = (units: ExtractedUnit[]): string[] => {
   return hashes;
 };
 
+const assembleEntries = (
+  units: ExtractedUnit[],
+  urlByHash: Map<string, string>,
+  freshHashes: Set<string> = new Set(),
+): { entries: LessonAudioEntry[]; withAudio: number; missing: number } => {
+  const entries: LessonAudioEntry[] = [];
+  let withAudio = 0;
+  let missing = 0;
+  for (const u of units) {
+    if (u.kind === "sentence") {
+      const hash = hashFor(DEFAULT_VOICE, u.text);
+      const audioUrl = urlByHash.get(hash);
+      if (!audioUrl) {
+        missing += 1;
+        continue;
+      }
+      withAudio += 1;
+      entries.push({
+        kind: "sentence",
+        key: u.key,
+        hash,
+        text: u.text,
+        audioUrl,
+        cacheHit: !freshHashes.has(hash),
+      });
+      continue;
+    }
+
+    const lines: LessonAudioLine[] = [];
+    for (const line of u.lines) {
+      const hash = hashFor(line.voice, line.text);
+      const audioUrl = urlByHash.get(hash);
+      if (!audioUrl) {
+        missing += 1;
+        continue;
+      }
+      withAudio += 1;
+      lines.push({
+        speaker: line.speaker,
+        text: line.text,
+        voice: line.voice,
+        hash,
+        audioUrl,
+        cacheHit: !freshHashes.has(hash),
+      });
+    }
+    // Conversations play line by line — one missing line drops the whole entry.
+    if (lines.length === u.lines.length) {
+      entries.push({ kind: "conversation", key: u.key, lines });
+    }
+  }
+  return { entries, withAudio, missing };
+};
+
 export const fetchLessonAudio = async (
   supabase: SupabaseClient<Database>,
   lessonId: string,
@@ -418,7 +476,9 @@ export const fetchLessonAudio = async (
   if (error || !lesson) throw new Error("Lesson not found");
 
   const units = extractLessonUnits(lesson.content ?? "");
-  if (units.length === 0) return { entries: [], generated: 0, reused: 0 };
+  if (units.length === 0) {
+    return { entries: [], generated: 0, reused: 0, missing: 0 };
+  }
 
   const hashes = collectHashes(units);
   const { data: cached } = await supabase
@@ -430,48 +490,8 @@ export const fetchLessonAudio = async (
   const urlByHash = new Map<string, string>();
   for (const row of cached ?? []) urlByHash.set(row.script_hash, row.audio_url);
 
-  const entries: LessonAudioEntry[] = [];
-  let reused = 0;
-  for (const u of units) {
-    if (u.kind === "sentence") {
-      const hash = hashFor(DEFAULT_VOICE, u.text);
-      const url = urlByHash.get(hash);
-      if (!url) continue;
-      entries.push({
-        kind: "sentence",
-        key: u.key,
-        hash,
-        text: u.text,
-        audioUrl: url,
-        cacheHit: true,
-      });
-      reused += 1;
-    } else {
-      const lines: LessonAudioLine[] = [];
-      for (const line of u.lines) {
-        const hash = hashFor(line.voice, line.text);
-        const url = urlByHash.get(hash);
-        if (!url) {
-          lines.length = 0;
-          break;
-        }
-        lines.push({
-          speaker: line.speaker,
-          text: line.text,
-          voice: line.voice,
-          hash,
-          audioUrl: url,
-          cacheHit: true,
-        });
-        reused += 1;
-      }
-      if (lines.length > 0) {
-        entries.push({ kind: "conversation", key: u.key, lines });
-      }
-    }
-  }
-
-  return { entries, generated: 0, reused };
+  const { entries, withAudio, missing } = assembleEntries(units, urlByHash);
+  return { entries, generated: 0, reused: withAudio, missing };
 };
 
 // ── Generation (instructor save) ────────────────────────────────────────────
@@ -531,6 +551,30 @@ const logLessonTtsTelemetry = async (
   }
 };
 
+/** Runs `fn` over `items` with at most `limit` calls in flight; results keep input order. */
+const mapWithConcurrency = async <T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> => {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++;
+      try {
+        results[i] = { status: "fulfilled", value: await fn(items[i]!) };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  );
+  return results;
+};
+
 export const synthesizeLessonAudio = async (
   supabase: SupabaseClient<Database>,
   lessonId: string,
@@ -564,7 +608,9 @@ export const synthesizeLessonAudio = async (
   }
 
   const units = extractLessonUnits(content);
-  if (units.length === 0) return { entries: [], generated: 0, reused: 0 };
+  if (units.length === 0) {
+    return { entries: [], generated: 0, reused: 0, missing: 0 };
+  }
 
   const startedAt = Date.now();
 
@@ -576,121 +622,67 @@ export const synthesizeLessonAudio = async (
     .in("script_hash", allHashes)
     .eq("speed", SPEED);
 
-  const cacheUrlByHash = new Map<string, string>();
+  const urlByHash = new Map<string, string>();
   for (const row of cachedRows ?? []) {
-    cacheUrlByHash.set(row.script_hash, row.audio_url);
+    urlByHash.set(row.script_hash, row.audio_url);
   }
 
-  const entries: LessonAudioEntry[] = [];
-  let generated = 0;
-  let reused = 0;
+  // ── 2. Synthesize each uncached clip once, in parallel. ─────────────
+  const toSynthesize = new Map<string, { voice: string; text: string }>();
+  for (const u of units) {
+    const clips =
+      u.kind === "sentence" ? [{ voice: DEFAULT_VOICE, text: u.text }] : u.lines;
+    for (const clip of clips) {
+      const hash = hashFor(clip.voice, clip.text);
+      if (!urlByHash.has(hash)) toSynthesize.set(hash, clip);
+    }
+  }
+
+  const jobs = [...toSynthesize];
+  const results = await mapWithConcurrency(jobs, TTS_CONCURRENCY, ([, clip]) =>
+    synthesizeSpeech({
+      supabase,
+      script: clip.text,
+      voiceId: clip.voice,
+      speed: SPEED,
+    }),
+  );
+
+  const freshHashes = new Set<string>();
   let generatedChars = 0;
   let firstError: string | null = null;
-
-  for (const u of units) {
-    if (u.kind === "sentence") {
-      const hash = hashFor(DEFAULT_VOICE, u.text);
-      const cached = cacheUrlByHash.get(hash);
-      if (cached) {
-        entries.push({
-          kind: "sentence",
-          key: u.key,
-          hash,
-          text: u.text,
-          audioUrl: cached,
-          cacheHit: true,
-        });
-        reused += 1;
-        continue;
-      }
-      try {
-        const res = await synthesizeSpeech({
-          supabase,
-          script: u.text,
-          voiceId: DEFAULT_VOICE,
-          speed: SPEED,
-        });
-        entries.push({
-          kind: "sentence",
-          key: u.key,
-          hash,
-          text: u.text,
-          audioUrl: res.audioUrl,
-          cacheHit: res.cacheHit,
-        });
-        if (res.cacheHit) reused += 1;
-        else {
-          generated += 1;
-          generatedChars += u.text.length;
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (!firstError) firstError = msg;
-        console.error(
-          `[ai.lesson-tts] sentence failed | text="${u.text.slice(0, 40)}…" | error:`,
-          msg,
-        );
+  for (const [i, result] of results.entries()) {
+    const [hash, clip] = jobs[i]!;
+    if (result.status === "fulfilled") {
+      urlByHash.set(hash, result.value.audioUrl);
+      if (!result.value.cacheHit) {
+        freshHashes.add(hash);
+        generatedChars += clip.text.length;
       }
       continue;
     }
-
-    // Conversation — synthesize each line in its own voice.
-    const lines: LessonAudioLine[] = [];
-    let convFailed = false;
-    for (const line of u.lines) {
-      const hash = hashFor(line.voice, line.text);
-      const cached = cacheUrlByHash.get(hash);
-      if (cached) {
-        lines.push({
-          speaker: line.speaker,
-          text: line.text,
-          voice: line.voice,
-          hash,
-          audioUrl: cached,
-          cacheHit: true,
-        });
-        reused += 1;
-        continue;
-      }
-      try {
-        const res = await synthesizeSpeech({
-          supabase,
-          script: line.text,
-          voiceId: line.voice,
-          speed: SPEED,
-        });
-        lines.push({
-          speaker: line.speaker,
-          text: line.text,
-          voice: line.voice,
-          hash,
-          audioUrl: res.audioUrl,
-          cacheHit: res.cacheHit,
-        });
-        if (res.cacheHit) reused += 1;
-        else {
-          generated += 1;
-          generatedChars += line.text.length;
-        }
-      } catch (err) {
-        convFailed = true;
-        const msg = err instanceof Error ? err.message : String(err);
-        if (!firstError) firstError = msg;
-        console.error(
-          `[ai.lesson-tts] conv line failed | conv=${u.key} | voice=${line.voice} | text="${line.text.slice(0, 40)}…" | error:`,
-          msg,
-        );
-        break;
-      }
-    }
-    if (!convFailed && lines.length > 0) {
-      entries.push({ kind: "conversation", key: u.key, lines });
-    }
+    const msg =
+      result.reason instanceof Error
+        ? result.reason.message
+        : String(result.reason);
+    if (!firstError) firstError = msg;
+    console.error(
+      `[ai.lesson-tts] clip failed | voice=${clip.voice} | text="${clip.text.slice(0, 40)}…" | error:`,
+      msg,
+    );
   }
+
+  const { entries, withAudio, missing } = assembleEntries(
+    units,
+    urlByHash,
+    freshHashes,
+  );
+  const generated = freshHashes.size;
+  const reused = withAudio - generated;
 
   const latencyMs = Date.now() - startedAt;
   console.log(
-    `[ai.lesson-tts] lesson=${lessonId} | entries=${entries.length} | generated=${generated} | reused=${reused} | chars=${generatedChars} | latency=${latencyMs}ms`,
+    `[ai.lesson-tts] lesson=${lessonId} | entries=${entries.length} | generated=${generated} | reused=${reused} | missing=${missing} | chars=${generatedChars} | latency=${latencyMs}ms`,
   );
 
   await logLessonTtsTelemetry(supabase, {
@@ -704,5 +696,5 @@ export const synthesizeLessonAudio = async (
     error: firstError,
   });
 
-  return { entries, generated, reused };
+  return { entries, generated, reused, missing };
 };

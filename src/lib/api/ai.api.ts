@@ -131,6 +131,7 @@ export interface LessonAudioResponse {
   entries: LessonAudioEntry[];
   generated: number;
   reused: number;
+  missing: number;
 }
 
 export interface GradeAttemptInput {
